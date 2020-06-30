@@ -172,9 +172,7 @@ sub parse {
 
     RULE: {
         foreach my $rule (@{$self->{rules}}) {
-            my $result = $rule->($self);
-
-            if (defined $result) {
+            if (defined (my $result = $rule->($self))) {
                 push @results, $result;
                 redo RULE;
             }

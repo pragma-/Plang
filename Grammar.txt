@@ -1,4 +1,4 @@
-# generated via `grep Grammar plang > Grammar.txt`
+# generated via `grep Grammar Grammar.pm > Grammar.txt`
 
 # Grammar: Program --> Statement(s)
 # Grammar: Statement --> Expression TERM | TERM

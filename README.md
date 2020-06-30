@@ -10,7 +10,7 @@ Here's what you can do so far:
 <!-- -->
     $ ./plang <<< '1 * 2 + (3 * 4)'        # complex expressions
 <!-- -->
-    $ ./plang -dumptokens < test/lexer_input.txt  # test the lexer
+    $ ./plang --dumptokens < test/lexer_input.txt  # test the lexer
 
 ## Debugging
 You can set the `DEBUG` environment variable to enable debugging output.
