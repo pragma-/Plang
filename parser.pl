@@ -64,12 +64,6 @@ sub multiline_comment {
     }
 }
 
-# iterates over lines of standard input
-my $input_iter = sub { <STDIN> };
-
-# iterates over tokens returned by lexer
-my $token_iter = $lexer->tokens($input_iter);
-
 # Grammar: DumpToken --> *
 sub DumpToken {
     my ($parser) = @_;
@@ -269,6 +263,12 @@ sub Program {
 
     return @statements ? ['PRGM', \@statements] : undef;
 }
+
+# iterates over lines of standard input
+my $input_iter = sub { <STDIN> };
+
+# iterates over tokens returned by lexer
+my $token_iter = $lexer->tokens($input_iter);
 
 # our parser and its token iterator
 my $parser = Parser->new(token_iter => $token_iter);
