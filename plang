@@ -173,7 +173,7 @@ sub Expression {
             $parser->advance;
             return ['ADD', $term, $expression];
         } else {
-            my $token = $parser->{read_tokens}->[$parser->{current_position}];
+            my $token = $parser->current_token;
             $token = defined $token ? $token->[0] : 'EOF';
             print "Expected Expression but got $token\n";
         }

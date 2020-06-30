@@ -30,65 +30,69 @@ sub initialize {
     }
 
     $self->{read_tokens} = [];
-    $self->{current_position} = 0;
-    $self->{saved_positions} = [];
+    $self->{current_token} = 0;
+    $self->{backtrack} = [];
 
     my $rules = [];
 }
 
+# try a rule (pushes the current token index onto the backtrack)
 sub try {
     my ($self) = @_;
-    push @{$self->{saved_positions}}, $self->{current_position};
+    push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
-        my $count = @{$self->{saved_positions}};
-        $self->{dprint}->(2, "[$count] saving posiition $self->{current_position}: ");
+        my $count = @{$self->{backtrack}};
+        $self->{dprint}->(2, "[$count] saving posiition $self->{current_token}: ");
 
-        my $token = $self->{read_tokens}->[$self->{current_position}];
+        my $token = $self->{read_tokens}->[$self->{current_token}];
         print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 2;
         print "\n" if not defined $token and $self->{debug} >= 2;
 
     }
 }
 
+# backtrack to the previous try point
 sub backtrack {
     my ($self) = @_;
-    $self->{current_position} = pop @{$self->{saved_positions}};
+    $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
-        my $count = @{$self->{saved_positions}};
-        $self->{dprint}->(2, "[$count] backtracking to position $self->{current_position}: ");
+        my $count = @{$self->{backtrack}};
+        $self->{dprint}->(2, "[$count] backtracking to position $self->{current_token}: ");
 
-        my $token = $self->{read_tokens}->[$self->{current_position}];
+        my $token = $self->{read_tokens}->[$self->{current_token}];
         print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 2;
         print "\n" if not defined $token and $self->{debug} >= 2;
     }
 }
 
+# advance to the next rule (pops and discards one backtrack)
+sub advance {
+    my ($self) = @_;
+    pop @{$self->{backtrack}};
+
+    if ($self->{debug}) {
+        my $count = @{$self->{backtrack}};
+        $self->{dprint}->(2, "[$count] popped a backtrack\n");
+    }
+}
+
+# alternate to another variant (backtrack and try another variant)
 sub alternate {
     my ($self) = @_;
     $self->backtrack;
     $self->try;
 }
 
-sub advance {
+# consumes the current token
+sub consume {
     my ($self) = @_;
-    pop @{$self->{saved_positions}};
-
-    if ($self->{debug}) {
-        my $count = @{$self->{saved_positions}};
-        $self->{dprint}->(2, "[$count] popped a backtrack\n");
-    }
+    $self->{current_token}++;
 }
 
-sub terminal {
-    my ($self) = @_;
-    $self->{dprint}->(2, "discarding backtrack\n");
-    $self->{read_tokens} = [];
-    $self->{saved_positions} = [];
-    $self->{current_token} = 0;
-}
-
+# gets the next token from the token iterator
+# if the first argument is 'peek' then the token will be returned unconsumed
 sub next_token {
     my ($self, $opt) = @_;
 
@@ -102,7 +106,7 @@ sub next_token {
     NEXT_TOKEN: {
         if ($opt eq 'peek') {
             # return token if we've already peeked a token
-            $token = $self->{read_tokens}->[$self->{current_position}];
+            $token = $self->{read_tokens}->[$self->{current_token}];
             print "peeked existing: [$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
             return $token if defined $token;
         }
@@ -123,11 +127,18 @@ sub next_token {
     push @{$self->{read_tokens}}, $token;
 
     # consume token unless we're just peeking
-    $self->{current_position}++ unless $opt eq 'peek';
+    $self->consume unless $opt eq 'peek';
 
-    print "[$token->[0], ", $self->{clean}->($token->[1]), "], position: $self->{current_position}\n" if $self->{debug} >= 5;
+    print "[$token->[0], ", $self->{clean}->($token->[1]), "], position: $self->{current_token}\n" if $self->{debug} >= 5;
 
     return $token;
+}
+
+# gets the current token from the backtrack
+# next_token() must be invoked sometime beforehand
+sub current_token {
+    my ($self) = @_;
+    return $self->{read_tokens}->[$self->{current_token}];
 }
 
 sub upcoming {
@@ -141,7 +152,7 @@ sub upcoming {
 
     if ($token->[0] eq $expected) {
         print "got it (", $self->{clean}->($token->[1]), ")\n" if $self->{debug};
-        $self->{current_position}++;
+        $self->consume;
         return $token;
     } else {
         print "got $token->[0]\n" if $self->{debug};
