@@ -18,6 +18,7 @@ use Parser;
 my $lexer = Lexer->new;
 
 # define the tokens our lexer will recognize
+# (this table is quite incomplete and will be fleshed out as the language progresses)
 $lexer->define_tokens(
   # [ TOKEN_TYPE,      MATCH REGEX,    OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
     ['COMMENT_EOL',    qr{\G(   (?://|\#).*$        )}x,  sub {''}],
