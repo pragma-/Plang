@@ -1,0 +1,26 @@
+int main(void) {
+   int i = 42;
+   char c = 'b';  // this is a 'single quoted' literal
+   char *s = "cat";
+
+   i++; // increment "i" by one
+
+   puts("string /* with comment */");
+
+   /* "comment with string" */
+
+   printf("\"i\" = %d, c = '%c'%c", i, c, '\n');
+
+   /* one
+      two */
+
+   float/* test */j = 42;
+
+  /*******************
+   * here we return  *
+   * the value for a *
+   * successful exit *
+   *******************/
+
+   return EXIT_SUCCESS;
+}

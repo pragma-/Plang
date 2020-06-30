@@ -1,0 +1,99 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+
+package Lexer;
+
+sub new {
+    my ($proto, %conf) = @_;
+    my $class = ref($proto) || $proto;
+    my $self  = bless {}, $class;
+    $self->initialize(%conf);
+    return $self;
+}
+
+sub initialize {
+    my ($self, %conf) = @_;
+
+    $self->{tokentypes} = [];
+}
+
+# define our tokentypes
+sub define_tokens {
+    my $self = shift;
+
+    $self->{tokentypes} = [];
+
+    foreach my $arg (@_) {
+        push @{$self->{tokentypes}}, $arg;
+    }
+}
+
+# append new tokentypes
+sub add_token {
+    my ($self, $tokentype) = @_;
+    push @{$self->{tokentypes}}, $tokentype;
+}
+
+sub tokens {
+    my ($self, $input, $tokentypes) = @_;
+
+    # allow overriding list of tokentypes and matchers
+    $tokentypes ||= $self->{tokentypes};
+
+    # the current line being lexed
+    my $text;
+
+    # closures are neat
+    return sub {
+        while (1) {
+            # get next line if we don't have a line
+            $text = $input->() if not defined $text;
+
+            # all done when there's no more input
+            return undef if not defined $text;
+
+            LOOP: {
+
+                # go through each tokentype
+                foreach my $tokentype (@$tokentypes) {
+                    # does this bit of text match this tokentype?
+                    if ($text =~ /$tokentype->[1]/gc) {
+                        # got a token
+                        my $literal = $1;
+
+                        # do we have a specific function to continue lexing this token?
+                        if (defined $tokentype->[3]) {
+                            my $token = $tokentype->[3]->($input, \$text, $tokentype->[0], $literal, $tokentype->[2]);
+                            if (defined $token and (ref $token and length $token->[1]) or not length $token) {
+                                return $token;
+                            } else {
+                                redo LOOP;
+                            }
+                        }
+
+                        # do we have a specific function to build this token?
+                        if (defined $tokentype->[2]) {
+                            my $token = $tokentype->[2]->();
+
+                            # is this token ignored?
+                            redo LOOP if not ref $token or not length $token->[1];
+
+                            # return built token
+                            return $token;
+                        }
+
+                        # return this token
+                        return [ $tokentype->[0], $literal ];
+                    }
+                }
+
+                # end of this input
+                $text = undef;
+            }
+        }
+    }
+}
+
+1;
