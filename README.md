@@ -8,7 +8,7 @@ Here's what you can do so far:
 
     $ ./plang <<< '1 + 2; 3 * 4; 5 - 6;'   # statements
 <!-- -->
-    $ ./plang <<< '1 + 2 * (3 * 4)'        # complex expressions
+    $ ./plang <<< '1 * 2 + (3 * 4)'        # complex expressions
 <!-- -->
     $ ./plang -dumptokens < test/lexer_input.txt  # test the lexer
 
