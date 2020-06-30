@@ -8,9 +8,6 @@ BEGIN {
     unshift @INC, '.';
 }
 
-# convenient data structure printer
-use Data::Dumper;
-
 use Lexer;
 use Parser;
 
@@ -286,5 +283,6 @@ if (grep { $_ eq '-dumptokens' } @ARGV) {
 my $result = $parser->parse;
 
 # dump the $result data structure
+use Data::Dumper;
 $Data::Dumper::Terse = 1;
 print Dumper $result;
