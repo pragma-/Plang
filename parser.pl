@@ -3,10 +3,12 @@
 use warnings;
 use strict;
 
+# allow loading .pm modules from the current directory
 BEGIN {
     unshift @INC, '.';
 }
 
+# convenient data structure printer
 use Data::Dumper;
 
 use Lexer;
@@ -94,9 +96,7 @@ sub Factor {
     $parser->{dprint}->(1, "Factor alternate: NUM\n");
     $parser->alternate;
 
-    my $token;
-
-    if ($token = $parser->upcoming('NUM')) {
+    if (my $token = $parser->upcoming('NUM')) {
         $parser->{indent}--;
         $parser->{dprint}->(1, "<- Factor (NUM)\n");
         $parser->advance;
