@@ -15,13 +15,16 @@ use Grammar qw/Program/;
 # our lexer
 my $lexer = Lexer->new;
 
+# ignore and discard token
+sub ignore {}
+
 # define the tokens our lexer will recognize
 # (this table is quite incomplete and will be fleshed out as the language progresses)
 $lexer->define_tokens(
   # [ TOKEN_TYPE,      MATCH REGEX,    OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
-    ['COMMENT_EOL',    qr{\G(   (?://|\#).*$        )}x,  sub {''}],
-    ['COMMENT_INLINE', qr{\G(   /\* .*? \*/         )}x,  sub {''}],
-    ['COMMENT_MULTI',  qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  sub {''}, sub { multiline_comment(@_) }],
+    ['COMMENT_EOL',    qr{\G(   (?://|\#).*$        )}x,  \&ignore],
+    ['COMMENT_INLINE', qr{\G(   /\* .*? \*/         )}x,  \&ignore],
+    ['COMMENT_MULTI',  qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  \&ignore, sub { multiline_comment(@_) }],
     ['DQUOTE_STRING',  qr{\G(   "(?:[^"\\]|\\.)*"   )}x],
     ['SQUOTE_STRING',  qr{\G(   '(?:[^'\\]|\\.)*'   )}x],
     ['EQ_EQ',          qr{\G(   ==                  )}x],
@@ -39,7 +42,7 @@ $lexer->define_tokens(
     ['NUM',            qr{\G(   [0-9.]+             )}x],
     ['IDENT',          qr{\G(   [A-Za-z_]\w*        )}x],
     ['TERM',           qr{\G(   ;\n* | \n+          )}x],
-    ['WHITESPACE',     qr{\G(   \s+                 )}x,  sub {''}],
+    ['WHITESPACE',     qr{\G(   \s+                 )}x,  \&ignore],
     ['OTHER',          qr{\G(   .                   )}x],
 );
 
