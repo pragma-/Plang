@@ -142,15 +142,15 @@ sub current_token {
 }
 
 sub upcoming {
-    my ($self, $expected) = @_;
+    my ($self, $wanted) = @_;
 
     my $token = $self->next_token('peek');
 
     return undef if not defined $token;
 
-    $self->{dprint}->(1, "Looking for $expected... ");
+    $self->{dprint}->(1, "Looking for $wanted... ");
 
-    if ($token->[0] eq $expected) {
+    if ($token->[0] eq $wanted) {
         print "got it (", $self->{clean}->($token->[1]), ")\n" if $self->{debug};
         $self->consume;
         return $token;
@@ -158,24 +158,6 @@ sub upcoming {
         print "got $token->[0]\n" if $self->{debug};
         return undef;
     }
-}
-
-sub expect {
-    my ($self, $expected) = @_;
-
-    my $token = $self->next_token('peek');
-
-    if (not defined $token) {
-        print "Expected $expected but got EOF\n";
-        return 0;
-    }
-
-    if ($token->[0] ne $expected) {
-        print "Expected $expected but got $token->[0]\n";
-        return 0;
-    }
-
-    return 1;
 }
 
 sub add_rule {
