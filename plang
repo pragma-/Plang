@@ -66,87 +66,67 @@ sub multiline_comment {
     }
 }
 
-# Grammar: DumpToken --> *
-sub DumpToken {
-    my ($parser) = @_;
-    return $parser->next_token;
-}
-
-# Grammar: Factor --> L_PAREN Expression R_PAREN | NUM
-sub Factor {
+# Grammar: Program --> Statement(s)
+sub Program {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Factor\n");
+    $parser->{dprint}->(1, "+-> Program");
     $parser->{indent}++;
 
-    $parser->{dprint}->(1,"Factor: L_PAREN Expression R_PAREN\n");
-    $parser->try;
+    my @statements;
 
-    if ($parser->upcoming('L_PAREN')) {
-        my $expression = Expression($parser);
+    while (1) {
+        $parser->{dprint}->(1, "Program: Statement \n");
+        $parser->try;
 
-        if ($expression and $parser->upcoming('R_PAREN')) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Factor (L_PAREN Expression R_PAREN)\n");
+        my $statement = Statement($parser);
+
+        if ($statement) {
             $parser->advance;
-            return $expression;
+            push @statements, $statement;
+        } else {
+            $parser->backtrack;
+            last;
         }
     }
 
-    $parser->{dprint}->(1, "Factor alternate: NUM\n");
-    $parser->alternate;
-
-    if (my $token = $parser->upcoming('NUM')) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Factor (NUM)\n");
-        $parser->advance;
-        return $token;
-    }
-
     $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Factor fail\n");
+    $parser->{dprint}->(1, "<- Program (Statement)\n");
 
-    $parser->backtrack;
-    return undef;
+    return @statements ? ['PRGM', \@statements] : undef;
 }
 
-# Grammar: Term --> Factor STAR Term | Factor
-sub Term {
+# Grammar: Statement --> Expression TERM | TERM
+sub Statement {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Term\n");
+    $parser->{dprint}->(1, "+-> Statement");
     $parser->{indent}++;
 
-    $parser->{dprint}->(1, "Term: Factor STAR Term\n");
+    $parser->{dprint}->(1, "Statement: Expression TERM\n");
     $parser->try;
 
-    my $factor = Factor($parser);
+    my $expression = Expression($parser);
 
-    if ($factor and $parser->upcoming('STAR')) {
-        my $term = Term($parser);
-
-        if (defined $term) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Term (Factor STAR Term)\n");
-            $parser->advance;
-            return ['MUL', $factor, $term];
-        }
+    if ($expression and $parser->upcoming('TERM')) {
+        $parser->{indent}--;
+        $parser->{dprint}->(1, "<- Statement (Expression TERM)\n");
+        $parser->advance;
+        return ['STMT', $expression];
     }
 
-    $parser->{dprint}->(1, "Term alternate: Factor\n");
+    $parser->{dprint}->(1, "Statement alternate: TERM\n");
     $parser->alternate;
 
-    $factor = Factor($parser);
-
-    if (defined $factor) {
+    if ($parser->upcoming('TERM')) {
         $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Term (Factor)\n");
+        $parser->{dprint}->(1, "<- Statement (TERM)\n");
         $parser->advance;
-        return $factor;
+        return ['STMT', ''];
     }
 
     $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Term fail\n");
+    $parser->{dprint}->(1, "<- Statement fail\n");
 
     $parser->backtrack;
     return undef;
@@ -198,70 +178,90 @@ sub Expression {
     return undef;
 }
 
-# Grammar: Statement --> Expression TERM | TERM
-sub Statement {
+# Grammar: Term --> Factor STAR Term | Factor
+sub Term {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Statement");
+    $parser->{dprint}->(1, "+-> Term\n");
     $parser->{indent}++;
 
-    $parser->{dprint}->(1, "Statement: Expression TERM\n");
+    $parser->{dprint}->(1, "Term: Factor STAR Term\n");
     $parser->try;
 
-    my $expression = Expression($parser);
+    my $factor = Factor($parser);
 
-    if ($expression and $parser->upcoming('TERM')) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Statement (Expression TERM)\n");
-        $parser->advance;
-        return ['STMT', $expression];
+    if ($factor and $parser->upcoming('STAR')) {
+        my $term = Term($parser);
+
+        if (defined $term) {
+            $parser->{indent}--;
+            $parser->{dprint}->(1, "<- Term (Factor STAR Term)\n");
+            $parser->advance;
+            return ['MUL', $factor, $term];
+        }
     }
 
-    $parser->{dprint}->(1, "Statement alternate: TERM\n");
+    $parser->{dprint}->(1, "Term alternate: Factor\n");
     $parser->alternate;
 
-    if ($parser->upcoming('TERM')) {
+    $factor = Factor($parser);
+
+    if (defined $factor) {
         $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Statement (TERM)\n");
+        $parser->{dprint}->(1, "<- Term (Factor)\n");
         $parser->advance;
-        return ['STMT', ''];
+        return $factor;
     }
 
     $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Statement fail\n");
+    $parser->{dprint}->(1, "<- Term fail\n");
 
     $parser->backtrack;
     return undef;
 }
 
-# Grammar: Program --> Statement(s)
-sub Program {
+# Grammar: Factor --> L_PAREN Expression R_PAREN | NUM
+sub Factor {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Program");
+    $parser->{dprint}->(1, "+-> Factor\n");
     $parser->{indent}++;
 
-    my @statements;
+    $parser->{dprint}->(1,"Factor: L_PAREN Expression R_PAREN\n");
+    $parser->try;
 
-    while (1) {
-        $parser->{dprint}->(1, "Program: Statement \n");
-        $parser->try;
+    if ($parser->upcoming('L_PAREN')) {
+        my $expression = Expression($parser);
 
-        my $statement = Statement($parser);
-
-        if ($statement) {
+        if ($expression and $parser->upcoming('R_PAREN')) {
+            $parser->{indent}--;
+            $parser->{dprint}->(1, "<- Factor (L_PAREN Expression R_PAREN)\n");
             $parser->advance;
-            push @statements, $statement;
-        } else {
-            $parser->backtrack;
-            last;
+            return $expression;
         }
     }
 
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Program (Statement)\n");
+    $parser->{dprint}->(1, "Factor alternate: NUM\n");
+    $parser->alternate;
 
-    return @statements ? ['PRGM', \@statements] : undef;
+    if (my $token = $parser->upcoming('NUM')) {
+        $parser->{indent}--;
+        $parser->{dprint}->(1, "<- Factor (NUM)\n");
+        $parser->advance;
+        return $token;
+    }
+
+    $parser->{indent}--;
+    $parser->{dprint}->(1, "<- Factor fail\n");
+
+    $parser->backtrack;
+    return undef;
+}
+
+# Grammar: DumpToken --> *
+sub DumpToken {
+    my ($parser) = @_;
+    return $parser->next_token;
 }
 
 # iterates over lines of standard input
@@ -276,9 +276,9 @@ my $parser = Parser->new(token_iter => $token_iter);
 # if -dumptokens was specified on command-line, use the DumpToken rule
 # otherwise use the Program rule
 if (grep { $_ eq '-dumptokens' } @ARGV) {
-    $parser->add_rule(\&DumpToken);
+    $parser->add_rule(\&DumpToken); # simply prints all the tokens as a flat list
 } else {
-    $parser->add_rule(\&Program);
+    $parser->add_rule(\&Program);   # generates an abstract syntax tree for a plang program
 }
 
 # parse the input into $result
