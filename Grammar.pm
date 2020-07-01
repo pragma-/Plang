@@ -97,8 +97,14 @@ sub Expression {
             return ['ADD', $term, $expression];
         } else {
             my $token = $parser->current_token;
-            $token = defined $token ? $token->[0] : 'EOF';
-            print "Expected Expression but got $token\n";
+            if (defined $token) {
+                my $name = $token->[0];
+                my $line = $token->[2]->{line};
+                my $col  = $token->[2]->{col};
+                $parser->add_diagnostic("Expected Expression but got $name on line $line, col $col");
+            } else {
+                $parser->add_diagnostic("Expected Expression but got EOF");
+            }
         }
     }
 
@@ -191,7 +197,7 @@ sub Factor {
         $parser->{indent}--;
         $parser->{dprint}->(1, "<- Factor (NUM)\n");
         $parser->advance;
-        return $token;
+        return [ $token->[0], $token->[1] ];
     }
 
     $parser->{indent}--;

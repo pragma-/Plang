@@ -17,6 +17,8 @@ sub initialize {
     my ($self, %conf) = @_;
 
     $self->{tokentypes} = [];
+    $self->{line} = 0;
+    $self->{col}  = 0;
 }
 
 # define our tokentypes
@@ -49,7 +51,7 @@ sub tokens {
     return sub {
         while (1) {
             # get next line if we don't have a line
-            $text = $input->() if not defined $text;
+            $self->{line}++, $text = $input->() if not defined $text;
 
             # all done when there's no more input
             return undef if not defined $text;
@@ -63,9 +65,12 @@ sub tokens {
                         # got a token
                         my $literal = $1;
 
+                        $self->{col} = pos ($text) + 1;
+                        $self->{col} -= length $literal;
+
                         # do we have a specific function to continue lexing this token?
                         if (defined $tokentype->[3]) {
-                            my $token = $tokentype->[3]->($input, \$text, $tokentype->[0], $literal, $tokentype->[2]);
+                            my $token = $tokentype->[3]->($self, $input, \$text, $tokentype->[0], $literal, $tokentype->[2]);
                             if (defined $token and (ref $token and length $token->[1]) or not length $token) {
                                 return $token;
                             } else {
@@ -85,7 +90,14 @@ sub tokens {
                         }
 
                         # return this token
-                        return [ $tokentype->[0], $literal ];
+                        return [
+                            $tokentype->[0],
+                            $literal,
+                            {
+                                line    => $self->{line},
+                                col     => $self->{col},
+                            }
+                        ];
                     }
                 }
 

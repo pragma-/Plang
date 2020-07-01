@@ -16,7 +16,7 @@ use Grammar qw/Program/;
 my $lexer = Lexer->new;
 
 # discard token
-sub discard {}
+sub discard {''}
 
 # define the tokens our lexer will recognize
 # (this table is quite incomplete and will be fleshed out as the language progresses)
@@ -48,10 +48,10 @@ $lexer->define_tokens(
 
 # sub-lexer for a multi-line comment token
 sub multiline_comment {
-    my ($input, $text, $tokentype, $buf, $tokenbuilder) = @_;
+    my ($lexer, $input, $text, $tokentype, $buf, $tokenbuilder) = @_;
 
     while (1) {
-        $$text = $input->() if not defined $$text;
+        $lexer->{line}++, $$text = $input->() if not defined $$text;
 
         if (not defined $$text) {
             return defined $tokenbuilder ? $tokenbuilder->() : [$tokentype, $buf];
@@ -93,6 +93,17 @@ if (grep { $_ eq '--dumptokens' } @ARGV) {
 
 # parse the input into $result
 my $result = $parser->parse;
+
+my $err_count = @{$parser->{diagnostics}};
+
+if ($err_count) {
+    foreach my $diagnostic (@{$parser->{diagnostics}}) {
+        print STDERR $diagnostic, "\n";
+    }
+
+    print STDERR "$err_count error", $err_count == 1 ? '' : 's', ".\n";
+    exit 1;
+}
 
 # dump the $result data structure
 use Data::Dumper;

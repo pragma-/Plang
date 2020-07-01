@@ -33,7 +33,9 @@ sub initialize {
     $self->{current_token} = 0;
     $self->{backtrack} = [];
 
-    my $rules = [];
+    $self->{diagnostics} = [];
+
+    $self->{rules} = [];
 }
 
 # try a rule (pushes the current token index onto the backtrack)
@@ -163,6 +165,11 @@ sub upcoming {
 sub add_rule {
     my ($self, $rule) = @_;
     push @{$self->{rules}}, $rule;
+}
+
+sub add_diagnostic {
+    my ($self, $text) = @_;
+    push @{$self->{diagnostics}}, $text;
 }
 
 sub parse {
