@@ -9,27 +9,49 @@ use base 'Exporter';
 our @EXPORT_OK = qw/Program/;
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 
+sub expected {
+    my ($parser, $expected) = @_;
+
+    my $token = $parser->current_token;
+
+    if (defined $token) {
+        my $name = "$token->[0] ($token->[1])";
+        my $line = $token->[2]->{line};
+        my $col  = $token->[2]->{col};
+        $parser->add_diagnostic("Expected $expected but got $name on line $line, col $col");
+    } else {
+        $parser->add_diagnostic("Expected $expected but got EOF");
+    }
+
+    $parser->consume_to('TERM');
+    $parser->rewrite_backtrack;
+    $parser->{got_error} = 1;
+}
+
 # Grammar: Program --> Statement(s)
 sub Program {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Program");
+    $parser->{dprint}->(1, "+-> Program\n");
     $parser->{indent}++;
 
     my @statements;
 
-    while (1) {
-        $parser->{dprint}->(1, "Program: Statement \n");
+    while (defined $parser->next_token('peek')) {
+        $parser->{dprint}->(1, "Program: Statement\n");
         $parser->try;
 
+        $parser->{dprint}->(3, "Error cleared\n");
+        $parser->{got_error} = 0;
+
         my $statement = Statement($parser);
+        next if $parser->errored;
 
         if ($statement) {
             $parser->advance;
             push @statements, $statement;
         } else {
             $parser->backtrack;
-            last;
         }
     }
 
@@ -43,29 +65,38 @@ sub Program {
 sub Statement {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Statement");
+    $parser->{dprint}->(1, "+-> Statement\n");
     $parser->{indent}++;
 
     $parser->{dprint}->(1, "Statement: Expression TERM\n");
     $parser->try;
 
     my $expression = Expression($parser);
+    return undef if $parser->errored;
 
-    if ($expression and $parser->upcoming('TERM')) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Statement (Expression TERM)\n");
-        $parser->advance;
-        return ['STMT', $expression];
+    if ($expression) {
+        if ($parser->consume('TERM')) {
+            $parser->{indent}--;
+            $parser->{dprint}->(1, "<- Statement (Expression TERM)\n");
+            $parser->advance;
+            return ['STMT', $expression];
+        } else {
+            expected($parser, 'TERM');
+            return undef;
+        }
     }
 
     $parser->{dprint}->(1, "Statement alternate: TERM\n");
     $parser->alternate;
 
-    if ($parser->upcoming('TERM')) {
+    if ($parser->consume('TERM')) {
         $parser->{indent}--;
         $parser->{dprint}->(1, "<- Statement (TERM)\n");
         $parser->advance;
         return ['STMT', ''];
+    } else {
+        expected($parser, 'TERM');
+        return undef;
     }
 
     $parser->{indent}--;
@@ -86,9 +117,11 @@ sub Expression {
     $parser->try;
 
     my $term = Term($parser);
+    return undef if $parser->errored;
 
-    if ($term and $parser->upcoming('PLUS')) {
+    if ($term and $parser->consume('PLUS')) {
         my $expression = Expression($parser);
+        return undef if $parser->errored;
 
         if (defined $expression) {
             $parser->{indent}--;
@@ -96,15 +129,8 @@ sub Expression {
             $parser->advance;
             return ['ADD', $term, $expression];
         } else {
-            my $token = $parser->current_token;
-            if (defined $token) {
-                my $name = $token->[0];
-                my $line = $token->[2]->{line};
-                my $col  = $token->[2]->{col};
-                $parser->add_diagnostic("Expected Expression but got $name on line $line, col $col");
-            } else {
-                $parser->add_diagnostic("Expected Expression but got EOF");
-            }
+            expected($parser, 'Expression');
+            return undef;
         }
     }
 
@@ -112,6 +138,7 @@ sub Expression {
     $parser->alternate;
 
     $term = Term($parser);
+    return undef if $parser->errored;
 
     if (defined $term) {
         $parser->{indent}--;
@@ -138,15 +165,20 @@ sub Term {
     $parser->try;
 
     my $factor = Factor($parser);
+    return undef if $parser->errored;
 
-    if ($factor and $parser->upcoming('STAR')) {
+    if ($factor and $parser->consume('STAR')) {
         my $term = Term($parser);
+        return undef if $parser->errored;
 
         if (defined $term) {
             $parser->{indent}--;
             $parser->{dprint}->(1, "<- Term (Factor STAR Term)\n");
             $parser->advance;
             return ['MUL', $factor, $term];
+        } else {
+            expected($parser, 'Term');
+            return undef;
         }
     }
 
@@ -154,6 +186,7 @@ sub Term {
     $parser->alternate;
 
     $factor = Factor($parser);
+    return undef if $parser->errored;
 
     if (defined $factor) {
         $parser->{indent}--;
@@ -179,10 +212,11 @@ sub Factor {
     $parser->{dprint}->(1,"Factor: L_PAREN Expression R_PAREN\n");
     $parser->try;
 
-    if ($parser->upcoming('L_PAREN')) {
+    if ($parser->consume('L_PAREN')) {
         my $expression = Expression($parser);
+        return undef if $parser->errored;
 
-        if ($expression and $parser->upcoming('R_PAREN')) {
+        if ($expression and $parser->consume('R_PAREN')) {
             $parser->{indent}--;
             $parser->{dprint}->(1, "<- Factor (L_PAREN Expression R_PAREN)\n");
             $parser->advance;
@@ -193,7 +227,7 @@ sub Factor {
     $parser->{dprint}->(1, "Factor alternate: NUM\n");
     $parser->alternate;
 
-    if (my $token = $parser->upcoming('NUM')) {
+    if (my $token = $parser->consume('NUM')) {
         $parser->{indent}--;
         $parser->{dprint}->(1, "<- Factor (NUM)\n");
         $parser->advance;

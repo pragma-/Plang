@@ -69,6 +69,19 @@ sub backtrack {
     }
 }
 
+sub errored {
+    my ($self) = @_;
+
+    if ($self->{got_error}) {
+        $self->{dprint}->(1, "Got error.\n");
+        $self->{indent}--;
+        $self->advance;
+        return 1;
+    }
+
+    return 0;
+}
+
 # advance to the next rule (pops and discards one backtrack)
 sub advance {
     my ($self) = @_;
@@ -85,12 +98,6 @@ sub alternate {
     my ($self) = @_;
     $self->backtrack;
     $self->try;
-}
-
-# consumes the current token
-sub consume {
-    my ($self) = @_;
-    $self->{current_token}++;
 }
 
 # gets the next token from the token iterator
@@ -136,15 +143,22 @@ sub next_token {
     return $token;
 }
 
-# gets the current token from the backtrack
-# next_token() must be invoked sometime beforehand
+# gets the current token from the backtrack without consuming it
+# next_token() must have been invoked at least once
 sub current_token {
     my ($self) = @_;
     return $self->{read_tokens}->[$self->{current_token}];
 }
 
-sub upcoming {
+# if no arguments passed, consumes the current token
+# otherwise, consumes and returns token only if token matches argument
+sub consume {
     my ($self, $wanted) = @_;
+
+    if (not defined $wanted) {
+        $self->{current_token}++;
+        return;
+    }
 
     my $token = $self->next_token('peek');
 
@@ -154,24 +168,61 @@ sub upcoming {
 
     if ($token->[0] eq $wanted) {
         print "got it (", $self->{clean}->($token->[1]), ")\n" if $self->{debug};
-        $self->consume;
+        $self->{current_token}++;
         return $token;
-    } else {
-        print "got $token->[0]\n" if $self->{debug};
-        return undef;
+    }
+
+    print "got $token->[0] instead\n" if $self->{debug};
+    return undef;
+}
+
+# consumes and discards tokens until target is reached,
+# whereupon target is consumed as well
+sub consume_to {
+    my ($self, $target) = @_;
+
+    $self->{dprint}->(1, "Consuming until $target\n");
+
+    while (1) {
+        my $token = $self->next_token('peek');
+
+        $self->{dprint}->(1, "Peeked EOF\n") if not defined $token;
+        return if not defined $token;
+
+        $self->{dprint}->(1, "Consumed $token->[0] at position $self->{current_token}\n");
+        $self->consume;
+
+        if ($token->[0] eq $target) {
+            $self->{dprint}->(1, "Got target.\n");
+            return;
+        }
     }
 }
 
+# rewrites the backtrack to the current token position
+sub rewrite_backtrack {
+    my ($self) = @_;
+
+    foreach my $backtrack (@{$self->{backtrack}}) {
+        $backtrack = $self->{current_token};
+    }
+}
+
+# add a diagnostic message
+sub add_diagnostic {
+    my ($self, $text) = @_;
+    push @{$self->{diagnostics}}, $text;
+
+    $self->{dprint}->(1, "Added diagnostic: $text\n");
+}
+
+# add a rule to the parser engine
 sub add_rule {
     my ($self, $rule) = @_;
     push @{$self->{rules}}, $rule;
 }
 
-sub add_diagnostic {
-    my ($self, $text) = @_;
-    push @{$self->{diagnostics}}, $text;
-}
-
+# parse the rules
 sub parse {
     my ($self) = @_;
 
