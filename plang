@@ -83,7 +83,7 @@ my $token_iter = $lexer->tokens($input_iter);
 # our parser and its token iterator
 my $parser = Parser->new(token_iter => $token_iter);
 
-# if -dumptokens was specified on command-line, use the DumpToken rule
+# if --dumptokens was specified on command-line, use the DumpToken rule
 # otherwise use the Program rule
 if (grep { $_ eq '--dumptokens' } @ARGV) {
     $parser->add_rule(\&DumpToken); # generates all the tokens as a flat list
