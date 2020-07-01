@@ -18,7 +18,7 @@ sub expected {
         my $name = "$token->[0] ($token->[1])";
         my $line = $token->[2]->{line};
         my $col  = $token->[2]->{col};
-        $parser->add_diagnostic("Expected $expected but got $name on line $line, col $col");
+        $parser->add_diagnostic("Expected $expected but got $name at line $line, col $col");
     } else {
         $parser->add_diagnostic("Expected $expected but got EOF");
     }
