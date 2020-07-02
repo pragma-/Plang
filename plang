@@ -85,8 +85,10 @@ my $parser = Parser->new(token_iter => $token_iter);
 
 # if --dumptokens was specified on command-line, use the DumpToken rule
 # otherwise use the Program rule
+my $dumptokens = 0;
 if (grep { $_ eq '--dumptokens' } @ARGV) {
     $parser->add_rule(\&DumpToken); # generates all the tokens as a flat list
+    $dumptokens = 1;
 } else {
     $parser->add_rule(\&Program);   # generates an abstract syntax tree for a plang program
 }
@@ -105,3 +107,10 @@ if (my $count = @{$parser->{errors}}) {
 use Data::Dumper;
 $Data::Dumper::Terse = 1;
 print Dumper $result;
+
+# unless --dumptokens was specified on the command-line, interpret the AST
+unless ($dumptokens) {
+    use Interpreter;
+    my $interpreter = Interpreter->new(ast => $result);
+    print "Result: ", $interpreter->run, "\n";
+}
