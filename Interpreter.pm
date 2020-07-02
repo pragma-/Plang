@@ -50,8 +50,10 @@ sub statement {
     my $instruction = $data->[0];
 
     # This was originally a given/when switch block.
+    # While it was pretty to look at, it was slightly slower than if/else.
     #
-    # While it was pretty to look at, it was a tad slower than if/else.
+    # Given 100,000 instructions:
+    # given/when took 650ms/700ms on average; if/else took 500ms to 550ms.
 
     if ($instruction eq 'NUM') {
         return $data->[1];
