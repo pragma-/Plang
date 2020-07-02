@@ -94,14 +94,10 @@ if (grep { $_ eq '--dumptokens' } @ARGV) {
 # parse the input into $result
 my $result = $parser->parse;
 
-my $err_count = @{$parser->{diagnostics}};
-
-if ($err_count) {
-    foreach my $diagnostic (@{$parser->{diagnostics}}) {
-        print STDERR $diagnostic, "\n";
-    }
-
-    print STDERR "$err_count error", $err_count == 1 ? '' : 's', ".\n";
+# were there any parse errors? print them and exit
+if (my $count = @{$parser->{errors}}) {
+    print STDERR "$_\n" for @{$parser->{errors}};
+    print STDERR "$count error", $count == 1 ? '' : 's', ".\n";
     exit 1;
 }
 

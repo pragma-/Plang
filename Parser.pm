@@ -33,7 +33,7 @@ sub initialize {
     $self->{current_token} = 0;
     $self->{backtrack} = [];
 
-    $self->{diagnostics} = [];
+    $self->{errors} = [];
 
     $self->{rules} = [];
 }
@@ -208,12 +208,12 @@ sub rewrite_backtrack {
     }
 }
 
-# add a diagnostic message
-sub add_diagnostic {
+# add an error message
+sub add_error {
     my ($self, $text) = @_;
-    push @{$self->{diagnostics}}, $text;
+    push @{$self->{errors}}, $text;
 
-    $self->{dprint}->(1, "Added diagnostic: $text\n");
+    $self->{dprint}->(1, "Added error: $text\n");
 }
 
 # add a rule to the parser engine
