@@ -15,8 +15,8 @@ Here's what you can do so far:
 ## Debugging
 You can set the `DEBUG` environment variable to enable debugging output.
 
-The value is integer representing verbosity, where lower values are less verbose.
+The value is an integer representing verbosity, where higher values are more verbose.
 
-    $ DEBUG=5 ./plang <<< '1 + 2'  # very verbose debugging output
-<!-- -->
     $ DEBUG=1 ./plang <<< '1 + 2'  # minimal (though still a quite a bit) output
+<!-- -->
+    $ DEBUG=5 ./plang <<< '1 + 2'  # very verbose debugging output
