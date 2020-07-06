@@ -32,17 +32,12 @@ sub expected {
 sub Program {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Program\n");
-    $parser->{indent}++;
-
     my @statements;
 
     while (defined $parser->next_token('peek')) {
-        $parser->{dprint}->(1, "Program: Statement\n");
-        $parser->try;
+        $parser->clear_error;
 
-        $parser->{dprint}->(3, "Error cleared\n");
-        $parser->{got_error} = 0;
+        $parser->try;
 
         my $statement = Statement($parser);
         next if $parser->errored;
@@ -55,190 +50,174 @@ sub Program {
         }
     }
 
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Program (Statement)\n");
-
+    #deubg
     return @statements ? ['PRGM', \@statements] : undef;
 }
 
-# Grammar: Statement --> Expression TERM | TERM
+# Grammar: Statement --> Expression | TERM
 sub Statement {
     my ($parser) = @_;
 
-    $parser->{dprint}->(1, "+-> Statement\n");
-    $parser->{indent}++;
-
-    $parser->{dprint}->(1, "Statement: Expression TERM\n");
     $parser->try;
 
     my $expression = Expression($parser);
-    return undef if $parser->errored;
+    return if $parser->errored;
 
     if ($expression) {
-        if ($parser->consume('TERM')) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Statement (Expression TERM)\n");
-            $parser->advance;
-            return ['STMT', $expression];
-        } else {
-            expected($parser, 'TERM');
-            return undef;
-        }
+        $parser->advance;
+        return ['STMT', $expression];
     }
 
-    $parser->{dprint}->(1, "Statement alternate: TERM\n");
     $parser->alternate;
 
     if ($parser->consume('TERM')) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Statement (TERM)\n");
         $parser->advance;
         return ['STMT', ''];
     } else {
-        expected($parser, 'TERM');
-        return undef;
+        return expected($parser, 'TERM');
     }
 
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Statement fail\n");
-
     $parser->backtrack;
-    return undef;
+    return;
 }
 
-# Grammar: Expression --> Term PLUS Expression | Term
+my %precedence_table = (
+    ASSIGNMENT  => 1,
+    CONDITIONAL => 2,
+    SUM         => 3,
+    PRODUCT     => 4,
+    EXPONENT    => 5,
+    PREFIX      => 6,
+    POSTFIX     => 7,
+    CALL        => 8,
+);
+
+my %token_precedence = (
+    EQ          => $precedence_table{'ASSIGNMENT'},
+    EQ_EQ       => $precedence_table{'CONDITIONAL'},
+    GREATER_EQ  => $precedence_table{'CONDITIONAL'},
+    LESS_EQ     => $precedence_table{'CONDITIONAL'},
+    LESS        => $precedence_table{'CONDITIONAL'},
+    GREATER     => $precedence_table{'CONDITIONAL'},
+    PLUS        => $precedence_table{'SUM'},
+    MINUS       => $precedence_table{'SUM'},
+    STAR        => $precedence_table{'PRODUCT'},
+    SLASH       => $precedence_table{'PRODUCT'},
+    STAR_STAR   => $precedence_table{'EXPONENT'},
+    PERCENT     => $precedence_table{'EXPONENT'},
+    BANG        => $precedence_table{'PREFIX'},
+    TILDE       => $precedence_table{'PREFIX'},
+    PLUS_PLUS   => $precedence_table{'POSTFIX'},
+    MINUS_MINUS => $precedence_table{'POSTFIX'},
+    L_PAREN     => $precedence_table{'CALL'},
+);
+
+sub get_precedence {
+    my ($tokentype) = @_;
+    return $token_precedence{$tokentype} // 0;
+}
+
 sub Expression {
-    my ($parser) = @_;
+    my ($parser, $precedence) = @_;
 
-    $parser->{dprint}->(1, "+-> Expression\n");
-    $parser->{indent}++;
+    $precedence ||= 0;
 
-    $parser->{dprint}->(1, "Expression: Term PLUS Expression\n");
-    $parser->try;
+    my $left = Prefix($parser, $precedence);
+    return if $parser->errored;
 
-    my $term = Term($parser);
-    return undef if $parser->errored;
+    return if not $left;
+    # debug
 
-    if ($term and $parser->consume('PLUS')) {
-        my $expression = Expression($parser);
-        return undef if $parser->errored;
+    while (1) {
+        my $token = $parser->next_token('peek');
+        last if not defined $token;
+        last if $precedence >= get_precedence $token->[0];
 
-        if (defined $expression) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Expression (Term PLUS Expression)\n");
-            $parser->advance;
-            return ['ADD', $term, $expression];
-        } else {
-            expected($parser, 'Expression');
-            return undef;
-        }
+        $left = Infix($parser, $left, $precedence);
+        return if $parser->errored;
+
     }
 
-    $parser->{dprint}->(1, "Expression alternate Term\n");
-    $parser->alternate;
-
-    $term = Term($parser);
-    return undef if $parser->errored;
-
-    if (defined $term) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Expression (Term)\n");
-        $parser->advance;
-        return $term;
-    }
-
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Expression fail\n");
-
-    $parser->backtrack;
-    return undef;
+    return $left;
 }
 
-# Grammar: Term --> Factor STAR Term | Factor
-sub Term {
-    my ($parser) = @_;
+sub Prefix {
+    my ($parser, $precedence) = @_;
+    my $token;
 
-    $parser->{dprint}->(1, "+-> Term\n");
-    $parser->{indent}++;
-
-    $parser->{dprint}->(1, "Term: Factor STAR Term\n");
-    $parser->try;
-
-    my $factor = Factor($parser);
-    return undef if $parser->errored;
-
-    if ($factor and $parser->consume('STAR')) {
-        my $term = Term($parser);
-        return undef if $parser->errored;
-
-        if (defined $term) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Term (Factor STAR Term)\n");
-            $parser->advance;
-            return ['MUL', $factor, $term];
-        } else {
-            expected($parser, 'Term');
-            return undef;
-        }
+    if ($token = $parser->consume('NUM')) {
+        return ['NUM', $token->[1], Expression($parser, get_precedence 'NUM')];
     }
 
-    $parser->{dprint}->(1, "Term alternate: Factor\n");
-    $parser->alternate;
-
-    $factor = Factor($parser);
-    return undef if $parser->errored;
-
-    if (defined $factor) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Term (Factor)\n");
-        $parser->advance;
-        return $factor;
+    if ($token = $parser->consume('TERM')) {
+        return;
     }
 
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Term fail\n");
+    if ($token = $parser->consume('BANG')) {
+        return ['NOT', Expression($parser, get_precedence 'BANG')];
+    }
 
-    $parser->backtrack;
-    return undef;
+    if ($token = $parser->consume('L_PAREN')) {
+        my $expr = Expression($parser);
+        $parser->consume('R_PAREN');
+        return $expr;
+    }
+
+    if ($token = $parser->consume('IDENT')) {
+        return ['IDENT', $token->[1], Expression($parser, get_precedence 'IDENT')];
+    }
+
+    return;
 }
 
-# Grammar: Factor --> L_PAREN Expression R_PAREN | NUM
-sub Factor {
-    my ($parser) = @_;
+sub Infix {
+    my ($parser, $left, $precedence) = @_;
+    my $token;
 
-    $parser->{dprint}->(1, "+-> Factor\n");
-    $parser->{indent}++;
 
-    $parser->{dprint}->(1,"Factor: L_PAREN Expression R_PAREN\n");
-    $parser->try;
-
-    if ($parser->consume('L_PAREN')) {
-        my $expression = Expression($parser);
-        return undef if $parser->errored;
-
-        if ($expression and $parser->consume('R_PAREN')) {
-            $parser->{indent}--;
-            $parser->{dprint}->(1, "<- Factor (L_PAREN Expression R_PAREN)\n");
-            $parser->advance;
-            return $expression;
-        }
+    if ($token = $parser->consume('PLUS')) {
+        return ['ADD', $left, Expression($parser, get_precedence 'PLUS')];
     }
 
-    $parser->{dprint}->(1, "Factor alternate: NUM\n");
-    $parser->alternate;
-
-    if (my $token = $parser->consume('NUM')) {
-        $parser->{indent}--;
-        $parser->{dprint}->(1, "<- Factor (NUM)\n");
-        $parser->advance;
-        return [ $token->[0], $token->[1] ];
+    if ($token = $parser->consume('MINUS')) {
+        return ['SUB', $left, Expression($parser, get_precedence 'MINUS')];
     }
 
-    $parser->{indent}--;
-    $parser->{dprint}->(1, "<- Factor fail\n");
+    if ($token = $parser->consume('STAR')) {
+        return ['MUL', $left, Expression($parser, get_precedence 'STAR')];
+    }
 
-    $parser->backtrack;
-    return undef;
+    if ($token = $parser->consume('SLASH')) {
+        return ['DIV', $left, Expression($parser, get_precedence 'SLASH')];
+    }
+
+    if ($token = $parser->consume('EQ')) {
+        # right-associative
+        return ['ASSIGN', $left, Expression($parser, $precedence_table{'ASSIGNMENT'} - 1)];
+    }
+
+    if ($token = $parser->consume('STAR_STAR')) {
+        # right-associative
+        return ['EXP', $left, Expression($parser, get_precedence('STAR_STAR') - 1)];
+    }
+
+    $left = Postfix($parser, $left, $precedence);
+    return $left;
+}
+
+sub Postfix {
+    my ($parser, $left, $precedence) = @_;
+    my $token;
+
+    if ($token = $parser->consume('PLUS_PLUS')) {
+        return ['POSTFIX_ADD', $token->[1], $left];
+    }
+
+    if ($token = $parser->consume('MINUS_MINUS')) {
+        return ['POSTFIX_SUB', $token->[1], $left];
+    }
+
+    return $left;
 }
 
 1;

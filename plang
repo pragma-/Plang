@@ -27,16 +27,34 @@ $lexer->define_tokens(
     ['COMMENT_MULTI',  qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  \&discard, sub { multiline_comment(@_) }],
     ['DQUOTE_STRING',  qr{\G(   "(?:[^"\\]|\\.)*"   )}x],
     ['SQUOTE_STRING',  qr{\G(   '(?:[^'\\]|\\.)*'   )}x],
+    ['NOT_EQ',         qr{\G(   !=                  )}x],
+    ['GREATER_EQ',     qr{\G(   >=                  )}x],
+    ['LESS_EQ',        qr{\G(   <=                  )}x],
     ['EQ_EQ',          qr{\G(   ==                  )}x],
+    ['SLASH_EQ',       qr{\G(   /=                  )}x],
+    ['STAR_EQ',        qr{\G(   \*=                 )}x],
+    ['MINUS_EQ',       qr{\G(   -=                  )}x],
     ['PLUS_EQ',        qr{\G(   \+=                 )}x],
     ['PLUS_PLUS',      qr{\G(   \+\+                )}x],
+    ['STAR_STAR',      qr{\G(   \*\*                )}x],
+    ['MINUS_MINUS',    qr{\G(   --                  )}x],
     ['EQ',             qr{\G(   =                   )}x],
     ['PLUS',           qr{\G(   \+                  )}x],
     ['MINUS',          qr{\G(   -                   )}x],
+    ['GREATER',        qr{\G(   >                   )}x],
+    ['LESS',           qr{\G(   <                   )}x],
+    ['BANG',           qr{\G(   !                   )}x],
+    ['QUESTION',       qr{\G(   \?                  )}x],
+    ['COLON',          qr{\G(   :                   )}x],
+    ['TILDE',          qr{\G(   ~                   )}x],
+    ['CARET',          qr{\G(   ^                   )}x],
+    ['PERCENT',        qr{\G(   %                   )}x],
+    ['POUND',          qr{\G(   \#                  )}x],
     ['COMMA',          qr{\G(   ,                   )}x],
+    ['STOP',           qr{\G(   \.                  )}x],
     ['STAR',           qr{\G(   \*                  )}x],
-    ['BSLASH',         qr{\G(   /                   )}x],
-    ['FSLASH',         qr{\G(   \\                  )}x],
+    ['SLASH',          qr{\G(   /                   )}x],
+    ['BSLASH',         qr{\G(   \\                  )}x],
     ['L_PAREN',        qr{\G(   \(                  )}x],
     ['R_PAREN',        qr{\G(   \)                  )}x],
     ['NUM',            qr{\G(   [0-9.]+             )}x],
@@ -106,6 +124,9 @@ if (my $count = @{$parser->{errors}}) {
 # dump the $result data structure
 use Data::Dumper;
 $Data::Dumper::Terse = 1;
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Useqq = 1;
+
 print Dumper $result;
 
 # unless --dumptokens was specified on the command-line, interpret the AST

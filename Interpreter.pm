@@ -49,32 +49,43 @@ sub statement {
 
     my $instruction = $data->[0];
 
-    # This was originally a given/when switch block.
-    # While it was pretty to look at, it was slightly slower than if/else.
-    #
-    # Given 100,000 instructions:
-    # given/when took 650ms/700ms on average; if/else took 500ms to 550ms.
+    print "statement: ins: $instruction\n";
 
     if ($instruction eq 'NUM') {
         return $data->[1];
     }
 
-    if ($instruction eq 'ADD') {
-        my ($left, $right) = ($data->[1], $data->[2]);
+    if ($data->[0] eq 'ADD') {
+        my $left_value  = $self->statement($data->[1]);
+        my $right_value = $self->statement($data->[2]);
 
-        my $left_value  = $self->statement($left);
-        my $right_value = $self->statement($right);
-
+        print "adding $left_value + $right_value\n";
         return $left_value + $right_value;
     }
 
-    if ($instruction eq 'MUL') {
-        my ($left, $right) = ($data->[1], $data->[2]);
+    if ($data->[0] eq 'SUB') {
+        my $left_value  = $self->statement($data->[1]);
+        my $right_value = $self->statement($data->[2]);
 
-        my $left_value  = $self->statement($left);
-        my $right_value = $self->statement($right);
+        print "subtracting $left_value - $right_value\n";
+        return $left_value - $right_value;
+    }
 
+
+    if ($data->[0] eq 'MUL') {
+        my $left_value  = $self->statement($data->[1]);
+        my $right_value = $self->statement($data->[2]);
+
+        print "multiplying $left_value * $right_value\n";
         return $left_value * $right_value;
+    }
+
+    if ($data->[0] eq 'DIV') {
+        my $left_value  = $self->statement($data->[1]);
+        my $right_value = $self->statement($data->[2]);
+
+        print "dividing $left_value / $right_value\n";
+        return $left_value / $right_value;
     }
 }
 

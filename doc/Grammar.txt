@@ -1,8 +1,0 @@
-# generated via `grep Grammar Grammar.pm > Grammar.txt`
-
-# Grammar: Program --> Statement(s)
-# Grammar: Statement --> Expression TERM | TERM
-# Grammar: Expression --> Term PLUS Expression | Term
-# Grammar: Term --> Factor STAR Term | Factor
-# Grammar: Factor --> L_PAREN Expression R_PAREN | NUM
-# Grammar: DumpToken --> *

@@ -44,13 +44,14 @@ sub try {
     push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
+        $self->{indent}++;
+
         my $count = @{$self->{backtrack}};
         $self->{dprint}->(2, "[$count] saving posiition $self->{current_token}: ");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
         print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 2;
         print "\n" if not defined $token and $self->{debug} >= 2;
-
     }
 }
 
@@ -60,6 +61,8 @@ sub backtrack {
     $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
+        $self->{indent}--;
+
         my $count = @{$self->{backtrack}};
         $self->{dprint}->(2, "[$count] backtracking to position $self->{current_token}: ");
 
@@ -69,25 +72,14 @@ sub backtrack {
     }
 }
 
-sub errored {
-    my ($self) = @_;
-
-    if ($self->{got_error}) {
-        $self->{dprint}->(1, "Got error.\n");
-        $self->{indent}--;
-        $self->advance;
-        return 1;
-    }
-
-    return 0;
-}
-
 # advance to the next rule (pops and discards one backtrack)
 sub advance {
     my ($self) = @_;
     pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
+        $self->{indent}--;
+
         my $count = @{$self->{backtrack}};
         $self->{dprint}->(2, "[$count] popped a backtrack\n");
     }
@@ -155,19 +147,18 @@ sub current_token {
 sub consume {
     my ($self, $wanted) = @_;
 
+    my $token = $self->next_token('peek');
+    return undef if not defined $token;
+
     if (not defined $wanted) {
         $self->{current_token}++;
-        return;
+        return $token;
     }
-
-    my $token = $self->next_token('peek');
-
-    return undef if not defined $token;
 
     $self->{dprint}->(1, "Looking for $wanted... ");
 
     if ($token->[0] eq $wanted) {
-        print "got it (", $self->{clean}->($token->[1]), ")\n" if $self->{debug};
+        print "got it (", $self->{clean}->($token->[1]), ")                        <-------------\n" if $self->{debug};
         $self->{current_token}++;
         return $token;
     }
@@ -214,6 +205,33 @@ sub add_error {
     push @{$self->{errors}}, $text;
 
     $self->{dprint}->(1, "Added error: $text\n");
+}
+
+# was there an error in the last parse?
+sub errored {
+    my ($self) = @_;
+
+    if ($self->{got_error}) {
+        $self->{dprint}->(1, "Got error.\n");
+        $self->advance;
+        return 1;
+    }
+
+    return 0;
+}
+
+# set the error flag
+sub set_error {
+    my ($self) = @_;
+    $self->{dprint}->(3, "Error set.\n");
+    $self->{got_error} = 1;
+}
+
+# clear the error flag
+sub clear_error {
+    my ($self) = @_;
+    $self->{dprint}->(3, "Error cleared.\n");
+    $self->{got_error} = 0;
 }
 
 # add a rule to the parser engine
