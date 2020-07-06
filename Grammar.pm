@@ -10,7 +10,9 @@ our @EXPORT_OK = qw/Program/;
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 
 sub expected {
-    my ($parser, $expected) = @_;
+    my ($parser, $expected, $consume_to) = @_;
+
+    $consume_to ||= 'TERM';
 
     my $token = $parser->current_token;
 
@@ -23,7 +25,7 @@ sub expected {
         $parser->add_error("Expected $expected but got EOF");
     }
 
-    $parser->consume_to('TERM');
+    $parser->consume_to($consume_to);
     $parser->rewrite_backtrack;
     $parser->{got_error} = 1;
 }
@@ -37,20 +39,14 @@ sub Program {
     while (defined $parser->next_token('peek')) {
         $parser->clear_error;
 
-        $parser->try;
-
         my $statement = Statement($parser);
         next if $parser->errored;
 
         if ($statement) {
-            $parser->advance;
             push @statements, $statement;
-        } else {
-            $parser->backtrack;
         }
     }
 
-    #deubg
     return @statements ? ['PRGM', \@statements] : undef;
 }
 
@@ -126,7 +122,6 @@ sub Expression {
     return if $parser->errored;
 
     return if not $left;
-    # debug
 
     while (1) {
         my $token = $parser->next_token('peek');
@@ -135,7 +130,6 @@ sub Expression {
 
         $left = Infix($parser, $left, $precedence);
         return if $parser->errored;
-
     }
 
     return $left;
@@ -173,7 +167,6 @@ sub Prefix {
 sub Infix {
     my ($parser, $left, $precedence) = @_;
     my $token;
-
 
     if ($token = $parser->consume('PLUS')) {
         return ['ADD', $left, Expression($parser, get_precedence 'PLUS')];
