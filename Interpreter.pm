@@ -61,9 +61,9 @@ my %eval_op = (
 );
 
 sub binary_op {
-    my ($self, $data, $instruction, $op, $debug_msg) = @_;
+    my ($self, $data, $op, $debug_msg) = @_;
 
-    if ($instruction eq $op) {
+    if ($data->[0] eq $op) {
         my $left_value  = $self->statement($data->[1]);
         my $right_value = $self->statement($data->[2]);
 
@@ -73,7 +73,7 @@ sub binary_op {
             print $debug_msg, "\n";
         }
 
-        return $eval_op{$instruction}->($left_value, $right_value);
+        return $eval_op{$data->[0]}->($left_value, $right_value);
     }
 
     return undef;
@@ -83,31 +83,30 @@ sub statement {
     my ($self, $data) = @_;
     return 0 if not $data;
 
-    my $instruction = $data->[0];
-    print "stmt ins: $instruction\n" if $self->{debug} >= 3;
+    print "stmt ins: $data->[0]\n" if $self->{debug} >= 3;
 
-    if ($instruction eq 'NUM') {
+    if ($data->[0] eq 'NUM') {
         return $data->[1];
     }
 
-    if ($instruction eq 'NOT') {
+    if ($data->[0] eq 'NOT') {
         my $value  = $self->statement($data->[1]);
-        print "NOTing $value\n" if $self->{debug} >= 3;
+        print "!$value\n" if $self->{debug} >= 3;
         return int !$value;
     }
 
     my $value;
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'ADD', '$a + $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'SUB', '$a - $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'MUL', '$a * $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'DIV', '$a / $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'REM', '$a % $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'POW', '$a ** $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'EQ',  '$a == $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'LT',  '$a < $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'GT',  '$a > $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'LTE', '$a <= $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'GTE', '$a >= $b'));
+    return $value if defined ($value = $self->binary_op($data, 'ADD', '$a + $b'));
+    return $value if defined ($value = $self->binary_op($data, 'SUB', '$a - $b'));
+    return $value if defined ($value = $self->binary_op($data, 'MUL', '$a * $b'));
+    return $value if defined ($value = $self->binary_op($data, 'DIV', '$a / $b'));
+    return $value if defined ($value = $self->binary_op($data, 'REM', '$a % $b'));
+    return $value if defined ($value = $self->binary_op($data, 'POW', '$a ** $b'));
+    return $value if defined ($value = $self->binary_op($data, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($data, 'LT',  '$a < $b'));
+    return $value if defined ($value = $self->binary_op($data, 'GT',  '$a > $b'));
+    return $value if defined ($value = $self->binary_op($data, 'LTE', '$a <= $b'));
+    return $value if defined ($value = $self->binary_op($data, 'GTE', '$a >= $b'));
 }
 
 1;
