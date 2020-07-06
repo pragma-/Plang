@@ -185,13 +185,17 @@ sub Infix {
     my ($parser, $left, $precedence) = @_;
     my $expr;
 
-    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',      'ADD',    'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',     'SUB',    'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR',      'MUL',    'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',     'DIV',    'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ',        'ASSIGN', 'ASSIGNMENT', 1);
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ_EQ',     'EQ',     'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR', 'POW',    'EXPONENT');
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',    'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',    'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',    'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',    'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ_EQ',       'EQ',     'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',     'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',     'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',    'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',    'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',    'EXPONENT');
 
     return Postfix($parser, $left, $precedence);
 }

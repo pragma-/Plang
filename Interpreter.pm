@@ -47,12 +47,17 @@ sub interpret_ast {
 }
 
 my %eval_op = (
-    'ADD' => sub { $_[0] + $_[1] },
-    'SUB' => sub { $_[0] - $_[1] },
-    'MUL' => sub { $_[0] * $_[1] },
-    'DIV' => sub { $_[0] / $_[1] },
-
+    'ADD' => sub { $_[0]  + $_[1] },
+    'SUB' => sub { $_[0]  - $_[1] },
+    'MUL' => sub { $_[0]  * $_[1] },
+    'DIV' => sub { $_[0]  / $_[1] },
+    'REM' => sub { $_[0]  % $_[1] },
+    'POW' => sub { $_[0] ** $_[1] },
     'EQ'  => sub { $_[0] == $_[1] },
+    'LT'  => sub { $_[0]  < $_[1] },
+    'GT'  => sub { $_[0]  > $_[1] },
+    'LTE' => sub { $_[0] <= $_[1] },
+    'GTE' => sub { $_[0] >= $_[1] },
 );
 
 sub binary_op {
@@ -92,11 +97,17 @@ sub statement {
     }
 
     my $value;
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'ADD', 'adding $a + $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'SUB', 'subbing $a - $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'MUL', 'multiplying $a * $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'DIV', 'dividing $a / $b'));
-    return $value if defined ($value = $self->binary_op($data, $instruction, 'EQ',  'equality $a == $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'ADD', '$a + $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'SUB', '$a - $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'MUL', '$a * $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'DIV', '$a / $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'REM', '$a % $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'POW', '$a ** $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'LT',  '$a < $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'GT',  '$a > $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'LTE', '$a <= $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'GTE', '$a >= $b'));
 }
 
 1;
