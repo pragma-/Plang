@@ -57,7 +57,6 @@ sub tokens {
             return undef if not defined $text;
 
             LOOP: {
-
                 # go through each tokentype
                 foreach my $tokentype (@$tokentypes) {
                     # does this bit of text match this tokentype?
