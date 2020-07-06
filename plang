@@ -4,13 +4,16 @@ use warnings;
 use strict;
 
 # allow loading .pm modules from the current directory
-BEGIN {
-    unshift @INC, '.';
-}
+use lib '.';
+
+use Data::Dumper;
 
 use Lexer;
 use Parser;
 use Grammar qw/Program/;
+use Interpreter;
+
+my $debug = $ENV{DEBUG} // 0;
 
 # our lexer
 my $lexer = Lexer->new;
@@ -122,16 +125,13 @@ if (my $count = @{$parser->{errors}}) {
 }
 
 # dump the $result data structure
-use Data::Dumper;
-$Data::Dumper::Terse = 1;
-$Data::Dumper::Indent = 1;
-$Data::Dumper::Useqq = 1;
+if ($debug >= 2) {
+    $Data::Dumper::Terse = 1;
+    $Data::Dumper::Indent = 1;
+    $Data::Dumper::Useqq = 1;
 
-print Dumper $result;
+    print Dumper ($result), "\n";
+}
 
 # unless --dumptokens was specified on the command-line, interpret the AST
-unless ($dumptokens) {
-    use Interpreter;
-    my $interpreter = Interpreter->new(ast => $result);
-    print "Result: ", $interpreter->run, "\n";
-}
+Interpreter->new(ast => $result, debug => $debug)->run unless $dumptokens;

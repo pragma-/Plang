@@ -16,6 +16,7 @@ sub new {
 sub initialize {
     my ($self, %conf) = @_;
     $self->{ast} = $conf{ast};
+    $self->{debug} = $conf{debug} // 0;
 }
 
 sub run {
@@ -41,50 +42,53 @@ sub interpret_ast {
         }
     }
 
-    return $result;
+    print "$result\n";
+    return 1;
 }
 
 sub statement {
     my ($self, $data) = @_;
+    return 0 if not $data;
 
     my $instruction = $data->[0];
-
-    print "statement: ins: $instruction\n";
+    print "stmt ins: $instruction\n" if $self->{debug} >= 3;
 
     if ($instruction eq 'NUM') {
         return $data->[1];
     }
 
-    if ($data->[0] eq 'ADD') {
+    if ($instruction eq 'NOT') {
+        my $value  = $self->statement($data->[1]);
+        print "NOTing $value\n" if $self->{debug} >= 3;
+        return int !$value;
+    }
+
+    if ($instruction eq 'ADD') {
         my $left_value  = $self->statement($data->[1]);
         my $right_value = $self->statement($data->[2]);
-
-        print "adding $left_value + $right_value\n";
+        print "adding $left_value + $right_value\n" if $self->{debug} >= 3;
         return $left_value + $right_value;
     }
 
-    if ($data->[0] eq 'SUB') {
+    if ($instruction eq 'SUB') {
         my $left_value  = $self->statement($data->[1]);
         my $right_value = $self->statement($data->[2]);
-
-        print "subtracting $left_value - $right_value\n";
+        print "subtracting $left_value - $right_value\n" if $self->{debug} >= 3;
         return $left_value - $right_value;
     }
 
 
-    if ($data->[0] eq 'MUL') {
+    if ($instruction eq 'MUL') {
         my $left_value  = $self->statement($data->[1]);
         my $right_value = $self->statement($data->[2]);
-
-        print "multiplying $left_value * $right_value\n";
+        print "multiplying $left_value * $right_value\n" if $self->{debug} >= 3;
         return $left_value * $right_value;
     }
 
-    if ($data->[0] eq 'DIV') {
+    if ($instruction eq 'DIV') {
         my $left_value  = $self->statement($data->[1]);
         my $right_value = $self->statement($data->[2]);
-
-        print "dividing $left_value / $right_value\n";
+        print "dividing $left_value / $right_value\n" if $self->{debug} >= 3;
         return $left_value / $right_value;
     }
 }

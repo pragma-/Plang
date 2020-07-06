@@ -135,67 +135,65 @@ sub Expression {
     return $left;
 }
 
+sub UnaryOp {
+    my ($parser, $op, $ins) = @_;
+
+    if ($parser->consume($op)) {
+        my $expr = Expression($parser, $precedence_table{'PREFIX'});
+        return $expr ? [$ins, $expr] : expected($parser, 'Expression');
+    }
+}
+
 sub Prefix {
     my ($parser, $precedence) = @_;
-    my $token;
+    my ($token, $expr);
 
     if ($token = $parser->consume('NUM')) {
-        return ['NUM', $token->[1], Expression($parser, get_precedence 'NUM')];
+        return ['NUM', $token->[1], Expression($parser)];
+    }
+
+    if ($token = $parser->consume('IDENT')) {
+        return ['IDENT', $token->[1], Expression($parser)];
     }
 
     if ($token = $parser->consume('TERM')) {
         return;
     }
 
-    if ($token = $parser->consume('BANG')) {
-        return ['NOT', Expression($parser, get_precedence 'BANG')];
-    }
+    return $expr if $expr = UnaryOp($parser, 'BANG',     'NOT');
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser);
-        $parser->consume('R_PAREN');
+        return expected($parser, 'R_PAREN') if not $parser->consume('R_PAREN');
         return $expr;
-    }
-
-    if ($token = $parser->consume('IDENT')) {
-        return ['IDENT', $token->[1], Expression($parser, get_precedence 'IDENT')];
     }
 
     return;
 }
 
+sub BinaryOp {
+    my ($parser, $left, $op, $ins, $precedence, $right_associative) = @_;
+    $right_associative ||= 0;
+
+    if ($parser->consume($op)) {
+        my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
+        return $right ? [$ins, $left, $right] : expected($parser, 'Expression');
+    }
+}
+
 sub Infix {
     my ($parser, $left, $precedence) = @_;
-    my $token;
+    my $expr;
 
-    if ($token = $parser->consume('PLUS')) {
-        return ['ADD', $left, Expression($parser, get_precedence 'PLUS')];
-    }
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',      'ADD',    'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',     'SUB',    'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR',      'MUL',    'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',     'DIV',    'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ',        'ASSIGN', 'ASSIGNMENT', 1);
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ_EQ',     'EQ',     'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR', 'POW',    'EXPONENT');
 
-    if ($token = $parser->consume('MINUS')) {
-        return ['SUB', $left, Expression($parser, get_precedence 'MINUS')];
-    }
-
-    if ($token = $parser->consume('STAR')) {
-        return ['MUL', $left, Expression($parser, get_precedence 'STAR')];
-    }
-
-    if ($token = $parser->consume('SLASH')) {
-        return ['DIV', $left, Expression($parser, get_precedence 'SLASH')];
-    }
-
-    if ($token = $parser->consume('EQ')) {
-        # right-associative
-        return ['ASSIGN', $left, Expression($parser, $precedence_table{'ASSIGNMENT'} - 1)];
-    }
-
-    if ($token = $parser->consume('STAR_STAR')) {
-        # right-associative
-        return ['EXP', $left, Expression($parser, get_precedence('STAR_STAR') - 1)];
-    }
-
-    $left = Postfix($parser, $left, $precedence);
-    return $left;
+    return Postfix($parser, $left, $precedence);
 }
 
 sub Postfix {
