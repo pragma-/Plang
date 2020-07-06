@@ -1,1 +1,0 @@
-grep Grammar: Grammar.pm | cut -f3- -d' '
