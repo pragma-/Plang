@@ -46,7 +46,11 @@ sub interpret_ast {
     return 1;
 }
 
-my %eval_op = (
+my %eval_unary_op = (
+    'NOT' => sub { int ! $_[0] },
+);
+
+my %eval_binary_op = (
     'ADD' => sub { $_[0]  + $_[1] },
     'SUB' => sub { $_[0]  - $_[1] },
     'MUL' => sub { $_[0]  * $_[1] },
@@ -59,6 +63,20 @@ my %eval_op = (
     'LTE' => sub { $_[0] <= $_[1] },
     'GTE' => sub { $_[0] >= $_[1] },
 );
+
+sub unary_op {
+    my ($self, $data, $op, $debug_msg) = @_;
+
+    if ($data->[0] eq $op) {
+        my $value  = $self->statement($data->[1]);
+
+        if ($debug_msg and $self->{debug} >= 3) {
+            $debug_msg =~ s/\$a/$value/g;
+        }
+        return $eval_unary_op{$data->[0]}->($value);
+    }
+    return undef;
+}
 
 sub binary_op {
     my ($self, $data, $op, $debug_msg) = @_;
@@ -73,14 +91,15 @@ sub binary_op {
             print $debug_msg, "\n";
         }
 
-        return $eval_op{$data->[0]}->($left_value, $right_value);
+        return $eval_binary_op{$data->[0]}->($left_value, $right_value);
     }
-
     return undef;
 }
 
 sub statement {
     my ($self, $data) = @_;
+    my $value;
+
     return 0 if not $data;
 
     print "stmt ins: $data->[0]\n" if $self->{debug} >= 3;
@@ -89,13 +108,8 @@ sub statement {
         return $data->[1];
     }
 
-    if ($data->[0] eq 'NOT') {
-        my $value  = $self->statement($data->[1]);
-        print "!$value\n" if $self->{debug} >= 3;
-        return int !$value;
-    }
+    return $value if defined ($value = $self->unary_op($data, 'NOT', '! $a'));
 
-    my $value;
     return $value if defined ($value = $self->binary_op($data, 'ADD', '$a + $b'));
     return $value if defined ($value = $self->binary_op($data, 'SUB', '$a - $b'));
     return $value if defined ($value = $self->binary_op($data, 'MUL', '$a * $b'));
