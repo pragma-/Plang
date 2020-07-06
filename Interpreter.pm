@@ -46,6 +46,34 @@ sub interpret_ast {
     return 1;
 }
 
+my %eval_op = (
+    'ADD' => sub { $_[0] + $_[1] },
+    'SUB' => sub { $_[0] - $_[1] },
+    'MUL' => sub { $_[0] * $_[1] },
+    'DIV' => sub { $_[0] / $_[1] },
+
+    'EQ'  => sub { $_[0] == $_[1] },
+);
+
+sub binary_op {
+    my ($self, $data, $instruction, $op, $debug_msg) = @_;
+
+    if ($instruction eq $op) {
+        my $left_value  = $self->statement($data->[1]);
+        my $right_value = $self->statement($data->[2]);
+
+        if ($debug_msg and $self->{debug} >= 3) {
+            $debug_msg =~ s/\$a/$left_value/g;
+            $debug_msg =~ s/\$b/$right_value/g;
+            print $debug_msg, "\n";
+        }
+
+        return $eval_op{$instruction}->($left_value, $right_value);
+    }
+
+    return undef;
+}
+
 sub statement {
     my ($self, $data) = @_;
     return 0 if not $data;
@@ -63,34 +91,12 @@ sub statement {
         return int !$value;
     }
 
-    if ($instruction eq 'ADD') {
-        my $left_value  = $self->statement($data->[1]);
-        my $right_value = $self->statement($data->[2]);
-        print "adding $left_value + $right_value\n" if $self->{debug} >= 3;
-        return $left_value + $right_value;
-    }
-
-    if ($instruction eq 'SUB') {
-        my $left_value  = $self->statement($data->[1]);
-        my $right_value = $self->statement($data->[2]);
-        print "subtracting $left_value - $right_value\n" if $self->{debug} >= 3;
-        return $left_value - $right_value;
-    }
-
-
-    if ($instruction eq 'MUL') {
-        my $left_value  = $self->statement($data->[1]);
-        my $right_value = $self->statement($data->[2]);
-        print "multiplying $left_value * $right_value\n" if $self->{debug} >= 3;
-        return $left_value * $right_value;
-    }
-
-    if ($instruction eq 'DIV') {
-        my $left_value  = $self->statement($data->[1]);
-        my $right_value = $self->statement($data->[2]);
-        print "dividing $left_value / $right_value\n" if $self->{debug} >= 3;
-        return $left_value / $right_value;
-    }
+    my $value;
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'ADD', 'adding $a + $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'SUB', 'subbing $a - $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'MUL', 'multiplying $a * $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'DIV', 'dividing $a / $b'));
+    return $value if defined ($value = $self->binary_op($data, $instruction, 'EQ',  'equality $a == $b'));
 }
 
 1;
