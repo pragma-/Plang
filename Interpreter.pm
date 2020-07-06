@@ -17,11 +17,23 @@ sub initialize {
     my ($self, %conf) = @_;
     $self->{ast} = $conf{ast};
     $self->{debug} = $conf{debug} // 0;
+
+    $self->{stack} = [];
 }
 
 sub run {
     my ($self) = @_;
     return $self->interpret_ast if $self->{ast};
+}
+
+sub push_stack {
+    my ($self, $context) = @_;
+    push @{$self->{stack}}, $context;
+}
+
+sub pop_stack {
+    my ($self) = @_;
+    return pop @{$self->{stack}};
 }
 
 sub interpret_ast {
@@ -34,11 +46,15 @@ sub interpret_ast {
 
     my $result;
 
+    my $context = {
+        variables => {},
+    };
+
     foreach my $statement (@$statements) {
         my $instruction = $statement->[0];
 
         if ($instruction eq 'STMT') {
-            $result += $self->statement($statement->[1]);
+            $result += $self->statement($context, $statement->[1]);
         }
     }
 
@@ -65,10 +81,10 @@ my %eval_binary_op = (
 );
 
 sub unary_op {
-    my ($self, $data, $op, $debug_msg) = @_;
+    my ($self, $context, $data, $op, $debug_msg) = @_;
 
     if ($data->[0] eq $op) {
-        my $value  = $self->statement($data->[1]);
+        my $value  = $self->statement($context, $data->[1]);
 
         if ($debug_msg and $self->{debug} >= 3) {
             $debug_msg =~ s/\$a/$value/g;
@@ -79,11 +95,11 @@ sub unary_op {
 }
 
 sub binary_op {
-    my ($self, $data, $op, $debug_msg) = @_;
+    my ($self, $context, $data, $op, $debug_msg) = @_;
 
     if ($data->[0] eq $op) {
-        my $left_value  = $self->statement($data->[1]);
-        my $right_value = $self->statement($data->[2]);
+        my $left_value  = $self->statement($context, $data->[1]);
+        my $right_value = $self->statement($context, $data->[2]);
 
         if ($debug_msg and $self->{debug} >= 3) {
             $debug_msg =~ s/\$a/$left_value/g;
@@ -97,7 +113,7 @@ sub binary_op {
 }
 
 sub statement {
-    my ($self, $data) = @_;
+    my ($self, $context, $data) = @_;
     my $value;
 
     return 0 if not $data;
@@ -108,19 +124,30 @@ sub statement {
         return $data->[1];
     }
 
-    return $value if defined ($value = $self->unary_op($data, 'NOT', '! $a'));
+    if ($data->[0] eq 'IDENT') {
+        return $context->{variables}->{$data->[1]} // 0;
+    }
 
-    return $value if defined ($value = $self->binary_op($data, 'ADD', '$a + $b'));
-    return $value if defined ($value = $self->binary_op($data, 'SUB', '$a - $b'));
-    return $value if defined ($value = $self->binary_op($data, 'MUL', '$a * $b'));
-    return $value if defined ($value = $self->binary_op($data, 'DIV', '$a / $b'));
-    return $value if defined ($value = $self->binary_op($data, 'REM', '$a % $b'));
-    return $value if defined ($value = $self->binary_op($data, 'POW', '$a ** $b'));
-    return $value if defined ($value = $self->binary_op($data, 'EQ',  '$a == $b'));
-    return $value if defined ($value = $self->binary_op($data, 'LT',  '$a < $b'));
-    return $value if defined ($value = $self->binary_op($data, 'GT',  '$a > $b'));
-    return $value if defined ($value = $self->binary_op($data, 'LTE', '$a <= $b'));
-    return $value if defined ($value = $self->binary_op($data, 'GTE', '$a >= $b'));
+    if ($data->[0] eq 'ASSIGN') {
+        my $left_value  = $data->[1];
+        my $right_value = $self->statement($context, $data->[2]);
+        $context->{variables}->{$left_value->[1]} = $right_value;
+        return 0;
+    }
+
+    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
+
+    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
 }
 
 1;
