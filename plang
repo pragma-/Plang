@@ -136,4 +136,8 @@ if ($dumptokens or $debug >= 2) {
 }
 
 # unless --dumptokens was specified on the command-line, interpret the AST
-Interpreter->new(ast => $result, debug => $debug)->run unless $dumptokens;
+# and exit with the return value.
+$result = Interpreter->new(ast => $result, debug => $debug)->run unless $dumptokens;
+
+no warnings;
+exit $result;
