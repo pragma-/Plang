@@ -2,7 +2,9 @@
 Plang is an experimental foray into implementing a programming language in Perl.
 
 ## Features
-Plang is in early development stages. This is what is implemented so far.
+Plang is in early development stage. There will be bugs. There will be abrupt design changes.
+
+This is what is implemented so far.
 
 * Lexer: Done
 * Parser: Done
@@ -56,7 +58,9 @@ To prevent printing the last statement, make the last statement `return`.
       -1
 
 ### Variables
-Variables are declared by assigning a value to an identifier;
+Variables are declared by assigning a value to an identifier. An identifier is a
+sequence of characters beginning with an underscore or a letter, optionally followed
+by additional underscores, letters or digits.
 
     $ ./plang <<< 'a = 5; print a'
       5
@@ -76,9 +80,10 @@ fn | function definition
 return | return value from function
 
 ### Functions
-Functions are an abstracted group of statements. Functions can take variables
-as arguments and will return the value of the last statement. You can also explicitly
-return a value via the `return` keyword.
+Functions are an abstracted group of statements. Functions can take identifiers as
+parameters and will return the value of the last statement. You can explicitly
+return a value via the `return` keyword. Arguments passed to function calls may be
+any valid expression, optionally enclosed with parentheses.
 
 For example, a function to square a value:
 
