@@ -86,7 +86,7 @@ sub Statement {
         $parser->advance;
         return ['STMT', ''];
     } else {
-        return expected($parser, 'TERM');
+        return expected($parser, 'statement');
     }
 
     $parser->backtrack;
@@ -94,9 +94,10 @@ sub Statement {
 }
 
 my %keywords = (
-    'fn' => 1,
-    'if' => 1,
-    'else' => 1,
+    'fn'     => 1,
+    'return' => 1,
+    'if'     => 1,
+    'else'   => 1,
 );
 
 # Grammar: FuncDef   =>    fn IDENT L_PAREN IdentList R_PAREN L_BRACE Statement(s) R_BRACE
@@ -218,6 +219,16 @@ sub UnaryOp {
     }
 }
 
+sub BinaryOp {
+    my ($parser, $left, $op, $ins, $precedence, $right_associative) = @_;
+    $right_associative ||= 0;
+
+    if ($parser->consume($op)) {
+        my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
+        return $right ? [$ins, $left, $right] : expected($parser, 'Expression');
+    }
+}
+
 sub Prefix {
     my ($parser, $precedence) = @_;
     my ($token, $expr);
@@ -249,16 +260,6 @@ sub Prefix {
     }
 
     return;
-}
-
-sub BinaryOp {
-    my ($parser, $left, $op, $ins, $precedence, $right_associative) = @_;
-    $right_associative ||= 0;
-
-    if ($parser->consume($op)) {
-        my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
-        return $right ? [$ins, $left, $right] : expected($parser, 'Expression');
-    }
 }
 
 sub Infix {
