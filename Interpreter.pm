@@ -78,17 +78,23 @@ sub pop_stack {
 
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
+    print "set_variable: ", Dumper($context), Dumper($name), Dumper ($value), "\n";
     $context->{variables}->{$name} = $value;
 }
 
 sub get_variable {
     my ($self, $context, $name) = @_;
 
+    print "get_variable: ", Dumper($context),  Dumper($name), "\n";
+
     if (exists $context->{variables}->{$name}) {
+        # local variable
         return $context->{variables}->{$name}->[1];
     } elsif (exists $self->{stack}->[0]->{variables}->{$name}) {
+        # global variable
         return $self->{stack}->[0]->{variables}->{$name}->[1];
     } else {
+        # undefined variable
         return 0;
     }
 }
@@ -208,7 +214,9 @@ sub func_call {
             return $self->error($context, "Missing argument $parameters->[$i] to function $name.\n");
         }
 
-        my $value = $self->statement($context, $arg); # this should be an expression
+        my $value = $self->statement($context, $arg); # this ought to be an expression, but
+                                                      # let's see where this goes (imagine `if`
+                                                      # statements returning the value of its branches...)
         $arg = ['NUM', $value];
 
         $new_context->{variables}->{$parameters->[$i]} = $arg;
@@ -259,22 +267,22 @@ sub statement {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if ($tok_type eq 'IDENT') {
-            return ++$context->{variables}->{$tok_value};
+        if (not exists $context->{variables}->{$tok_value}) {
+            $context->{variables}->{$tok_value} = ['NUM', 0];
         }
 
-        return;
+        return ++$context->{variables}->{$tok_value}->[1];
     }
 
     if ($ins eq 'PREFIX_SUB') {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if ($tok_type eq 'IDENT') {
-            return --$context->{variables}->{$tok_value};
+        if (not exists $context->{variables}->{$tok_value}) {
+            $context->{variables}->{$tok_value} = ['NUM', 0];
         }
 
-        return;
+        return --$context->{variables}->{$tok_value}->[1];
     }
 
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
@@ -292,23 +300,25 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
 
     if ($ins eq 'POSTFIX_ADD') {
-        my $token = $value;
+        my $token = $data->[1];
         my ($type, $value) = ($token->[0], $token->[1]);
 
-        if ($type eq 'IDENT') {
-            return $context->{variables}->{$value}++;
-        } else {
-            return $self->error($context, "Postfix increment on non-object");
+        if (not exists $context->{variables}->{$value}) {
+            $context->{variables}->{$value} = ['NUM', 0];
         }
+
+        return $context->{variables}->{$value}->[1]++;
     }
 
     if ($ins eq 'POSTFIX_SUB') {
-        my $token = $value;
+        my $token = $data->[1];
         my ($type, $value) = ($token->[0], $token->[1]);
 
-        if ($type eq 'IDENT') {
-            return $context->{variables}->{$value}--;
+        if (not exists $context->{variables}->{$value}) {
+            $context->{variables}->{$value} = ['NUM', 0];
         }
+
+        return $context->{variables}->{$value}->[1]--;
     }
 
     return;

@@ -100,7 +100,7 @@ my %keywords = (
     'else'   => 1,
 );
 
-# Grammar: FuncDef   =>    fn IDENT L_PAREN IdentList R_PAREN L_BRACE Statement(s) R_BRACE
+# Grammar: FuncDef   =>    "fn" IDENT L_PAREN IdentList(s) R_PAREN L_BRACE Statement(s) R_BRACE
 #          IdentList =>    IDENT COMMA(?)
 sub FuncDef {
     my ($parser) = @_;
@@ -254,7 +254,7 @@ sub Prefix {
     return $expr if $expr = UnaryOp($parser, 'MINUS_MINUS', 'PREFIX_SUB');
 
     if ($token = $parser->consume('L_PAREN')) {
-        my $expr = Expression($parser, $precedence);
+        my $expr = Expression($parser, 0);
         return expected($parser, 'R_PAREN') if not $parser->consume('R_PAREN');
         return $expr;
     }
