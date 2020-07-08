@@ -62,7 +62,7 @@ Variables are declared by assigning a value to an identifier. An identifier is a
 sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
 
-    $ ./plang <<< 'a = 5; print a'
+    $ ./plang <<< 'a = 5; a'
       5
 
 Identifiers that have not yet been assigned a value will simply yield 0.
