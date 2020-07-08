@@ -1,8 +1,8 @@
-# plang
-plang is an experimental foray into implementing a programming language in Perl
+# Plang
+Plang is an experimental foray into implementing a programming language in Perl.
 
 ## Features
-plang is in early development stages. This is what is implemented so far.
+Plang is in early development stages. This is what is implemented so far.
 
 * Lexer: Done
 * Parser: Done
@@ -46,13 +46,18 @@ Operator | Description | Associativity
 A statement is a single instruction. Statements may be terminated by a
 semi-colon or a newline.
 
-    $ ./plang <<< '1 + 2; 3 * 4; 5 - 6;'
-      14
+Plang automatically prints the value of the last statement. To print the
+values of previous statements, you must use the `print` [function](#functions).
+
+    $ ./plang <<< 'print 1 + 2, "\n"; print 3 * 4, "\n"; 5 - 6'
+      3
+      12
+      -1
 
 ### Variables
 Variables are declared by assigning a value to an identifier;
 
-    $ ./plang <<< 'a = 5; a'
+    $ ./plang <<< 'a = 5; print a'
       5
 
 Identifiers that have not yet been assigned a value will simply yield 0.
@@ -76,7 +81,7 @@ return a value via the `return` keyword.
 
 For example, a function to square a value:
 
-    $ ./plang <<< 'fn square(x) { x * x }; square(4)'
+    $ ./plang <<< 'fn square(x) { x * x } square 4'
       16
 
 #### Built-in functions
