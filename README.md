@@ -1,9 +1,23 @@
 # Plang
 Plang is an experimental foray into implementing a programming language in Perl.
 
-## Features
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
+<!-- md-toc-begin -->
+  * [Features](#features)
+    * [Expressions](#expressions)
+      * [Operators](#operators)
+    * [Statements](#statements)
+    * [Variables](#variables)
+    * [Keywords](#keywords)
+    * [Functions](#functions)
+      * [Built-in functions](#built-in-functions)
+  * [Debugging](#debugging)
+    * [DEBUG environment variable](#debug-environment-variable)
+    * [Testing the lexer](#testing-the-lexer)
+<!-- md-toc-end -->
+
+## Features
 This is what is implemented so far.
 
 * Lexer: Done
@@ -98,7 +112,7 @@ Another trivial example, adding two numbers:
 #### Built-in functions
 Function | Description
 --- | ---
-print string | Prints `string` to standard output.
+print `expr` | Prints expression `expr` to standard output.
 
 ## Debugging
 ### DEBUG environment variable
