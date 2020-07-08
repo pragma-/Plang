@@ -64,8 +64,9 @@ A statement is a single instruction. Statements may be terminated by a
 semi-colon or a newline.
 
 Plang automatically prints the value of the last statement. To print the
-values of previous statements, you must use the `print` [function](#functions)
-To prevent printing the last statement, make the last statement `return`.
+values of previous statements, the `print` [function](#functions).
+
+To prevent printing the last statement, use the `return` keyword.
 
     $ ./plang <<< 'print 1 + 2, "\n"; print 3 * 4, "\n"; 5 - 6'
       3
