@@ -87,7 +87,7 @@ For example, a function to square a value:
 #### Built-in functions
 Function | Description
 --- | ---
-print(string) | Prints `string` to standard output.
+print string | Prints `string` to standard output.
 
 ## Debugging
 ### DEBUG environment variable
