@@ -36,28 +36,28 @@ This is what is implemented so far.
       0
 
 #### Operators
-These are the operators implemented so far, from lowest to highest precedence.
+These are the operators implemented so far, from highest to lowest precedence.
 
 Operator | Description | Associativity
 --- | --- | ---
-=  | Assignment | Right to left
-== | Equality | Left to right
-\>= | Greater or equal | Left to right
-\<= | Less or equal | Left to right
-\> | Greater | Left to right
-\<  | Less | Left to right
-\+ | Addition | Left to right
-\- | Subtraction | Left to right
-\* | Product | Left to right
-/ | Division | Left to right
-% | Remainder | Left to right
-\*\* | Exponent | Right to left
-! | Not | Right to left
-\+\+ | Prefix increment | Right to left
-\-\- | Prefix decrement | Right to left
+\(\) | Function call     | Left to right
 \+\+ | Postfix increment | Left to right
 \-\- | Postfix decrement | Left to right
-\(\) | Function call | Left to right
+\+\+ | Prefix increment  | Right to left
+\-\- | Prefix decrement  | Right to left
+!    | Logical negation  | Right to left
+\*   | Product           | Left to right
+/    | Division          | Left to right
+%    | Remainder         | Left to right
+\*\* | Exponent          | Right to left
+\+   | Addition          | Left to right
+\-   | Subtraction       | Left to right
+==   | Equality          | Left to right
+\>=  | Greater or equal  | Left to right
+\<=  | Less or equal     | Left to right
+\>   | Greater           | Left to right
+\<   | Less              | Left to right
+=    | Assignment        | Right to left
 
 ### Statements
 A statement is a single instruction. Statements may be terminated by a
