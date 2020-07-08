@@ -116,7 +116,7 @@ sub next_token {
         $token = $self->{token_iter}->();
 
         # no token, bail early
-        return undef if not defined $token;
+        return if not defined $token;
 
         # is this token ignored?
         if (ref $token and not length $token->[1] or not length $token) {
@@ -148,7 +148,7 @@ sub consume {
     my ($self, $wanted) = @_;
 
     my $token = $self->next_token('peek');
-    return undef if not defined $token;
+    return if not defined $token;
 
     if (not defined $wanted) {
         $self->{current_token}++;
@@ -164,7 +164,7 @@ sub consume {
     }
 
     print "got $token->[0] instead\n" if $self->{debug};
-    return undef;
+    return;
 }
 
 # consumes and discards tokens until target is reached,

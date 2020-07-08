@@ -54,7 +54,7 @@ sub tokens {
             $self->{line}++, $text = $input->() if not defined $text;
 
             # all done when there's no more input
-            return undef if not defined $text;
+            return if not defined $text;
 
             LOOP: {
                 # go through each tokentype
