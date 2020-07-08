@@ -82,8 +82,8 @@ return | return value from function
 ### Functions
 Functions are an abstracted group of statements. Functions can take identifiers as
 parameters and will return the value of the last statement. You can explicitly
-return a value via the `return` keyword. Arguments passed to function calls may be
-any valid expression, optionally enclosed with parentheses.
+return from a value from an earlier statement via the `return` keyword. Arguments
+passed to function calls may be any valid expression, optionally enclosed with parentheses.
 
 For example, a function to square a value:
 
