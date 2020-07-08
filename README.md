@@ -64,7 +64,7 @@ A statement is a single instruction. Statements may be terminated by a
 semi-colon or a newline.
 
 Plang automatically prints the value of the last statement. To print the
-values of previous statements, the `print` [function](#functions).
+values of previous statements, use the `print` [function](#functions).
 
 To prevent printing the last statement, use the `return` keyword.
 
