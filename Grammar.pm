@@ -9,25 +9,48 @@ use base 'Exporter';
 our @EXPORT_OK = qw/Program/;
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 
-sub expected {
-    my ($parser, $expected, $consume_to) = @_;
+sub error {
+    my ($parser, $err_msg, $consume_to) = @_;
+    chomp $err_msg;
 
     $consume_to ||= 'TERM';
 
-    my $token = $parser->current_token;
-
-    if (defined $token) {
-        my $name = "$token->[0] ($token->[1])";
+    if (defined (my $token = $parser->current_or_last_token)) {
         my $line = $token->[2]->{line};
         my $col  = $token->[2]->{col};
-        $parser->add_error("Expected $expected but got $name at line $line, col $col");
+        $parser->add_error("Error: $err_msg at line $line, col $col.");
     } else {
-        $parser->add_error("Expected $expected but got EOF");
+        $parser->add_error("Error: $err_msg");
     }
 
     $parser->consume_to($consume_to);
     $parser->rewrite_backtrack;
-    $parser->{got_error} = 1;
+    return;
+}
+
+my %pretty_tokens = (
+    'TERM' => 'statement terminator',
+);
+
+sub pretty_token {
+    $pretty_tokens{$_[0]} // $_[0];
+}
+
+sub pretty_value {
+    my ($value) = @_;
+    $value =~ s/\n/\\n/g;
+    return $value;
+}
+
+sub expected {
+    my ($parser, $expected, $consume_to) = @_;
+
+    if (defined (my $token = $parser->current_or_last_token)) {
+        my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
+        return error($parser, "Expected $expected but got $name");
+    } else {
+        return error($parser, "Expected $expected but got EOF");
+    }
 }
 
 # Grammar: Program --> Statement(s)
@@ -128,7 +151,7 @@ sub FuncDef {
             return expected($parser, 'COMMA or R_PAREN after function parameter IDENT');
         }
 
-        return expected($parser, 'Opening L_BRACE for function body') if not $parser->consume('L_BRACE');
+        return expected($parser, 'opening L_BRACE for function body') if not $parser->consume('L_BRACE');
 
         my $statements = [];
         while (1) {
@@ -215,7 +238,7 @@ sub UnaryOp {
 
     if ($parser->consume($op)) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        return $expr ? [$ins, $expr] : expected($parser, 'Expression');
+        return $expr ? [$ins, $expr] : expected($parser, 'expression');
     }
 }
 
@@ -225,7 +248,7 @@ sub BinaryOp {
 
     if ($parser->consume($op)) {
         my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
-        return $right ? [$ins, $left, $right] : expected($parser, 'Expression');
+        return $right ? [$ins, $left, $right] : expected($parser, 'expression');
     }
 }
 
@@ -249,9 +272,29 @@ sub Prefix {
         return ['STRING', $token->[1]];
     }
 
+    if ($parser->consume('MINUS_MINUS')) {
+        my $expr = Expression($parser, $precedence_table{'PREFIX'});
+        return expected($parser, 'expression') if not defined $expr;
+
+        if ($expr->[0] eq 'IDENT') {
+            return ['PREFIX_SUB', $expr];
+        } else {
+            return error($parser, "Prefix decrement must be used on objects (got " . pretty_token($expr->[0]) . ")");
+        }
+    }
+
+    if ($parser->consume('PLUS_PLUS')) {
+        my $expr = Expression($parser, $precedence_table{'PREFIX'});
+        return expected($parser, 'expression') if not defined $expr;
+
+        if ($expr->[0] eq 'IDENT') {
+            return ['PREFIX_ADD', $expr];
+        } else {
+            return error($parser, "Prefix increment must be used on objects (got " . pretty_token($expr->[0]) . ")");
+        }
+    }
+
     return $expr if $expr = UnaryOp($parser, 'BANG',        'NOT');
-    return $expr if $expr = UnaryOp($parser, 'PLUS_PLUS',   'PREFIX_ADD');
-    return $expr if $expr = UnaryOp($parser, 'MINUS_MINUS', 'PREFIX_SUB');
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser, 0);
@@ -278,7 +321,7 @@ sub Infix {
             }
 
             last if $parser->consume('R_PAREN');
-            return expected($parser, 'Expression or closing R_PAREN for function call argument list');
+            return expected($parser, 'expression or closing R_PAREN for function call argument list');
         }
 
         return ['CALL', $left->[1], $arguments];
@@ -304,11 +347,19 @@ sub Postfix {
     my ($parser, $left, $precedence) = @_;
 
     if ($parser->consume('PLUS_PLUS')) {
-        return ['POSTFIX_ADD', $left];
+        if ($left->[0] eq 'IDENT') {
+            return ['POSTFIX_ADD', $left];
+        } else {
+            return error($parser, "Postfix increment must be used on objects (got " . pretty_token($left->[0]) . ")");
+        }
     }
 
     if ($parser->consume('MINUS_MINUS')) {
-        return ['POSTFIX_SUB', $left];
+        if ($left->[0] eq 'IDENT') {
+            return ['POSTFIX_SUB', $left];
+        } else {
+            return error($parser, "Postfix decrement must be used on objects (got " . pretty_token($left->[0]) . ")");
+        }
     }
 
     return $left;

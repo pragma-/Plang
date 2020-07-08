@@ -142,6 +142,22 @@ sub current_token {
     return $self->{read_tokens}->[$self->{current_token}];
 }
 
+# gets the current or the last token from the backtrack
+# next_token() must have been invoked at least once
+sub current_or_last_token {
+    my ($self) = @_;
+
+    if ($self->{current_token} > 0) {
+        if (defined $self->{read_tokens}->[$self->{current_token}]) {
+            return $self->{read_tokens}->[$self->{current_token}];
+        }
+
+        return $self->{read_tokens}->[$self->{current_token} - 1];
+    }
+
+    return;
+}
+
 # if no arguments passed, consumes the current token
 # otherwise, consumes and returns token only if token matches argument
 sub consume {
@@ -203,7 +219,7 @@ sub rewrite_backtrack {
 sub add_error {
     my ($self, $text) = @_;
     push @{$self->{errors}}, $text;
-
+    $self->set_error;
     $self->{dprint}->(1, "Added error: $text\n");
 }
 
