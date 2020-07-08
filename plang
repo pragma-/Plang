@@ -127,7 +127,7 @@ if (my $count = @{$parser->{errors}}) {
 }
 
 # dump the $result data structure
-if ($debug >= 2) {
+if ($dumptokens or $debug >= 2) {
     $Data::Dumper::Terse = 1;
     $Data::Dumper::Indent = 1;
     $Data::Dumper::Useqq = 1;
