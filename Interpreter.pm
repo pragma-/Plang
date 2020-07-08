@@ -5,6 +5,8 @@ use strict;
 
 package Interpreter;
 
+use Data::Dumper;
+
 sub new {
     my ($proto, %conf) = @_;
     my $class = ref($proto) || $proto;
@@ -23,13 +25,45 @@ sub initialize {
 
 sub run {
     my ($self) = @_;
-    return $self->interpret_ast if $self->{ast};
+
+    if (not $self->{ast}) {
+        print STDERR "No program to run.\n";
+        return;
+    }
+
+    my $context = {
+        variables => {},
+        functions => {},
+    };
+
+    # first context pushed onto the stack is the global context
+    # which contains global variables and functions
+    $self->push_stack($context);
+
+    my $program    = $self->{ast}->[0];
+    my $statements = $program->[1];
+
+    my $result = $self->interpret_ast($context, $statements);
+
+    if (defined $result) {
+        print "$result\n";
+    }
+
+    return $result;
+}
+
+sub warning {
+    my ($self, $context, $warn_msg) = @_;
+    chomp $warn_msg;
+    print STDERR "Warning: $warn_msg\n";
+    return;
 }
 
 sub error {
     my ($self, $context, $err_msg) = @_;
-    print STDERR $err_msg;
-    return undef;
+    chomp $err_msg;
+    print STDERR "Fatal error: $err_msg\n";
+    return;
 }
 
 sub push_stack {
@@ -42,30 +76,39 @@ sub pop_stack {
     return pop @{$self->{stack}};
 }
 
+sub set_variable {
+    my ($self, $context, $name, $value) = @_;
+    $context->{variables}->{$name} = $value;
+}
+
+sub get_variable {
+    my ($self, $context, $name) = @_;
+
+    if (exists $context->{variables}->{$name}) {
+        return $context->{variables}->{$name}->[1];
+    } elsif (exists $self->{stack}->[0]->{variables}->{$name}) {
+        return $self->{stack}->[0]->{variables}->{$name}->[1];
+    } else {
+        return 0;
+    }
+}
+
 sub interpret_ast {
-    my ($self) = @_;
+    my ($self, $context, $ast) = @_;
 
-    my $ast = $self->{ast};
-
-    my $program = $ast->[0];
-    my $statements = $program->[1];
+    print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
 
     my $result;
-
-    my $context = {
-        variables => {},
-    };
-
-    foreach my $statement (@$statements) {
-        my $instruction = $statement->[0];
+    foreach my $node (@$ast) {
+        my $instruction = $node->[0];
 
         if ($instruction eq 'STMT') {
-            $result += $self->statement($context, $statement->[1]);
+            $result = $self->statement($context, $node->[1]);
+            last if not defined $result;
         }
     }
 
-    print "$result\n";
-    return 1;
+    return $result;
 }
 
 my %eval_unary_op = (
@@ -98,7 +141,7 @@ sub unary_op {
         }
         return $eval_unary_op{$data->[0]}->($value);
     }
-    return undef;
+    return;
 }
 
 sub binary_op {
@@ -116,64 +159,123 @@ sub binary_op {
 
         return $eval_binary_op{$data->[0]}->($left_value, $right_value);
     }
-    return undef;
+    return;
+}
+
+sub func_definition {
+    my ($self, $context, $data) = @_;
+
+    my $name       = $data->[1];
+    my $parameters = $data->[2];
+    my $statements = $data->[3];
+
+    if (exists $context->{functions}->{$name}) {
+        $self->warning($context, "Overwriting existing function `$name`.\n");
+    }
+
+    $context->{functions}->{$name} = [$parameters, $statements];
+    return 1;
+}
+
+sub func_call {
+    my ($self, $context, $data) = @_;
+
+    my $name      = $data->[1];
+    my $arguments = $data->[2];
+
+    my $func;
+
+    if (exists $context->{functions}->{$name}) {
+        $func = $context->{functions}->{$name};
+    } elsif (exists $self->{stack}->[0]->{functions}->{$name}) {
+        $func = $self->{stack}->[0]->{functions}->{$name};
+    } else {
+        return $self->error($context, "Undefined function `$name`.");
+    }
+
+    my $parameters = $func->[0];
+    my $statements = $func->[1];
+
+    my $new_context = {
+        variables => {},
+        functions => {},
+    };
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        my $arg = $arguments->[$i];
+
+        if (not defined $arg) {
+            return $self->error($context, "Missing argument $parameters->[$i] to function $name.\n");
+        }
+
+        if ($arg->[0] eq 'IDENT') {
+            $arg = ['NUM', $self->get_variable($context, $arg->[1])];
+        }
+
+        $new_context->{variables}->{$parameters->[$i]} = $arg;
+    }
+
+    if (@$arguments > @$parameters) {
+        $self->warning($context, "Extra arguments provided to function $name (takes " . @$parameters . " but passed " . @$arguments . ").");
+    }
+
+    $self->push_stack($context);
+    my $result = $self->interpret_ast($new_context, $statements);;
+    $self->pop_stack;
+    return $result;
 }
 
 sub statement {
     my ($self, $context, $data) = @_;
-    my $value;
+    return if not $data;
 
-    return 0 if not $data;
+    my $ins   = $data->[0];
+    my $value = $data->[1];
 
-    print "stmt ins: $data->[0]\n" if $self->{debug} >= 3;
+    print "stmt ins: $ins\n" if $self->{debug} >= 4;
 
-    if ($data->[0] eq 'NUM') {
-        return $data->[1];
-    }
+    return $value if $ins eq 'NUM';
+    return $value if $ins eq 'STRING';
 
-    if ($data->[0] eq 'STRING') {
-        return $data->[1];
-    }
-
-    if ($data->[0] eq 'IDENT') {
-        return $context->{variables}->{$data->[1]} // 0;
-    }
-
-    if ($data->[0] eq 'FUNCDEF') {
-        print "Defining function\n";
-    }
-
-    if ($data->[0] eq 'CALL') {
-        print "Calling function\n";
-    }
-
-    if ($data->[0] eq 'ASSIGN') {
-        my $left_token  = $data->[1];
+    if ($ins eq 'ASSIGN') {
+        my $left_token  = $value;
         my $right_value = $self->statement($context, $data->[2]);
-        $context->{variables}->{$left_token->[1]} = $right_value;
-        return 0;
+        $self->set_variable($context, $left_token->[1], [$left_token->[0], $right_value]);
+        return $right_value;
     }
 
-    if ($data->[0] eq 'PREFIX_ADD') {
-        my $token = $data->[1];
-        my ($type, $value) = ($token->[0], $token->[1]);
-
-        if ($type eq 'IDENT') {
-            return ++$context->{variables}->{$value};
-        }
-
-        return 0;
+    if ($ins eq 'IDENT') {
+        return $self->get_variable($context, $value);
     }
 
-    if ($data->[0] eq 'PREFIX_SUB') {
-        my $token = $data->[1];
-        my ($type, $value) = ($token->[0], $token->[1]);
+    if ($ins eq 'FUNCDEF') {
+        return $self->func_definition($context, $data);
+    }
 
-        if ($type eq 'IDENT') {
-            return --$context->{variables}->{$value};
+    if ($ins eq 'CALL') {
+        return $self->func_call($context, $data);
+    }
+
+    if ($ins eq 'PREFIX_ADD') {
+        my $token = $value;
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
+
+        if ($tok_type eq 'IDENT') {
+            return ++$context->{variables}->{$tok_value};
         }
 
-        return 0;
+        return;
+    }
+
+    if ($ins eq 'PREFIX_SUB') {
+        my $token = $value;
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
+
+        if ($tok_type eq 'IDENT') {
+            return --$context->{variables}->{$tok_value};
+        }
+
+        return;
     }
 
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
@@ -190,25 +292,27 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
 
-    if ($data->[0] eq 'POSTFIX_ADD') {
-        my $token = $data->[1];
+    if ($ins eq 'POSTFIX_ADD') {
+        my $token = $value;
         my ($type, $value) = ($token->[0], $token->[1]);
 
         if ($type eq 'IDENT') {
             return $context->{variables}->{$value}++;
         } else {
-            return $self->error($context, 'Postfix increment on non-object');
+            return $self->error($context, "Postfix increment on non-object");
         }
     }
 
-    if ($data->[0] eq 'POSTFIX_SUB') {
-        my $token = $data->[1];
+    if ($ins eq 'POSTFIX_SUB') {
+        my $token = $value;
         my ($type, $value) = ($token->[0], $token->[1]);
 
         if ($type eq 'IDENT') {
             return $context->{variables}->{$value}--;
         }
     }
+
+    return;
 }
 
 1;
