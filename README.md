@@ -40,23 +40,24 @@ These are the operators implemented so far, from lowest to highest precedence.
 
 Operator | Description | Associativity
 --- | --- | ---
-=  | Assignment | Left
-== | Equality | Right
-\>= | Greater or equal | Right
-\<= | Less or equal | Right
-\> | Greater | Right
-\<  | Less | Right
-\+ | Addition | Right
-\- | Subtraction | Right
-\* | Product | Right
-/ | Division | Right
-\*\* | Exponent | Right
-% | Remainder | Right
-! | Not | Left
-\+\+ | Prefix increment | Left
-\-\- | Prefix decrement | Left
-\+\+ | Postfix increment | Right
-\-\- | Postfix decrement | Right
+=  | Assignment | Right to left
+== | Equality | Left to right
+\>= | Greater or equal | Left to right
+\<= | Less or equal | Left to right
+\> | Greater | Left to right
+\<  | Less | Left to right
+\+ | Addition | Left to right
+\- | Subtraction | Left to right
+\* | Product | Left to right
+/ | Division | Left to right
+% | Remainder | Left to right
+\*\* | Exponent | Right to left
+! | Not | Right to left
+\+\+ | Prefix increment | Right to left
+\-\- | Prefix decrement | Right to left
+\+\+ | Postfix increment | Left to right
+\-\- | Postfix decrement | Left to right
+\(\) | Function call | Left to right
 
 ### Statements
 A statement is a single instruction. Statements may be terminated by a
