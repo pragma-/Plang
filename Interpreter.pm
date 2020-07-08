@@ -174,7 +174,7 @@ sub func_definition {
     }
 
     $context->{functions}->{$name} = [$parameters, $statements];
-    return 1;
+    return 0;
 }
 
 sub func_call {
@@ -208,9 +208,8 @@ sub func_call {
             return $self->error($context, "Missing argument $parameters->[$i] to function $name.\n");
         }
 
-        if ($arg->[0] eq 'IDENT') {
-            $arg = ['NUM', $self->get_variable($context, $arg->[1])];
-        }
+        my $value = $self->statement($context, $arg); # this should be an expression
+        $arg = ['NUM', $value];
 
         $new_context->{variables}->{$parameters->[$i]} = $arg;
     }
