@@ -90,6 +90,11 @@ For example, a function to square a value:
     $ ./plang <<< 'fn square(x) { x * x } square 4'
       16
 
+Another trivial example, adding two numbers:
+
+    $ ./plang <<< 'fn add(a, b) { a + b } add(2, 3)'
+      5
+
 #### Built-in functions
 Function | Description
 --- | ---
