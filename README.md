@@ -67,6 +67,7 @@ Identifiers that have not yet been assigned a value will simply yield 0.
 Keyword | Description
 --- | ---
 fn | function definition
+return | return value from function
 
 ### Functions
 Functions are an abstracted group of statements. Functions can take variables
