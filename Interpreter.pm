@@ -26,6 +26,12 @@ sub run {
     return $self->interpret_ast if $self->{ast};
 }
 
+sub error {
+    my ($self, $context, $err_msg) = @_;
+    print STDERR $err_msg;
+    return undef;
+}
+
 sub push_stack {
     my ($self, $context) = @_;
     push @{$self->{stack}}, $context;
@@ -88,6 +94,7 @@ sub unary_op {
 
         if ($debug_msg and $self->{debug} >= 3) {
             $debug_msg =~ s/\$a/$value/g;
+            print $debug_msg, "\n";
         }
         return $eval_unary_op{$data->[0]}->($value);
     }
@@ -124,14 +131,48 @@ sub statement {
         return $data->[1];
     }
 
+    if ($data->[0] eq 'STRING') {
+        return $data->[1];
+    }
+
     if ($data->[0] eq 'IDENT') {
         return $context->{variables}->{$data->[1]} // 0;
     }
 
+    if ($data->[0] eq 'FUNCDEF') {
+        print "Defining function\n";
+    }
+
+    if ($data->[0] eq 'CALL') {
+        print "Calling function\n";
+    }
+
     if ($data->[0] eq 'ASSIGN') {
-        my $left_value  = $data->[1];
+        my $left_token  = $data->[1];
         my $right_value = $self->statement($context, $data->[2]);
-        $context->{variables}->{$left_value->[1]} = $right_value;
+        $context->{variables}->{$left_token->[1]} = $right_value;
+        return 0;
+    }
+
+    if ($data->[0] eq 'PREFIX_ADD') {
+        my $token = $data->[1];
+        my ($type, $value) = ($token->[0], $token->[1]);
+
+        if ($type eq 'IDENT') {
+            return ++$context->{variables}->{$value};
+        }
+
+        return 0;
+    }
+
+    if ($data->[0] eq 'PREFIX_SUB') {
+        my $token = $data->[1];
+        my ($type, $value) = ($token->[0], $token->[1]);
+
+        if ($type eq 'IDENT') {
+            return --$context->{variables}->{$value};
+        }
+
         return 0;
     }
 
@@ -148,6 +189,26 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+
+    if ($data->[0] eq 'POSTFIX_ADD') {
+        my $token = $data->[1];
+        my ($type, $value) = ($token->[0], $token->[1]);
+
+        if ($type eq 'IDENT') {
+            return $context->{variables}->{$value}++;
+        } else {
+            return $self->error($context, 'Postfix increment on non-object');
+        }
+    }
+
+    if ($data->[0] eq 'POSTFIX_SUB') {
+        my $token = $data->[1];
+        my ($type, $value) = ($token->[0], $token->[1]);
+
+        if ($type eq 'IDENT') {
+            return $context->{variables}->{$value}--;
+        }
+    }
 }
 
 1;

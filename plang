@@ -60,6 +60,8 @@ $lexer->define_tokens(
     ['BSLASH',         qr{\G(   \\                  )}x],
     ['L_PAREN',        qr{\G(   \(                  )}x],
     ['R_PAREN',        qr{\G(   \)                  )}x],
+    ['L_BRACE',        qr{\G(   \{                  )}x],
+    ['R_BRACE',        qr{\G(   \}                  )}x],
     ['NUM',            qr{\G(   [0-9.]+             )}x],
     ['IDENT',          qr{\G(   [A-Za-z_]\w*        )}x],
     ['TERM',           qr{\G(   ;\n* | \n+          )}x],
