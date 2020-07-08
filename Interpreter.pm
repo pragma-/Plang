@@ -78,14 +78,11 @@ sub pop_stack {
 
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
-    print "set_variable: ", Dumper($context), Dumper($name), Dumper ($value), "\n";
     $context->{variables}->{$name} = $value;
 }
 
 sub get_variable {
     my ($self, $context, $name) = @_;
-
-    print "get_variable: ", Dumper($context),  Dumper($name), "\n";
 
     if (exists $context->{variables}->{$name}) {
         # local variable
