@@ -8,14 +8,14 @@ use lib '.';
 
 use Data::Dumper;
 
-use Plang::Plang;
+use Plang::Interpreter;
 
 # example of setting up a simple straight-forward Plang interpreter
 sub plang {
     my ($text) = @_;
 
     # create Plang object
-    my $plang = Plang::Plang->new;
+    my $plang = Plang::Interpreter->new;
 
     if (defined $text) {
         # if a string argument was provided, interpret the string
@@ -38,7 +38,7 @@ sub DumpToken {
 }
 
 sub plang_dbg {
-    my $plang = Plang::Plang->new(embedded => 0, debug => $debug);
+    my $plang = Plang::Interpreter->new(embedded => 0, debug => $debug);
 
     # if --dumptokens was specified on command-line, use the DumpToken rule
     # otherwise use the Program rule
