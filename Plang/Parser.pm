@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
+package Plang::Parser;
+
 use warnings;
 use strict;
-
-package Parser;
 
 sub new {
     my ($proto, %conf) = @_;
@@ -28,12 +28,6 @@ sub initialize {
         $self->{dprint} = sub {};
         $self->{clean} = sub {};
     }
-
-    $self->{read_tokens} = [];
-    $self->{current_token} = 0;
-    $self->{backtrack} = [];
-
-    $self->{errors} = [];
 
     $self->{rules} = [];
 }
@@ -250,6 +244,12 @@ sub clear_error {
     $self->{got_error} = 0;
 }
 
+# remove existing rules
+sub clear_rules {
+    my ($self) = @_;
+    $self->{rules} = [];
+}
+
 # add a rule to the parser engine
 sub add_rule {
     my ($self, $rule) = @_;
@@ -258,7 +258,15 @@ sub add_rule {
 
 # parse the rules
 sub parse {
-    my ($self) = @_;
+    my ($self, $token_iter) = @_;
+
+    $self->{token_iter} = $token_iter if defined $token_iter;
+
+    $self->{read_tokens}   = [];
+    $self->{current_token} = 0;
+    $self->{backtrack}     = [];
+
+    $self->{errors} = [];
 
     my @results;
 

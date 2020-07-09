@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
+package Plang::Interpreter;
+
 use warnings;
 use strict;
-
-package Interpreter;
 
 use Data::Dumper;
 
@@ -17,19 +17,24 @@ sub new {
 
 sub initialize {
     my ($self, %conf) = @_;
-    $self->{ast} = $conf{ast};
-    $self->{debug} = $conf{debug} // 0;
 
-    $self->{stack} = [];
+    $self->{ast}      = $conf{ast};
+    $self->{debug}    = $conf{debug}    // 0;
+    $self->{embedded} = $conf{embedded} // 0;
 }
 
+# runs a new Plang program with a fresh environment
 sub run {
-    my ($self) = @_;
+    my ($self, $ast) = @_;
+
+    $self->{ast} = $ast if defined $ast;
 
     if (not $self->{ast}) {
         print STDERR "No program to run.\n";
         return;
     }
+
+    $self->{stack} = [];
 
     my $context = {
         variables => {},
@@ -45,7 +50,7 @@ sub run {
 
     my $result = $self->interpret_ast($context, $statements);
 
-    if (defined $result) {
+    if (!$self->{embedded} and defined $result) {
         print "$result\n";
     }
 

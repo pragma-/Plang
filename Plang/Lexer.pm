@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
+package Plang::Lexer;
+
 use warnings;
 use strict;
-
-package Lexer;
 
 sub new {
     my ($proto, %conf) = @_;
@@ -17,8 +17,6 @@ sub initialize {
     my ($self, %conf) = @_;
 
     $self->{tokentypes} = [];
-    $self->{line} = 0;
-    $self->{col}  = 0;
 }
 
 # define our tokentypes
@@ -32,12 +30,6 @@ sub define_tokens {
     }
 }
 
-# append new tokentypes
-sub add_token {
-    my ($self, $tokentype) = @_;
-    push @{$self->{tokentypes}}, $tokentype;
-}
-
 sub tokens {
     my ($self, $input, $tokentypes) = @_;
 
@@ -46,6 +38,9 @@ sub tokens {
 
     # the current line being lexed
     my $text;
+
+    $self->{line} = 0;
+    $self->{col}  = 0;
 
     # closures are neat
     return sub {

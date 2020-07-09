@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-package Grammar;
+package Plang::Grammar;
 
 use warnings;
 use strict;
