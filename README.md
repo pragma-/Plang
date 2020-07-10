@@ -26,7 +26,7 @@ This is what is implemented so far.
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
     * [Variables](#variables)
-  * [Scoping](#scoping)
+      * [Scoping](#scoping)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
 * [Debugging](#debugging)
@@ -81,7 +81,8 @@ Operator | Description | Associativity
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
-                      | FuncDef
+                      | VariableDeclaration
+                      | FunctionDefinition
                       | Expression Terminator
                       | Terminator
     StatementGroup ::=  "{" Statement+ "}"
@@ -141,7 +142,7 @@ Variables that have not yet been assigned a value will produce an error.
     $ ./plang <<< 'var a = 5; var b; a + b'
       Error: `b` not defined.
 
-### Scoping
+##### Scoping
 Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
 consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
 `nonlocal` are potential keywords.
