@@ -20,6 +20,7 @@ This is what is implemented so far.
 
 <!-- md-toc-begin -->
 * [Implementation](#implementation)
+  * [Notes](#notes)
   * [Expressions](#expressions)
     * [Operators](#operators)
   * [Statements and StatementGroups](#statements-and-statementgroups)
@@ -39,6 +40,18 @@ This is what is implemented so far.
 * Parser: Done
 * Grammar: In-progress
 * Interpreter: In-progress
+
+### Notes
+Plang automatically prints the value and type of the last statement of the program. To prevent this,
+use the `return` keyword (or construct any statement that doesn't yield a value) as the last statement.
+
+You may print the values of any statements explicitly by using the `println` function.
+`println` will not print the type.
+
+    $ ./plang <<< 'println(1 + 2); println(3 * 4); "Hello there!"'
+      3
+      12
+      "Hello there!" (STRING)
 
 ### Expressions
 Expressions perform arithmetic, assignment or logical operations.
@@ -95,17 +108,6 @@ A statement group is multiple statements enclosed in curly-braces.
 In Plang, statements have values. The value of a statement is the value of its expression.
 
 The value of a statement group is the value of the final statement in the group.
-
-Plang automatically prints the value and type of the last statement of the program. To prevent this,
-use the `return` keyword as the last statement.
-
-You may print the values of any statements explicitly by using the `println` function.
-`println` will not print the types.
-
-    $ ./plang <<< 'println(1 + 2); println(3 * 4); 5 - 6'
-      3
-      12
-      -1 (NUM)
 
 ### Identifiers
     Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
