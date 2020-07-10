@@ -1,12 +1,21 @@
 # Plang
 Plang is an experimental foray into implementing a programming language in Perl.
 
+Why? Because I wanted a small, yet useful, scripting language I could embed into
+some Perl scripts I have; notably [PBot](https://github.com/pragma-/pbot), an IRC bot that I've been tinkering with
+for quite a while.
+
+I wanted to be able to allow strings from external sources to be safely interpreted
+in a sandbox environment with access to exposed Perl subroutines. I also wanted to
+explore how a scripting language is made and what kind of unique ideas I might come up
+with.
+
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
 This is what is implemented so far.
 
 <!-- md-toc-begin -->
-* [Features](#features)
+* [Implementation](#implementation)
   * [Expressions](#expressions)
     * [Operators](#operators)
   * [Statements and StatementGroups](#statements-and-statementgroups)
@@ -20,7 +29,7 @@ This is what is implemented so far.
   * [Testing the lexer](#testing-the-lexer)
 <!-- md-toc-end -->
 
-## Features
+## Implementation
 * Lexer: Done
 * Parser: Done
 * Grammar: In-progress
