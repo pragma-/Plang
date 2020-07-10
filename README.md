@@ -26,6 +26,7 @@ This is what is implemented so far.
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
     * [Variables](#variables)
+  * [Scoping](#scoping)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
 * [Debugging](#debugging)
