@@ -80,12 +80,12 @@ Operator | Description | Associativity
 =    | Assignment        | Right to left
 
 ### Statements and StatementGroups
-    Statement      =    StatementGroup
+    Statement      ::=  StatementGroup
                       | FuncDef
                       | Expression Terminator
                       | Terminator
-    StatementGroup =    "{" Statement+ "}"
-    Terminator     =    ";"
+    StatementGroup ::=  "{" Statement+ "}"
+    Terminator     ::=  ";"
 
 A statement is a single instruction. Statements must be terminated by a semi-colon.
 
@@ -106,9 +106,9 @@ You may print the values of previous statements explicitly by using the `println
       -1
 
 ### Identifiers
-    Identifier =  ("_" | Letter)  ("_" | Letter | Digit)*
-    Letter     =  "a" - "z" | "A" - "Z"
-    Digit      =  "0" - "9"
+    Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
+    Letter     ::=  "a" - "z" | "A" - "Z"
+    Digit      ::=  "0" - "9"
 
 An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
@@ -123,7 +123,11 @@ fn | function definition
 return | return value from function
 
 #### Variables
-Variables are explicitly declared with the `var` keyword.
+    VariableDeclaration ::= "var" Identifier Initializer?
+    Initializer         ::= "=" Expression
+
+Variables are explicitly declared with the `var` keyword. Variables declarations
+may optionally have an initializer that assigns a default value.
 
     $ ./plang <<< 'var a = 5; a'
       5
@@ -143,8 +147,8 @@ consideration about allowing a way to write to the enclosing scope's identifiers
 `nonlocal` are potential keywords.
 
 ### Functions
-    FunctionDefinition = "fn" Identifier "(" IdentifierList* ")" (StatementGroup | Statement)
-    IdentifierList     = Identifier ","?
+    FunctionDefinition ::= "fn" Identifier IdentifierList (StatementGroup | Statement)
+    IdentifierList     ::= "(" (Identifier ","?) ")"
 
 A function definition is created by using the `fn` keyword followed by an identifer,
 then a list of identifiers enclosed in parentheses. The comma in the list of identifiers
