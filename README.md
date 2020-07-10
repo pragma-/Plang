@@ -3,6 +3,8 @@ Plang is an experimental foray into implementing a programming language in Perl.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
+This is what is implemented so far.
+
 <!-- md-toc-begin -->
 * [Features](#features)
   * [Expressions](#expressions)
@@ -19,8 +21,6 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 <!-- md-toc-end -->
 
 ## Features
-This is what is implemented so far.
-
 * Lexer: Done
 * Parser: Done
 * Grammar: In-progress
