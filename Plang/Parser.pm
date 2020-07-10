@@ -29,23 +29,32 @@ sub initialize {
         $self->{clean} = sub {};
     }
 
-    $self->{rules} = [];
+    $self->{rules}    = [];
+    $self->{keywords} = [];
+}
+
+# define our keywords
+sub define_keywords {
+    my $self = shift;
+    @{$self->{keywords}} = @_;
 }
 
 # try a rule (pushes the current token index onto the backtrack)
 sub try {
-    my ($self) = @_;
+    my ($self, $dbg_msg) = @_;
     push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
+        $self->{dprint}->(1, "+-> Trying $dbg_msg\n");
+        push @{$self->{current_rule}}, $dbg_msg;
         $self->{indent}++;
 
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(2, "[$count] saving posiition $self->{current_token}: ");
+        $self->{dprint}->(5, "[$count] saving posiition $self->{current_token}: ");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 2;
-        print "\n" if not defined $token and $self->{debug} >= 2;
+        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
+        print "\n" if not defined $token and $self->{debug} >= 5;
     }
 }
 
@@ -55,14 +64,17 @@ sub backtrack {
     $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
-        $self->{indent}--;
 
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(2, "[$count] backtracking to position $self->{current_token}: ");
+        $self->{dprint}->(5, "[$count] backtracking to position $self->{current_token}: ");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 2;
-        print "\n" if not defined $token and $self->{debug} >= 2;
+        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
+        print "\n" if not defined $token and $self->{debug} >= 5;
+
+        $self->{indent}--;
+        my $rule = pop @{$self->{current_rule}};
+        $self->{dprint}->(1, "<- Backtracked $rule\n");
     }
 }
 
@@ -72,18 +84,20 @@ sub advance {
     pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
-        $self->{indent}--;
-
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(2, "[$count] popped a backtrack\n");
+        $self->{dprint}->(5, "[$count] popped a backtrack\n");
+
+        $self->{indent}--;
+        my $rule = pop @{$self->{current_rule}};
+        $self->{dprint}->(1, "<- Advanced $rule\n");
     }
 }
 
 # alternate to another variant (backtrack and try another variant)
 sub alternate {
-    my ($self) = @_;
+    my ($self, $dbg_msg) = @_;
     $self->backtrack;
-    $self->try;
+    $self->try($dbg_msg);
 }
 
 # gets the next token from the token iterator
@@ -115,6 +129,16 @@ sub next_token {
         # is this token ignored?
         if (ref $token and not length $token->[1] or not length $token) {
             redo NEXT_TOKEN;
+        }
+
+        # is this token a keyword?
+        if ($token->[0] eq 'IDENT') {
+            foreach my $keyword (@{$self->{keywords}}) {
+                if ($token->[1] eq $keyword) {
+                    $token->[0] = "KEYWORD_$keyword";
+                    last;
+                }
+            }
         }
     }
 
@@ -168,7 +192,7 @@ sub consume {
     $self->{dprint}->(1, "Looking for $wanted... ");
 
     if ($token->[0] eq $wanted) {
-        print "got it (", $self->{clean}->($token->[1]), ")                        <-------------\n" if $self->{debug};
+        print "got it (", $self->{clean}->($token->[1]), ") <--\n" if $self->{debug};
         $self->{current_token}++;
         return $token;
     }

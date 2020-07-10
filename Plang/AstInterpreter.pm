@@ -39,6 +39,8 @@ sub run {
     my $context = {
         variables => {},
         functions => {},
+
+        scope => [],
     };
 
     # first context pushed onto the stack is the global context
@@ -106,17 +108,21 @@ sub interpret_ast {
 
     print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
 
-    my $result;
+    my $result;  # result of final statement
+
     foreach my $node (@$ast) {
         my $instruction = $node->[0];
 
         if ($instruction eq 'STMT') {
             $result = $self->statement($context, $node->[1]);
-            last if not defined $result;
+        }
+
+        if ($self->{debug} >= 3) {
+            print "Statement result: $result\n";
         }
     }
 
-    return $result;
+    return $result; # return result of final statement
 }
 
 my %eval_unary_op = (
@@ -242,6 +248,16 @@ sub statement {
     my $value = $data->[1];
 
     print "stmt ins: $ins\n" if $self->{debug} >= 4;
+
+    if ($ins eq 'STMT_GROUP') {
+        # new scope
+
+        my $statements = $value;
+        my $result = $self->interpret_ast($context, $statements);
+
+        # pop scope
+        return $result;
+    }
 
     return $value if $ins eq 'NUM';
     return $value if $ins eq 'STRING';

@@ -82,7 +82,7 @@ my $ret;
 
 # two ways to run the simple example:
 #
-# $ret = plang 'fn square(x) { x * x } square(7)';  # interpret a string
+# $ret = plang 'fn square(x) x * x; square(7)';  # interpret a string
 #
 # or
 #

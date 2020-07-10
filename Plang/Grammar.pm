@@ -45,6 +45,8 @@ sub pretty_value {
 sub expected {
     my ($parser, $expected, $consume_to) = @_;
 
+    $parser->{indent}-- if $parser->{debug};
+
     if (defined (my $token = $parser->current_or_last_token)) {
         my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
         return error($parser, "Expected $expected but got $name");
@@ -57,6 +59,7 @@ sub expected {
 sub Program {
     my ($parser) = @_;
 
+    $parser->try('Program: Statement(s)');
     my @statements;
 
     while (defined $parser->next_token('peek')) {
@@ -65,111 +68,159 @@ sub Program {
         my $statement = Statement($parser);
         next if $parser->errored;
 
-        if ($statement) {
+        if ($statement and $statement->[0] ne 'NOP') {
             push @statements, $statement;
         }
     }
 
+    $parser->advance;
     return @statements ? ['PRGM', \@statements] : undef;
 }
 
-# Grammar: Statement =>    FuncDef
+# Grammar: Statement =>  | StatementGroup
+#                        | FuncDef
 #                        | Conditional
 #                        | Loop
-#                        | StatementBlock
 #                        | Expression TERM
 #                        | TERM
 sub Statement {
     my ($parser) = @_;
 
-    $parser->try;
+    $parser->try('Statement: StatementGroup');
 
-    my $funcdef = FuncDef($parser);
-    return if $parser->errored;
+    {
+        my $statement_group = StatementGroup($parser);
+        return if $parser->errored;
 
-    if ($funcdef) {
-        $parser->advance;
-        return ['STMT', $funcdef];
+        if ($statement_group) {
+            $parser->advance;
+            return ['STMT', $statement_group];
+        }
     }
 
-    $parser->alternate;
+    $parser->alternate('Statement: FuncDef');
 
-    my $expression = Expression($parser);
-    return if $parser->errored;
+    {
+        my $funcdef = FuncDef($parser);
+        return if $parser->errored;
 
-    if ($expression) {
-        $parser->consume('TERM');
-        $parser->advance;
-        return ['STMT', $expression];
+        if ($funcdef) {
+            $parser->advance;
+            return ['STMT', $funcdef];
+        }
     }
 
-    $parser->alternate;
+    $parser->alternate('Statement: Expression');
 
-    if ($parser->consume('TERM')) {
-        $parser->advance;
-        return ['STMT', ''];
-    } else {
-        return expected($parser, 'statement');
+    {
+        my $expression = Expression($parser);
+        return if $parser->errored;
+
+        if ($expression) {
+            $parser->consume('TERM');
+            $parser->advance;
+            return ['STMT', $expression];
+        }
+    }
+
+    $parser->alternate('Statement: TERM');
+
+    {
+        if ($parser->consume('TERM')) {
+            $parser->advance;
+            return ['NOP', 'null statement'];
+        }
     }
 
     $parser->backtrack;
     return;
 }
 
-my %keywords = (
-    'fn'     => 1,
-    'return' => 1,
-    'if'     => 1,
-    'else'   => 1,
-);
+# Grammar: StatementGroup =>   L_BRACE Statement(s) R_BRACE
+sub StatementGroup {
+    my ($parser) = @_;
 
-# Grammar: FuncDef   =>    "fn" IDENT L_PAREN IdentList(s) R_PAREN L_BRACE Statement(s) R_BRACE
+    $parser->try('StatementGroup: L_BRACE Statement R_BRACE');
+
+    {
+        goto STATEMENT_GROUP_FAIL if not $parser->consume('L_BRACE');
+
+        my @statements;
+
+        while (1) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+            last if not $statement;
+            push @statements, $statement unless $statement->[0] eq 'NOP';
+        }
+
+        goto STATEMENT_GROUP_FAIL if not $parser->consume('R_BRACE');
+
+        $parser->advance;
+        return ['STMT_GROUP', \@statements];
+    }
+
+  STATEMENT_GROUP_FAIL:
+    $parser->backtrack;
+    return;
+}
+
+# Grammar: FuncDef   =>    KEYWORD_fn IDENT L_PAREN IdentList(s) R_PAREN (StatementGroup | Statement)
 #          IdentList =>    IDENT COMMA(?)
 sub FuncDef {
     my ($parser) = @_;
     my $token;
 
-    $parser->try;
+    $parser->try('FuncDef');
 
-    if ($token = $parser->consume('IDENT')) {
-        return if $token->[1] ne 'fn';
+    {
+        if ($token = $parser->consume('KEYWORD_fn')) {
+            $token = $parser->consume('IDENT');
+            return expected($parser, 'IDENT for function name') if not $token;
 
-        $token = $parser->consume('IDENT');
-        return expected($parser, 'IDENT for function name') if not $token;
+            my $name = $token->[1];
 
-        my $name = $token->[1];
+            return expected($parser, 'L_PAREN after function IDENT') if not $parser->consume('L_PAREN');
 
-        return expected($parser, 'L_PAREN after function IDENT') if not $parser->consume('L_PAREN');
-
-        my $parameters = [];
-        while (1) {
-            if ($token = $parser->consume('IDENT')) {
-                push @{$parameters}, $token->[1];
-                next if $parser->consume('COMMA');
-            }
-            last if $parser->consume('R_PAREN');
-            return expected($parser, 'COMMA or R_PAREN after function parameter IDENT');
-        }
-
-        return expected($parser, 'opening L_BRACE for function body') if not $parser->consume('L_BRACE');
-
-        my $statements = [];
-        while (1) {
-            my $statement = Statement($parser);
-            return if $parser->errored;
-
-            if ($statement) {
-                push @{$statements}, $statement;
+            my $parameters = [];
+            while (1) {
+                if ($token = $parser->consume('IDENT')) {
+                    push @{$parameters}, $token->[1];
+                    next if $parser->consume('COMMA');
+                }
+                last if $parser->consume('R_PAREN');
+                return expected($parser, 'COMMA or R_PAREN after function parameter IDENT');
             }
 
-            last if $parser->consume('R_BRACE');
-            return expected($parser, 'STATEMENT or R_BRACE in function body');
-        }
+            $parser->try('FuncDef body: StatementGroup');
 
-        return ['FUNCDEF', $name, $parameters, $statements];
+            {
+                my $statement_group = StatementGroup($parser);
+                return if $parser->errored;
+
+                if ($statement_group) {
+                    $parser->advance;
+                    return ['FUNCDEF', $name, $parameters, $statement_group->[1]];
+                }
+            }
+
+            $parser->alternate('FuncDef body: Statement');
+
+            {
+                my $statement = Statement($parser);
+                return if $parser->errored;
+
+                if ($statement) {
+                    $parser->advance;
+                    return ['FUNCDEF', $name, $parameters, [$statement]];
+                }
+            }
+
+            $parser->backtrack;
+        }
     }
 
-    $parser->{dprint}->(1, "<- FuncDef fail\n");
+  FUNCDEF_FAIL:
     $parser->backtrack;
     return;
 }
@@ -216,21 +267,30 @@ sub Expression {
 
     $precedence ||= 0;
 
-    my $left = Prefix($parser, $precedence);
-    return if $parser->errored;
+    $parser->try("Expression (prec $precedence)");
 
-    return if not $left;
-
-    while (1) {
-        my $token = $parser->next_token('peek');
-        last if not defined $token;
-        last if $precedence >= get_precedence $token->[0];
-
-        $left = Infix($parser, $left, $precedence);
+    {
+        my $left = Prefix($parser, $precedence);
         return if $parser->errored;
+
+        goto EXPRESSION_FAIL if not $left;
+
+        while (1) {
+            my $token = $parser->next_token('peek');
+            last if not defined $token;
+            last if $precedence >= get_precedence $token->[0];
+
+            $left = Infix($parser, $left, $precedence);
+            return if $parser->errored;
+        }
+
+        $parser->advance;
+        return $left;
     }
 
-    return $left;
+  EXPRESSION_FAIL:
+    $parser->backtrack;
+    return;
 }
 
 sub UnaryOp {

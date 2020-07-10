@@ -36,8 +36,6 @@ sub initialize {
 
     $self->{lexer} = Plang::Lexer->new(debug => $conf{debug});
 
-    # define the tokens our lexer will recognize
-    # (this table is quite incomplete and will be fleshed out as the language progresses)
     $self->{lexer}->define_tokens(
         # [ TOKEN_TYPE,  MATCH REGEX,  OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
         ['COMMENT_EOL',    qr{\G(   (?://|\#).*$        )}x,  \&discard],
@@ -79,13 +77,19 @@ sub initialize {
         ['R_BRACE',        qr{\G(   \}                  )}x],
         ['NUM',            qr{\G(   [0-9.]+             )}x],
         ['IDENT',          qr{\G(   [A-Za-z_]\w*        )}x],
-        ['TERM',           qr{\G(   ;\n* | \n+          )}x],
+        ['TERM',           qr{\G(   ;\n*                )}x],
         ['WHITESPACE',     qr{\G(   \s+                 )}x,  \&discard],
         ['OTHER',          qr{\G(   .                   )}x],
     );
 
     $self->{parser} = Plang::Parser->new(debug => $conf{debug});
+
     $self->{parser}->add_rule(\&Program);
+
+    $self->{parser}->define_keywords(
+        'fn', 'return',
+        'if', 'else',
+    );
 
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});
 }

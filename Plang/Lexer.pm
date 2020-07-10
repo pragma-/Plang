@@ -22,12 +22,7 @@ sub initialize {
 # define our tokentypes
 sub define_tokens {
     my $self = shift;
-
-    $self->{tokentypes} = [];
-
-    foreach my $arg (@_) {
-        push @{$self->{tokentypes}}, $arg;
-    }
+    @{$self->{tokentypes}} = @_;
 }
 
 sub tokens {
