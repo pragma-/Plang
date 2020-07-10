@@ -44,16 +44,16 @@ This is what is implemented so far.
 Expressions perform arithmetic, assignment or logical operations.
 
     $ ./plang <<< '1 * 2 + (3 * 4)'        # arithmetic expressions
-      14
+      14 (NUM)
 <!-- -->
     $ ./plang <<< '1 + 2 == 4 - 1'         # logical expressions
-      1
+      1 (NUM)
 
     $ ./plang <<< '3 > 5'
-      0
+      0 (NUM)
 <!-- -->
     $ ./plang <<< 'a = 5; b = 10; a + b'   # assignment expressions
-      15
+      15 (NUM)
 
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
@@ -96,15 +96,16 @@ In Plang, statements have values. The value of a statement is the value of its e
 
 The value of a statement group is the value of the final statement in the group.
 
-Plang automatically prints the value of the last statement of the program. To prevent this,
+Plang automatically prints the value and type of the last statement of the program. To prevent this,
 use the `return` keyword as the last statement.
 
-You may print the values of previous statements explicitly by using the `println` function.
+You may print the values of any statements explicitly by using the `println` function.
+`println` will not print the types.
 
     $ ./plang <<< 'println(1 + 2); println(3 * 4); 5 - 6'
       3
       12
-      -1
+      -1 (NUM)
 
 ### Identifiers
     Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
@@ -131,9 +132,13 @@ Variables are explicitly declared with the `var` keyword. Variables declarations
 may optionally have an initializer that assigns a default value.
 
     $ ./plang <<< 'var a = 5; a'
-      5
+      5 (NUM)
+
+    $ ./plang <<< 'var a = "hello"; a'
+      "hello" (STRING)
 
 Attempting to use a variable that has not been declared will produce an error.
+
     $ ./plang <<< 'var a = 5; a + b'
       Error: `b` not declared.
 
