@@ -138,7 +138,7 @@ parentheses. Arguments may be any valid expression.
 
 For example, a function to square a value:
 
-    $ ./plang <<< 'fn square(x) x * x; square(4)'
+    $ ./plang <<< 'fn square(x) x * x; square(2 + 2)'
       16
 
 Another trivial example, adding two numbers:
