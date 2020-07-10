@@ -107,19 +107,23 @@ sub set_variable {
 sub get_variable {
     my ($self, $context, $name) = @_;
 
+    # look for local variables in current scope
     if (exists $context->{variables}->{$name}) {
-        # local variable in current scope
         return $context->{variables}->{$name}->[1];
     }
 
-    # recurse back into get_variable with next $context in $context->{scope}
+    # look for variables in closing scopes
+    if (defined $context->{parent_context}) {
+        my $var = $self->get_variable($context->{parent_context}, $name);
+        return $var if defined $var;
+    }
 
+    # and finally look for global variables
     if (exists $self->{stack}->[0]->{variables}->{$name}) {
-        # global variable
         return $self->{stack}->[0]->{variables}->{$name}->[1];
     }
 
-    # undefined variable
+    # otherwise it's an undefined variable
     return 0;
 }
 
