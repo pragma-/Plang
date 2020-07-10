@@ -7,9 +7,10 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 * [Features](#features)
   * [Expressions](#expressions)
     * [Operators](#operators)
-  * [Statements](#statements)
-  * [Variables](#variables)
-  * [Keywords](#keywords)
+  * [Statements and StatementGroups](#statements-and-statementgroups)
+  * [Identifiers](#identifiers)
+    * [Keywords](#keywords)
+    * [Variables](#variables)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
 * [Debugging](#debugging)
@@ -90,10 +91,24 @@ You may print the values of previous statements explicitly by using the `println
       12
       -1
 
-### Variables
-Variables are declared by assigning a value to an identifier. An identifier is a
-sequence of characters beginning with an underscore or a letter, optionally followed
+### Identifiers
+    IDENT  =>  ('_' | LETTER)  ('_' | LETTER | DIGIT)+
+    LETTER =>  'a' - 'z' | 'A' - 'Z'
+    DIGIT  =>  '0' - '9'
+
+An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
+
+#### Keywords
+Keywords are reserved identifiers that have a special meaning to Plang.
+
+Keyword | Description
+--- | ---
+fn | function definition
+return | return value from function
+
+#### Variables
+Variables are declared by assigning a value to an identifier that is not a keyword.
 
     $ ./plang <<< 'a = 5; a'
       5
@@ -105,12 +120,6 @@ Identifiers that have not yet been assigned a value will simply yield 0.
 
     $ ./plang <<< '++c; ++c'
       2
-
-### Keywords
-Keyword | Description
---- | ---
-fn | function definition
-return | return value from function
 
 ### Functions
     FuncDef   => KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
