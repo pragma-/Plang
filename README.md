@@ -5,10 +5,14 @@ Why? Because I wanted a small, yet useful, scripting language I could embed into
 some Perl scripts I have; notably [PBot](https://github.com/pragma-/pbot), an IRC bot that I've been tinkering with
 for quite a while.
 
-I wanted to be able to allow strings from external sources to be safely interpreted
-in a sandbox environment with access to exposed Perl subroutines. I also wanted to
-explore how a scripting language is made and what kind of unique ideas I might come up
-with.
+I wanted to be able to allow text from external sources to be safely interpreted
+in a sandbox environment with access to exposed Perl subroutines.
+
+I originally tried using [PPI](https://metacpan.org/pod/PPI) to analyze and filter Perl subroutines
+and expressions, but it proved impossible to make the programs safe and still able to do anything.
+
+Since I've always wanted to explore how a scripting language is made and what kind of unique
+ideas I might come up with, I decided to start writing Plang.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
@@ -84,7 +88,7 @@ Operator | Description | Associativity
 
 A statement is a single instruction. Statements must be terminated by a semi-colon.
 
-A statement group is multiple statements enclosed by curly-braces.
+A statement group is multiple statements enclosed in curly-braces.
 
 In Plang, statements have values. The value of a statement is the value of its expression.
 
