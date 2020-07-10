@@ -71,26 +71,26 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
-Operator | Description | Associativity
+Operator | Description | Type
 --- | --- | ---
-\(\) | Function call     | Left to right
-\+\+ | Postfix increment | Left to right
-\-\- | Postfix decrement | Left to right
-\+\+ | Prefix increment  | Right to left
-\-\- | Prefix decrement  | Right to left
-!    | Logical negation  | Right to left
-\*   | Product           | Left to right
-/    | Division          | Left to right
-%    | Remainder         | Left to right
-\*\* | Exponent          | Right to left
-\+   | Addition          | Left to right
-\-   | Subtraction       | Left to right
-==   | Equality          | Left to right
-\>=  | Greater or equal  | Left to right
-\<=  | Less or equal     | Left to right
-\>   | Greater           | Left to right
-\<   | Less              | Left to right
-=    | Assignment        | Right to left
+\(\) | Function call     |
+\+\+ | Postfix increment | Postfix
+\-\- | Postfix decrement | Postfix
+\+\+ | Prefix increment  | Prefix
+\-\- | Prefix decrement  | Prefix
+!    | Logical negation  | Prefix
+\*   | Product           | Infix (left-to-right)
+/    | Division          | Infix (left-to-right)
+%    | Remainder         | Infix (left-to-right)
+\*\* | Exponent          | Infix (right-to-left)
+\+   | Addition          | Infix (left-to-right)
+\-   | Subtraction       | Infix (left-to-right)
+==   | Equality          | Infix (left-to-right)
+\>=  | Greater or equal  | Infix (left-to-right)
+\<=  | Less or equal     | Infix (left-to-right)
+\>   | Greater           | Infix (left-to-right)
+\<   | Less              | Infix (left-to-right)
+=    | Assignment        | Infix (right-to-left)
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
