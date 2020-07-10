@@ -105,7 +105,7 @@ You may print the values of previous statements explicitly by using the `println
       -1
 
 ### Identifiers
-    IDENT  =>  ('_' | LETTER)  ('_' | LETTER | DIGIT)+
+    IDENT  =>  ('_' | LETTER)  ('_' | LETTER | DIGIT)*
     LETTER =>  'a' - 'z' | 'A' - 'Z'
     DIGIT  =>  '0' - '9'
 
@@ -133,6 +133,11 @@ Identifiers that have not yet been assigned a value will simply yield 0.
 
     $ ./plang <<< '++c; ++c'
       2
+
+### Scoping
+Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
+consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
+`nonlocal` are potential keywords.
 
 ### Functions
     FuncDef   => KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)

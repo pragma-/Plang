@@ -55,11 +55,11 @@ sub expected {
     }
 }
 
-# Grammar: Program --> Statement(s)
+# Grammar: Program --> Statement+
 sub Program {
     my ($parser) = @_;
 
-    $parser->try('Program: Statement(s)');
+    $parser->try('Program: Statement+');
     my @statements;
 
     while (defined $parser->next_token('peek')) {
@@ -77,10 +77,8 @@ sub Program {
     return @statements ? ['PRGM', \@statements] : undef;
 }
 
-# Grammar: Statement =>  | StatementGroup
+# Grammar: Statement =>    StatementGroup
 #                        | FuncDef
-#                        | Conditional
-#                        | Loop
 #                        | Expression TERM
 #                        | TERM
 sub Statement {
@@ -136,7 +134,7 @@ sub Statement {
     return;
 }
 
-# Grammar: StatementGroup =>   L_BRACE Statement(s) R_BRACE
+# Grammar: StatementGroup =>   L_BRACE Statement+ R_BRACE
 sub StatementGroup {
     my ($parser) = @_;
 
@@ -165,8 +163,8 @@ sub StatementGroup {
     return;
 }
 
-# Grammar: FuncDef   =>    KEYWORD_fn IDENT L_PAREN IdentList(s) R_PAREN (StatementGroup | Statement)
-#          IdentList =>    IDENT COMMA(?)
+# Grammar: FuncDef   =>    KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
+#          IdentList =>    IDENT COMMA?
 sub FuncDef {
     my ($parser) = @_;
     my $token;
@@ -216,7 +214,7 @@ sub FuncDef {
                 }
             }
 
-            $parser->backtrack;
+            return expected($parser, "Statement or StatementGroup for body of function $name");
         }
     }
 

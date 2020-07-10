@@ -34,24 +34,25 @@ sub run {
         return;
     }
 
+    # stack for function calls
     $self->{stack} = [];
 
-    my $context = {
-        variables => {},
-        functions => {},
-
-        scope => [],
-    };
+    # current evaluation context
+    my $context = $self->new_context;
 
     # first context pushed onto the stack is the global context
     # which contains global variables and functions
     $self->push_stack($context);
 
+    # grab our program's statements
     my $program    = $self->{ast}->[0];
     my $statements = $program->[1];
 
+    # interpret the statements
     my $result = $self->interpret_ast($context, $statements);
 
+    # automatically print the result of the program unless we're
+    # running in embedded mode
     if (!$self->{embedded} and defined $result) {
         print "$result\n";
     }
@@ -73,6 +74,21 @@ sub error {
     return;
 }
 
+sub new_context {
+    my ($self, $parent_context) = @_;
+
+    return {
+        variables => {},
+        functions => {},
+        parent_context => $parent_context,
+    };
+}
+
+sub new_scope {
+    my ($self, $context) = @_;
+    return $self->new_context($context);
+}
+
 sub push_stack {
     my ($self, $context) = @_;
     push @{$self->{stack}}, $context;
@@ -92,15 +108,19 @@ sub get_variable {
     my ($self, $context, $name) = @_;
 
     if (exists $context->{variables}->{$name}) {
-        # local variable
+        # local variable in current scope
         return $context->{variables}->{$name}->[1];
-    } elsif (exists $self->{stack}->[0]->{variables}->{$name}) {
+    }
+
+    # recurse back into get_variable with next $context in $context->{scope}
+
+    if (exists $self->{stack}->[0]->{variables}->{$name}) {
         # global variable
         return $self->{stack}->[0]->{variables}->{$name}->[1];
-    } else {
-        # undefined variable
-        return 0;
     }
+
+    # undefined variable
+    return 0;
 }
 
 sub interpret_ast {
@@ -210,10 +230,7 @@ sub func_call {
     my $parameters = $func->[0];
     my $statements = $func->[1];
 
-    my $new_context = {
-        variables => {},
-        functions => {},
-    };
+    my $new_context = $self->new_context;
 
     for (my $i = 0; $i < @$parameters; $i++) {
         my $arg = $arguments->[$i];
@@ -250,12 +267,8 @@ sub statement {
     print "stmt ins: $ins\n" if $self->{debug} >= 4;
 
     if ($ins eq 'STMT_GROUP') {
-        # new scope
-
-        my $statements = $value;
-        my $result = $self->interpret_ast($context, $statements);
-
-        # pop scope
+        my $new_context = $self->new_scope($context);
+        my $result = $self->interpret_ast($new_context, $value);
         return $result;
     }
 
