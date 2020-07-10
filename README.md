@@ -80,12 +80,12 @@ Operator | Description | Associativity
 =    | Assignment        | Right to left
 
 ### Statements and StatementGroups
-    Statement      =>   StatementGroup
+    Statement      =    StatementGroup
                       | FuncDef
-                      | Expression TERM
-                      | TERM
-    StatementGroup =>   L_BRACE Statement+ R_BRACE
-    TERM  => ';'
+                      | Expression Terminator
+                      | Terminator
+    StatementGroup =    "{" Statement+ "}"
+    Terminator     =    ";"
 
 A statement is a single instruction. Statements must be terminated by a semi-colon.
 
@@ -106,9 +106,9 @@ You may print the values of previous statements explicitly by using the `println
       -1
 
 ### Identifiers
-    IDENT  =>  ('_' | LETTER)  ('_' | LETTER | DIGIT)*
-    LETTER =>  'a' - 'z' | 'A' - 'Z'
-    DIGIT  =>  '0' - '9'
+    Identifier =  ("_" | Letter)  ("_" | Letter | Digit)*
+    Letter     =  "a" - "z" | "A" - "Z"
+    Digit      =  "0" - '9'
 
 An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
@@ -118,22 +118,24 @@ Keywords are reserved identifiers that have a special meaning to Plang.
 
 Keyword | Description
 --- | ---
+var | variable declaration
 fn | function definition
 return | return value from function
 
 #### Variables
-Variables are declared by assigning a value to an identifier that is not a keyword.
+Variables are explicitly declared with the `var` keyword.
 
-    $ ./plang <<< 'a = 5; a'
+    $ ./plang <<< 'var a = 5; a'
       5
 
-Identifiers that have not yet been assigned a value will simply yield 0.
+Attempting to use a variable that has not been declared will produce an error.
+    $ ./plang <<< 'var a = 5; a + b'
+      Error: `b` not declared.
 
-    $ ./plang <<< 'a = 5; a + b'
-      5
+Variables that have not yet been assigned a value will produce an error.
 
-    $ ./plang <<< '++c; ++c'
-      2
+    $ ./plang <<< 'var a = 5; var b; a + b'
+      Error: `b` not defined.
 
 ### Scoping
 Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
@@ -141,8 +143,8 @@ consideration about allowing a way to write to the enclosing scope's identifiers
 `nonlocal` are potential keywords.
 
 ### Functions
-    FuncDef   => KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
-    IdentList => IDENT COMMA?
+    FunctionDefinition = "fn" Identifier "(" IdentifierList* ")" (StatementGroup | Statement)
+    IdentifierList     = Identifier ","?
 
 A function definition is created by using the `fn` keyword followed by an identifer,
 then a list of identifiers enclosed in parentheses. The comma in the list of identifiers
