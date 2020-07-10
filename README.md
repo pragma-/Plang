@@ -125,15 +125,16 @@ Identifiers that have not yet been assigned a value will simply yield 0.
     FuncDef   => KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
     IdentList => IDENT COMMA?
 
-Functions are an abstracted group of statements. Functions can take identifiers as
-parameters and will return the value of the last statement. You can explicitly
-return an earlier statement's value via the `return` keyword.
+A function definition is created by using the `fn` keyword followed by an identifer,
+then a list of identifiers enclosed in parentheses. The comma in the list of identifiers
+is optional. The body of the function can be either a group of statements enclosed in
+braces or it can be a single statement.
 
-The body of a function may be a single statement or a group of statements enclosed
-in braces.
+Plang functions automatically return the value of the last statement or statement group.
+You may use the `return` keyword to return the value of an ealier statement.
 
-Arguments passed to function calls must be enclosed with parentheses, and may be
-any valid expression.
+To call a function, write its identifier followed by a list of arguments enclosed in
+parentheses. Arguments may be any valid expression.
 
 For example, a function to square a value:
 
