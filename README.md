@@ -108,7 +108,7 @@ You may print the values of previous statements explicitly by using the `println
 ### Identifiers
     Identifier =  ("_" | Letter)  ("_" | Letter | Digit)*
     Letter     =  "a" - "z" | "A" - "Z"
-    Digit      =  "0" - '9'
+    Digit      =  "0" - "9"
 
 An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
