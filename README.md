@@ -54,7 +54,7 @@ You may print the values of any statements explicitly by using the `println` fun
       "Hello there!" (STRING)
 
 ### Expressions
-Expressions perform arithmetic, assignment or logical operations.
+Expressions perform arithmetic, logical or assignment operations.
 
     $ ./plang <<< '1 * 2 + (3 * 4)'        # arithmetic expressions
       14 (NUM)
