@@ -26,14 +26,19 @@ This is what is implemented so far.
 * Interpreter: In-progress
 
 ### Expressions
+Expressions perform arithmetic, assignment or logical operations.
+
     $ ./plang <<< '1 * 2 + (3 * 4)'        # arithmetic expressions
       14
 <!-- -->
-    $ ./plang <<< '1 + 2 == 4 - 1'         # conditional expressions
+    $ ./plang <<< '1 + 2 == 4 - 1'         # logical expressions
       1
 
     $ ./plang <<< '3 > 5'
       0
+<!-- -->
+    $ ./plang <<< 'a = 5; b = 10; a + b'   # assignment expressions
+      15
 
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
@@ -59,16 +64,28 @@ Operator | Description | Associativity
 \<   | Less              | Left to right
 =    | Assignment        | Right to left
 
-### Statements
-A statement is a single instruction. Statements may be terminated by a
-semi-colon or a newline.
+### Statements and StatementGroups
+    Statement      =>   StatementGroup
+                      | FuncDef
+                      | Expression TERM
+                      | TERM
+    StatementGroup =>   L_BRACE Statement+ R_BRACE
+    TERM  => ';'
 
-Plang automatically prints the value of the last statement. To print the
-values of previous statements, use the `print` [function](#functions).
+A statement is a single instruction. Statements must be terminated by a semi-colon.
 
-To prevent printing the last statement, use the `return` keyword.
+A statement group is multiple statements enclosed by curly-braces.
 
-    $ ./plang <<< 'print 1 + 2, "\n"; print 3 * 4, "\n"; 5 - 6'
+In Plang, statements have values. The value of a statement is the value of its expression.
+
+The value of a statement group is the value of the final statement in the group.
+
+Plang automatically prints the value of the last statement of the program. To prevent this,
+use the `return` keyword as the last statement.
+
+You may print the values of previous statements explicitly by using the `println` function.
+
+    $ ./plang <<< 'println(1 + 2); println(3 * 4); 5 - 6'
       3
       12
       -1
@@ -96,25 +113,34 @@ fn | function definition
 return | return value from function
 
 ### Functions
+    FuncDef   => KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
+    IdentList => IDENT COMMA?
+
 Functions are an abstracted group of statements. Functions can take identifiers as
 parameters and will return the value of the last statement. You can explicitly
-return an earlier statement's value via the `return` keyword. Arguments passed to
-function calls may be any valid expression, optionally enclosed with parentheses.
+return an earlier statement's value via the `return` keyword.
+
+The body of a function may be a single statement or a group of statements enclosed
+in braces.
+
+Arguments passed to function calls must be enclosed with parentheses, and may be
+any valid expression.
 
 For example, a function to square a value:
 
-    $ ./plang <<< 'fn square(x) { x * x } square 4'
+    $ ./plang <<< 'fn square(x) x * x; square(4)'
       16
 
 Another trivial example, adding two numbers:
 
-    $ ./plang <<< 'fn add(a, b) { a + b } add(2, 3)'
+    $ ./plang <<< 'fn add(a, b) a + b; add(2, 3)'
       5
 
 #### Built-in functions
-Function | Description
---- | ---
-print `expr` | Prints expression `expr` to standard output.
+Function | Parameters | Description
+--- | --- | ---
+print | `expr` | Prints expression `expr` to standard output.
+println | `expr` | Prints expression `expr` to standard output, with a newline appended.
 
 ## Debugging
 ### DEBUG environment variable
