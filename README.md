@@ -43,7 +43,7 @@ Here's a helpful table of contents:
 <!-- md-toc-end -->
 
 ## Implementation
-Plang automatically prints the value and type of the last statement of the program. To prevent this,
+Plang automatically prints the value of the last statement of the program. To prevent this,
 use the `return` keyword (or construct any statement that doesn't yield a value) as the last statement.
 
 You may print the values of any statements explicitly by using the `println` function.
@@ -51,22 +51,22 @@ You may print the values of any statements explicitly by using the `println` fun
     $ ./plang <<< 'println(1 + 2); println(3 * 4); "Hello there!"'
       3
       12
-      Hello there! (STRING)
+      Hello there!
 
 ### Expressions
 Expressions perform arithmetic, logical or assignment operations.
 
     $ ./plang <<< '1 * 2 + (3 * 4)'        # arithmetic expressions
-      14 (NUM)
+      14
 <!-- -->
     $ ./plang <<< '1 + 2 == 4 - 1'         # logical expressions
-      1 (NUM)
+      1
 
     $ ./plang <<< '3 > 5'
-      0 (NUM)
+      0
 <!-- -->
     $ ./plang <<< 'a = 5; b = 10; a + b'   # assignment expressions
-      15 (NUM)
+      15
 
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
@@ -148,10 +148,10 @@ may optionally have an initializer that assigns a default value.
 The `var` statement returns the value of the variable.
 
     $ ./plang <<< 'var a = 5'
-      5 (NUM)
+      5
 
     $ ./plang <<< 'var a = "hello"'
-      hello (STRING)
+      hello
 
 Attempting to use a variable that has not been declared will produce an error.
 
@@ -188,7 +188,7 @@ no difference between the quotes.
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
 
     $ ./plang <<< 'var a = 42; $"hello {a + 1} world"
-      hello 43 world (STRING)
+      hello 43 world
 
 ###### Nil
      Nil ::= "Nil"
