@@ -36,12 +36,6 @@ This is what is implemented so far.
 <!-- md-toc-end -->
 
 ## Implementation
-* Lexer: Done
-* Parser: Done
-* Grammar: In-progress
-* Interpreter: In-progress
-
-### Notes
 Plang automatically prints the value and type of the last statement of the program. To prevent this,
 use the `return` keyword (or construct any statement that doesn't yield a value) as the last statement.
 
@@ -130,7 +124,7 @@ return | return value from function
     VariableDeclaration ::= "var" Identifier Initializer?
     Initializer         ::= "=" Expression
 
-Variables are explicitly declared with the `var` keyword. Variables declarations
+Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
 may optionally have an initializer that assigns a default value.
 
     $ ./plang <<< 'var a = 5; a'
