@@ -28,6 +28,7 @@ Here's a helpful table of contents:
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
     * [Variables](#variables)
+      * [Types](#types)
       * [Scoping](#scoping)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
@@ -144,6 +145,9 @@ Variables that have not yet been assigned a value will produce an error.
 
     $ ./plang <<< 'var a = 5; var b; a + b'
       Error: `b` not defined.
+
+##### Types
+At this stage, there are seven types planned: reference, array, table, string, number, boolean and nil.
 
 ##### Scoping
 Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
