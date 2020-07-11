@@ -260,7 +260,7 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList = L_PAREN (IDENT COMMA?)* R_PAREN
+# Grammar: IdentifierList = L_PAREN (IDENT Initializer? COMMA?)* R_PAREN
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -272,8 +272,11 @@ sub IdentifierList {
         my $identlist = [];
         while (1) {
             if (my $token = $parser->consume('IDENT')) {
-                push @{$identlist}, $token->[1];
-                next if $parser->consume('COMMA');
+                my $name = $token->[1];
+                my $initializer = Initializer($parser);
+                push @{$identlist}, [$name, $initializer];
+                $parser->consume('COMMA');
+                next;
             }
             last if $parser->consume('R_PAREN');
             return expected($parser, 'Identifier, "," or ")" in Identifier List');
@@ -438,11 +441,12 @@ sub Infix {
 
             if ($expr) {
                 push @{$arguments}, $expr;
-                next if $parser->consume('COMMA');
+                $parser->consume('COMMA');
+                next;
             }
 
             last if $parser->consume('R_PAREN');
-            return expected($parser, 'Expression or closing "(" for function call argument list');
+            return expected($parser, 'Expression or closing ")" for function call argument list');
         }
 
         return ['CALL', $left->[1], $arguments];

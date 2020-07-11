@@ -102,14 +102,13 @@ sub pop_stack {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{variables}->{$name} = $value;
-    print "set_variable:\n", Dumper($context->{variables}), "\n";
+    print "set_variable:\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
 }
 
 sub get_variable {
     my ($self, $context, $name) = @_;
 
-    print "get_variable: $name\n", Dumper($context->{variables}), "\n";
-
+    print "get_variable: $name\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
     # look for local variables in current scope
     if (exists $context->{variables}->{$name}) {
         return $context->{variables}->{$name};
@@ -216,7 +215,7 @@ sub func_definition {
     }
 
     $context->{functions}->{$name} = [$parameters, $statements];
-    return ['NUM', 0];
+    return ['VAR', undef]; # TODO return reference to function
 }
 
 sub func_call {
@@ -244,14 +243,18 @@ sub func_call {
         my $arg = $arguments->[$i];
 
         if (not defined $arg) {
-            return $self->error($context, "Missing argument $parameters->[$i] to function $name.\n");
+            if (defined $parameters->[$i]->[1]) {
+                $arg = $parameters->[$i]->[1];
+            } else {
+                return $self->error($context, "Missing argument $parameters->[$i]->[0] to function $name.\n");
+            }
         }
 
         $arg = $self->statement($context, $arg); # this ought to be an expression, but
                                                  # let's see where this goes (imagine `if` statements
                                                  # returning the value of their branches...)
 
-        $new_context->{variables}->{$parameters->[$i]} = $arg;
+        $new_context->{variables}->{$parameters->[$i]->[0]} = $arg;
     }
 
     if (@$arguments > @$parameters) {
