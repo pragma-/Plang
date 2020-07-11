@@ -303,6 +303,7 @@ my %precedence_table = (
 
 my %token_precedence = (
     ASSIGN       => $precedence_table{'ASSIGNMENT'},
+    QUESTION     => $precedence_table{'CONDITIONAL'},
     EQ           => $precedence_table{'CONDITIONAL'},
     GREATER_EQ   => $precedence_table{'CONDITIONAL'},
     LESS_EQ      => $precedence_table{'CONDITIONAL'},
@@ -389,10 +390,12 @@ sub Prefix {
     }
 
     if ($token = $parser->consume('SQUOTE_STRING')) {
+        $token->[1] =~ s/^\'|\'$//g;
         return ['STRING', $token->[1]];
     }
 
     if ($token = $parser->consume('DQUOTE_STRING')) {
+        $token->[1] =~ s/^\"|\"$//g;
         return ['STRING', $token->[1]];
     }
 
@@ -452,6 +455,30 @@ sub Infix {
         return ['CALL', $left->[1], $arguments];
     }
 
+    # ternary conditional operator
+    if ($parser->consume('QUESTION')) {
+        my $then = Statement($parser);
+        return if $parser->errored;
+
+        if (not $then) {
+            return expected($parser, '<then> statement in conditional <if> ? <then> : <else> operator');
+        }
+
+        if (not $parser->consume('COLON')) {
+            return expected($parser, '":" after <then> statement in conditional <if> ? <then> : <else> operator');
+        }
+
+        my $else = Statement($parser);
+        return if $parser->errored;
+
+        if (not $else) {
+            return expected($parser, '<else> statement in conditional <if> ? <then> : <else> operator');
+        }
+
+        return ['COND', $left, $then, $else];
+    }
+
+    # binary operators
     return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',    'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',    'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',    'PRODUCT');

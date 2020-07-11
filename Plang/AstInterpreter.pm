@@ -136,6 +136,8 @@ sub interpret_ast {
 
     my $result;  # result of final statement
 
+    print Dumper 'ast result:', Dumper $result;
+
     foreach my $node (@$ast) {
         my $instruction = $node->[0];
 
@@ -144,7 +146,7 @@ sub interpret_ast {
         }
 
         if ($self->{debug} >= 3) {
-            print "Statement result: $result\n";
+            print "Statement result: $result->[1] ($result->[0])\n";
         }
     }
 
@@ -176,7 +178,7 @@ sub unary_op {
         my $value  = $self->statement($context, $data->[1]);
 
         if ($debug_msg and $self->{debug} >= 3) {
-            $debug_msg =~ s/\$a/$value/g;
+            $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
             print $debug_msg, "\n";
         }
         # TODO Check $value->[0] for 'NUM' or 'STRING'
@@ -193,8 +195,8 @@ sub binary_op {
         my $right_value = $self->statement($context, $data->[2]);
 
         if ($debug_msg and $self->{debug} >= 3) {
-            $debug_msg =~ s/\$a/$left_value/g;
-            $debug_msg =~ s/\$b/$right_value/g;
+            $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
+            $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
             print $debug_msg, "\n";
         }
         # TODO Check $left_value->[0] and $right_value->[0] for 'NUM' or 'STRING'
@@ -267,6 +269,28 @@ sub func_call {
     return $result;
 }
 
+sub is_truthy {
+    my ($self, $context, $expr) = @_;
+
+    my $result = $self->statement($context, $expr);
+
+    $self->error($context, 'No truthiness to check for...') if not $result;
+
+    if ($result->[0] eq 'NUM') {
+        return $result->[1] == 1;
+    }
+
+    if ($result->[0] eq 'STRING') {
+        return $result->[1] ne "";
+    }
+
+    if ($result->[0] eq 'BOOL') {
+        return $result->[1] == 1;
+    }
+
+    return;
+}
+
 sub statement {
     my ($self, $context, $data) = @_;
     return if not $data;
@@ -276,15 +300,18 @@ sub statement {
 
     print "stmt ins: $ins\n" if $self->{debug} >= 4;
 
+    # statement group
     if ($ins eq 'STMT_GROUP') {
         my $new_context = $self->new_scope($context);
         my $result = $self->interpret_ast($new_context, $value);
         return $result;
     }
 
+    # literals
     return ['NUM',    $value] if $ins eq 'NUM';
     return ['STRING', $value] if $ins eq 'STRING';
 
+    # variable declaration
     if ($ins eq 'VAR') {
         my $initializer = $data->[2];
         my $right_value = undef;
@@ -299,6 +326,20 @@ sub statement {
         return $right_value;
     }
 
+    # ternary ?: conditional operator
+    if ($ins eq 'COND') {
+        if ($self->is_truthy($context, $data->[1])) {
+            return $self->interpret_ast($context, [$data->[2]]);
+        } else {
+            return $self->interpret_ast($context, [$data->[3]]);
+        }
+    }
+
+    # if/else
+    if ($ins eq 'IF') {
+    }
+
+    # assignment
     if ($ins eq 'ASSIGN') {
         my $left_token  = $value;
         my $right_value = $self->statement($context, $data->[2]);
@@ -306,6 +347,7 @@ sub statement {
         return $right_value;
     }
 
+    # variable
     if ($ins eq 'IDENT') {
         my $var = $self->get_variable($context, $value);
 
@@ -320,14 +362,17 @@ sub statement {
         return $var;
     }
 
+    # function definition
     if ($ins eq 'FUNCDEF') {
         return $self->func_definition($context, $data);
     }
 
+    # function call
     if ($ins eq 'CALL') {
         return $self->func_call($context, $data);
     }
 
+    # prefix increment
     if ($ins eq 'PREFIX_ADD') {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
@@ -347,6 +392,7 @@ sub statement {
         return $var;
     }
 
+    # prefix decrement
     if ($ins eq 'PREFIX_SUB') {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
@@ -366,8 +412,10 @@ sub statement {
         return $var;
     }
 
+    # unary operators
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
 
+    # binary operators
     return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
@@ -380,6 +428,7 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
 
+    # postfix increment
     if ($ins eq 'POSTFIX_ADD') {
         my $token = $data->[1];
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
@@ -400,6 +449,7 @@ sub statement {
         return $temp_var;
     }
 
+    # postfix decrement
     if ($ins eq 'POSTFIX_SUB') {
         my $token = $data->[1];
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
