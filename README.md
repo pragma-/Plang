@@ -16,11 +16,12 @@ ideas I might come up with, I decided to start writing Plang.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
-This is what is implemented so far.
+This README describes what is implemented so far.
+
+Here's a helpful table of contents:
 
 <!-- md-toc-begin -->
 * [Implementation](#implementation)
-  * [Notes](#notes)
   * [Expressions](#expressions)
     * [Operators](#operators)
   * [Statements and StatementGroups](#statements-and-statementgroups)
@@ -40,7 +41,6 @@ Plang automatically prints the value and type of the last statement of the progr
 use the `return` keyword (or construct any statement that doesn't yield a value) as the last statement.
 
 You may print the values of any statements explicitly by using the `println` function.
-`println` will not print the type.
 
     $ ./plang <<< 'println(1 + 2); println(3 * 4); "Hello there!"'
       3
