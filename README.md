@@ -24,6 +24,7 @@ Here's a helpful table of contents:
 * [Implementation](#implementation)
   * [Expressions](#expressions)
     * [Operators](#operators)
+    * [Truthiness](#truthiness)
   * [Statements and StatementGroups](#statements-and-statementgroups)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
@@ -87,6 +88,17 @@ Operator | Description | Type
 \<   | Less              | Infix (left-to-right)
 ?:   | Conditional       | Infix ternary (right-to-left)
 =    | Assignment        | Infix (right-to-left)
+
+#### Truthiness
+For the logical operators (==, >=, <=, <, >, etc), this is how truthiness
+is evaluated for each type.
+
+Type | Truthiness
+--- | ---
+nil | `nil` is always false.
+Number | false when value is `0`;true otherwise.
+String | false when value is empty string; true otherwise.
+Boolean | false when value is `false`; true otherwise.
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
