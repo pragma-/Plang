@@ -71,7 +71,7 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
-Precedence | Operator | Description | Type
+| Operator | Description | Type
 --- | --- | --- | ---
 8 | \(\) | Function call     |
 7 | \+\+ | Postfix increment | Postfix
