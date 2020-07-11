@@ -29,8 +29,10 @@ Here's a helpful table of contents:
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
     * [Variables](#variables)
-      * [String interpolation](#string-interpolation)
       * [Types](#types)
+        * [Numbers](#numbers)
+        * [Strings](#strings)
+        * [Nil](#nil)
       * [Scoping](#scoping)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
@@ -161,14 +163,38 @@ Variables that have not yet been assigned a value will produce an error.
     $ ./plang <<< 'var a = 5; var b; a + b'
       Error: `b` not defined.
 
-##### String interpolation
-Plang supports interpolating statements into strings.
-
-    $ ./plang <<< 'var a = 42; "hello {a + 1} world"
-      hello 43 world (STRING)
-
 ##### Types
 At this stage, there are seven types planned: reference, array, table, string, number, boolean and nil.
+
+Types of variables are inferred from the type of their value. All variables are simply declared with `var`
+and no type specifier.
+
+Currently implemented are:
+
+###### Numbers
+    Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
+
+`Number`s are things like -100, +4.20, 2001, etc. We all know what numbers are!
+
+In Plang, the `Number` type is equivalent to a double-precision type.
+
+###### Strings
+    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
+    StringContents ::= TODO
+
+A `String` is a sequence of characters enclosed in double or single quotes. There is
+no difference between the quotes.
+
+When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
+
+    $ ./plang <<< 'var a = 42; $"hello {a + 1} world"
+      hello 43 world (STRING)
+
+###### Nil
+     Nil ::= "Nil"
+
+The `Nil` type signifies that there is no value. All logical comparisons against `Nil` produce
+`Nil`.
 
 ##### Scoping
 Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
