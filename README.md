@@ -223,3 +223,6 @@ You can pass `--dumptokens` as a command-line argument to display a flat-list
 of all the tokens as they are encountered.
 
     $ ./plang --dumptokens < test/lexer_input.txt  # test the lexer
+
+## Example Plang scripts
+[Check out some examples!](examples/)
