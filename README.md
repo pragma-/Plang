@@ -46,7 +46,7 @@ You may print the values of any statements explicitly by using the `println` fun
     $ ./plang <<< 'println(1 + 2); println(3 * 4); "Hello there!"'
       3
       12
-      "Hello there!" (STRING)
+      Hello there! (STRING)
 
 ### Expressions
 Expressions perform arithmetic, logical or assignment operations.
@@ -135,7 +135,7 @@ The `var` statement returns the value of the variable.
       5 (NUM)
 
     $ ./plang <<< 'var a = "hello"'
-      "hello" (STRING)
+      hello (STRING)
 
 Attempting to use a variable that has not been declared will produce an error.
 
