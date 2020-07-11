@@ -127,10 +127,12 @@ return | return value from function
 Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
 may optionally have an initializer that assigns a default value.
 
-    $ ./plang <<< 'var a = 5; a'
+The `var` statement returns the value of the variable.
+
+    $ ./plang <<< 'var a = 5'
       5 (NUM)
 
-    $ ./plang <<< 'var a = "hello"; a'
+    $ ./plang <<< 'var a = "hello"'
       "hello" (STRING)
 
 Attempting to use a variable that has not been declared will produce an error.
