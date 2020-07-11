@@ -21,6 +21,9 @@ sub initialize {
     $self->{ast}      = $conf{ast};
     $self->{debug}    = $conf{debug}    // 0;
     $self->{embedded} = $conf{embedded} // 0;
+
+    $self->{max_recursion} = $conf{max_recursion} // 10000;
+    $self->{recursions}    = 0;
 }
 
 # runs a new Plang program with a fresh environment
@@ -218,6 +221,41 @@ sub func_definition {
     return ['VAR', undef]; # TODO return reference to function
 }
 
+my %func_builtins = (
+    'print' => \&func_builtin_print,
+    'println' => \&func_builtin_println,
+);
+
+sub process_func_call_arguments {
+    my ($self, $context, $parameters, $arguments) = @_;
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        $arguments->[$i] = $self->statement($context, $arguments->[$i]);
+    }
+
+    if (@$arguments > @$parameters) {
+        $self->warning($context, "Extra arguments provided to function println (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
+    }
+}
+
+sub func_builtin_print {
+    my ($self, $context, $data) = @_;
+    my @parameters = qw/expr/;
+    my $arguments = $data->[2];
+    $self->process_func_call_arguments($context, \@parameters, $arguments);
+    print $arguments->[0]->[1];
+    return;
+}
+
+sub func_builtin_println {
+    my ($self, $context, $data) = @_;
+    my @parameters = qw/expr/;
+    my $arguments = $data->[2];
+    $self->process_func_call_arguments($context, \@parameters, $arguments);
+    print $arguments->[0]->[1], "\n";
+    return;
+}
+
 sub func_call {
     my ($self, $context, $data) = @_;
 
@@ -230,6 +268,8 @@ sub func_call {
         $func = $context->{functions}->{$name};
     } elsif (exists $self->{stack}->[0]->{functions}->{$name}) {
         $func = $self->{stack}->[0]->{functions}->{$name};
+    } elsif (exists $func_builtins{$name}) {
+        return $func_builtins{$name}->($self, $context, $data);
     } else {
         return $self->error($context, "Undefined function `$name`.");
     }
@@ -258,11 +298,19 @@ sub func_call {
     }
 
     if (@$arguments > @$parameters) {
-        $self->warning($context, "Extra arguments provided to function $name (takes " . @$parameters . " but passed " . @$arguments . ").");
+        $self->warning($context, "Extra arguments provided to function $name (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
     }
 
+
+    # check for recursion limit
+    if (++$self->{recursions} > $self->{max_recursion}) {
+        return $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
+    }
+
+    # invoke the function
     $self->push_stack($context);
     my $result = $self->interpret_ast($new_context, $statements);;
+    $self->{recursion}--;
     $self->pop_stack;
     return $result;
 }

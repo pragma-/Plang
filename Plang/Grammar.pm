@@ -118,13 +118,13 @@ sub Statement {
     }
 
     my $result;
-    return $result if defined ($result = alternate_statement($parser, \&VariableDeclaration, 'VariableDeclaration'));
+    return $result if defined ($result = alternate_statement($parser, \&VariableDeclaration, 'Statement: VariableDeclaration'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'FunctionDefinition'));
+    return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'Statement: FunctionDefinition'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&Expression,          'Expression'));
+    return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
     return if $parser->errored;
 
     $parser->alternate('Statement: TERM');
@@ -136,10 +136,11 @@ sub Statement {
         }
     }
 
-    return expected($parser, 'Statement');
+    $parser->advance;
+    return ['NOP', 'null statement'];
 }
 
-# Grammar: StatementGroup = L_BRACE Statement+ R_BRACE
+# Grammar: StatementGroup = L_BRACE Statement* R_BRACE
 sub StatementGroup {
     my ($parser) = @_;
 
@@ -153,11 +154,13 @@ sub StatementGroup {
         while (1) {
             my $statement = Statement($parser);
             return if $parser->errored;
-            last if not $statement;
-            push @statements, $statement unless $statement->[0] eq 'NOP';
-        }
 
-        goto STATEMENT_GROUP_FAIL if not $parser->consume('R_BRACE');
+            if ($statement and $statement->[0] ne 'NOP') {
+                push @statements, $statement;
+            }
+
+            last if $parser->consume('R_BRACE');
+        }
 
         $parser->advance;
         return ['STMT_GROUP', \@statements];
