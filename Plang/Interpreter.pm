@@ -46,7 +46,7 @@ sub initialize {
         ['NOT_EQ',         qr{\G(   !=                  )}x],
         ['GREATER_EQ',     qr{\G(   >=                  )}x],
         ['LESS_EQ',        qr{\G(   <=                  )}x],
-        ['EQ_EQ',          qr{\G(   ==                  )}x],
+        ['EQ',             qr{\G(   ==                  )}x],
         ['SLASH_EQ',       qr{\G(   /=                  )}x],
         ['STAR_EQ',        qr{\G(   \*=                 )}x],
         ['MINUS_EQ',       qr{\G(   -=                  )}x],
@@ -54,7 +54,7 @@ sub initialize {
         ['PLUS_PLUS',      qr{\G(   \+\+                )}x],
         ['STAR_STAR',      qr{\G(   \*\*                )}x],
         ['MINUS_MINUS',    qr{\G(   --                  )}x],
-        ['EQ',             qr{\G(   =                   )}x],
+        ['ASSIGN',         qr{\G(   =                   )}x],
         ['PLUS',           qr{\G(   \+                  )}x],
         ['MINUS',          qr{\G(   -                   )}x],
         ['GREATER',        qr{\G(   >                   )}x],
@@ -87,6 +87,7 @@ sub initialize {
     $self->{parser}->add_rule(\&Program);
 
     $self->{parser}->define_keywords(
+        'var',
         'fn', 'return',
         'if', 'else',
     );

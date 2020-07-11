@@ -29,11 +29,14 @@ sub error {
 }
 
 my %pretty_tokens = (
-    'TERM' => 'statement terminator',
+    'TERM'  => 'statement terminator',
+    'IDENT' => 'Identifier',
 );
 
 sub pretty_token {
-    $pretty_tokens{$_[0]} // $_[0];
+    my ($token) = @_;
+    return 'Keyword' if $token =~ /^KEYWORD_/;
+    return $pretty_tokens{$token} // $token;
 }
 
 sub pretty_value {
@@ -55,7 +58,7 @@ sub expected {
     }
 }
 
-# Grammar: Program --> Statement+
+# Grammar: Program = Statement+
 sub Program {
     my ($parser) = @_;
 
@@ -77,8 +80,26 @@ sub Program {
     return @statements ? ['PRGM', \@statements] : undef;
 }
 
-# Grammar: Statement =>    StatementGroup
-#                        | FuncDef
+sub alternate_statement {
+    my ($parser, $subref, $debug_msg) = @_;
+
+    $parser->alternate($debug_msg);
+
+    {
+        my $result = $subref->($parser);
+        return if $parser->errored;
+
+        if ($result) {
+            $parser->consume('TERM');
+            $parser->advance;
+            return ['STMT', $result];
+        }
+    }
+}
+
+# Grammar: Statement =     StatementGroup
+#                        | VariableDeclaration
+#                        | FunctionDefition
 #                        | Expression TERM
 #                        | TERM
 sub Statement {
@@ -96,30 +117,15 @@ sub Statement {
         }
     }
 
-    $parser->alternate('Statement: FuncDef');
+    my $result;
+    return $result if defined ($result = alternate_statement($parser, \&VariableDeclaration, 'VariableDeclaration'));
+    return if $parser->errored;
 
-    {
-        my $funcdef = FuncDef($parser);
-        return if $parser->errored;
+    return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'FunctionDefinition'));
+    return if $parser->errored;
 
-        if ($funcdef) {
-            $parser->advance;
-            return ['STMT', $funcdef];
-        }
-    }
-
-    $parser->alternate('Statement: Expression');
-
-    {
-        my $expression = Expression($parser);
-        return if $parser->errored;
-
-        if ($expression) {
-            $parser->consume('TERM');
-            $parser->advance;
-            return ['STMT', $expression];
-        }
-    }
+    return $result if defined ($result = alternate_statement($parser, \&Expression,          'Expression'));
+    return if $parser->errored;
 
     $parser->alternate('Statement: TERM');
 
@@ -130,11 +136,10 @@ sub Statement {
         }
     }
 
-    $parser->backtrack;
-    return;
+    return expected($parser, 'Statement');
 }
 
-# Grammar: StatementGroup =>   L_BRACE Statement+ R_BRACE
+# Grammar: StatementGroup = L_BRACE Statement+ R_BRACE
 sub StatementGroup {
     my ($parser) = @_;
 
@@ -160,37 +165,70 @@ sub StatementGroup {
 
   STATEMENT_GROUP_FAIL:
     $parser->backtrack;
-    return;
 }
 
-# Grammar: FuncDef   =>    KEYWORD_fn IDENT L_PAREN IdentList* R_PAREN (StatementGroup | Statement)
-#          IdentList =>    IDENT COMMA?
-sub FuncDef {
+# Grammar: VariableDeclaration = KEYWORD_var IDENT Initializer?
+sub VariableDeclaration {
     my ($parser) = @_;
-    my $token;
 
-    $parser->try('FuncDef');
+    $parser->try('VariableDeclaration');
 
     {
-        if ($token = $parser->consume('KEYWORD_fn')) {
-            $token = $parser->consume('IDENT');
-            return expected($parser, 'IDENT for function name') if not $token;
+        if ($parser->consume('KEYWORD_var')) {
+            my $token = $parser->consume('IDENT');
+            return expected($parser, 'Identifier for variable name') if not $token;
 
             my $name = $token->[1];
 
-            return expected($parser, 'L_PAREN after function IDENT') if not $parser->consume('L_PAREN');
+            my $initializer = Initializer($parser);
+            return if $parser->errored;
 
-            my $parameters = [];
-            while (1) {
-                if ($token = $parser->consume('IDENT')) {
-                    push @{$parameters}, $token->[1];
-                    next if $parser->consume('COMMA');
-                }
-                last if $parser->consume('R_PAREN');
-                return expected($parser, 'COMMA or R_PAREN after function parameter IDENT');
+            $parser->advance;
+            return ['VAR', $name, $initializer];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+#Grammar: Initializer = ASSIGN Expression
+sub Initializer {
+    my ($parser) = @_;
+
+    $parser->try('Initializer');
+
+    {
+        if ($parser->consume('ASSIGN')) {
+            my $expr = Expression($parser);
+            return if $parser->errored;
+
+            if ($expr) {
+                $parser->advance;
+                return $expr;
             }
+        }
+    }
 
-            $parser->try('FuncDef body: StatementGroup');
+    $parser->backtrack;
+}
+
+# Grammar: FunctionDefinition = KEYWORD_fn IDENT IdentifierList (StatementGroup | Statement)
+sub FunctionDefinition {
+    my ($parser) = @_;
+
+    $parser->try('FunctionDefinition');
+
+    {
+        if ($parser->consume('KEYWORD_fn')) {
+            my $token = $parser->consume('IDENT');
+            return expected($parser, 'Identifier for function name') if not $token;
+
+            my $name = $token->[1];
+
+            my $identlist = IdentifierList($parser);
+            return if $parser->errored;
+
+            $parser->try('FunctionDefinition body: StatementGroup');
 
             {
                 my $statement_group = StatementGroup($parser);
@@ -198,11 +236,11 @@ sub FuncDef {
 
                 if ($statement_group) {
                     $parser->advance;
-                    return ['FUNCDEF', $name, $parameters, $statement_group->[1]];
+                    return ['FUNCDEF', $name, $identlist, $statement_group->[1]];
                 }
             }
 
-            $parser->alternate('FuncDef body: Statement');
+            $parser->alternate('FunctionDefinition body: Statement');
 
             {
                 my $statement = Statement($parser);
@@ -210,7 +248,7 @@ sub FuncDef {
 
                 if ($statement) {
                     $parser->advance;
-                    return ['FUNCDEF', $name, $parameters, [$statement]];
+                    return ['FUNCDEF', $name, $identlist, [$statement]];
                 }
             }
 
@@ -220,7 +258,33 @@ sub FuncDef {
 
   FUNCDEF_FAIL:
     $parser->backtrack;
-    return;
+}
+
+# Grammar: IdentifierList = L_PAREN (IDENT COMMA?)* R_PAREN
+sub IdentifierList {
+    my ($parser) = @_;
+
+    $parser->try('IdentifierList');
+
+    {
+        return expected($parser, '"(" to begin Identifier List') if not $parser->consume('L_PAREN');
+
+        my $identlist = [];
+        while (1) {
+            if (my $token = $parser->consume('IDENT')) {
+                push @{$identlist}, $token->[1];
+                next if $parser->consume('COMMA');
+            }
+            last if $parser->consume('R_PAREN');
+            return expected($parser, 'Identifier, "," or ")" in Identifier List');
+        }
+
+        $parser->advance;
+        return $identlist;
+    }
+
+    # not reached
+    $parser->backtrack;
 }
 
 my %precedence_table = (
@@ -235,8 +299,8 @@ my %precedence_table = (
 );
 
 my %token_precedence = (
-    EQ           => $precedence_table{'ASSIGNMENT'},
-    EQ_EQ        => $precedence_table{'CONDITIONAL'},
+    ASSIGN       => $precedence_table{'ASSIGNMENT'},
+    EQ           => $precedence_table{'CONDITIONAL'},
     GREATER_EQ   => $precedence_table{'CONDITIONAL'},
     LESS_EQ      => $precedence_table{'CONDITIONAL'},
     LESS         => $precedence_table{'CONDITIONAL'},
@@ -288,7 +352,6 @@ sub Expression {
 
   EXPRESSION_FAIL:
     $parser->backtrack;
-    return;
 }
 
 sub UnaryOp {
@@ -296,7 +359,7 @@ sub UnaryOp {
 
     if ($parser->consume($op)) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        return $expr ? [$ins, $expr] : expected($parser, 'expression');
+        return $expr ? [$ins, $expr] : expected($parser, 'Expression');
     }
 }
 
@@ -306,7 +369,7 @@ sub BinaryOp {
 
     if ($parser->consume($op)) {
         my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
-        return $right ? [$ins, $left, $right] : expected($parser, 'expression');
+        return $right ? [$ins, $left, $right] : expected($parser, 'Expression');
     }
 }
 
@@ -332,23 +395,23 @@ sub Prefix {
 
     if ($parser->consume('MINUS_MINUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        return expected($parser, 'expression') if not defined $expr;
+        return expected($parser, 'Expression') if not defined $expr;
 
         if ($expr->[0] eq 'IDENT') {
             return ['PREFIX_SUB', $expr];
         } else {
-            return error($parser, "Prefix decrement must be used on objects (got " . pretty_token($expr->[0]) . ")");
+            return error($parser, "Prefix decrement must be used on Identifiers (got " . pretty_token($expr->[0]) . ")");
         }
     }
 
     if ($parser->consume('PLUS_PLUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        return expected($parser, 'expression') if not defined $expr;
+        return expected($parser, 'Expression') if not defined $expr;
 
         if ($expr->[0] eq 'IDENT') {
             return ['PREFIX_ADD', $expr];
         } else {
-            return error($parser, "Prefix increment must be used on objects (got " . pretty_token($expr->[0]) . ")");
+            return error($parser, "Prefix increment must be used on Identifiers (got " . pretty_token($expr->[0]) . ")");
         }
     }
 
@@ -356,7 +419,7 @@ sub Prefix {
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser, 0);
-        return expected($parser, 'R_PAREN') if not $parser->consume('R_PAREN');
+        return expected($parser, '")"') if not $parser->consume('R_PAREN');
         return $expr;
     }
 
@@ -379,7 +442,7 @@ sub Infix {
             }
 
             last if $parser->consume('R_PAREN');
-            return expected($parser, 'expression or closing R_PAREN for function call argument list');
+            return expected($parser, 'Expression or closing "(" for function call argument list');
         }
 
         return ['CALL', $left->[1], $arguments];
@@ -389,8 +452,8 @@ sub Infix {
     return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',    'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',    'PRODUCT');
     return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',    'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ_EQ',       'EQ',     'CONDITIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      'ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'EQ',     'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',     'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',     'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',    'CONDITIONAL');
@@ -408,7 +471,7 @@ sub Postfix {
         if ($left->[0] eq 'IDENT') {
             return ['POSTFIX_ADD', $left];
         } else {
-            return error($parser, "Postfix increment must be used on objects (got " . pretty_token($left->[0]) . ")");
+            return error($parser, "Postfix increment must be used on Identifiers (got " . pretty_token($left->[0]) . ")");
         }
     }
 
@@ -416,7 +479,7 @@ sub Postfix {
         if ($left->[0] eq 'IDENT') {
             return ['POSTFIX_SUB', $left];
         } else {
-            return error($parser, "Postfix decrement must be used on objects (got " . pretty_token($left->[0]) . ")");
+            return error($parser, "Postfix decrement must be used on Identifiers (got " . pretty_token($left->[0]) . ")");
         }
     }
 

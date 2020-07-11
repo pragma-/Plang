@@ -54,7 +54,7 @@ sub run {
     # automatically print the result of the program unless we're
     # running in embedded mode
     if (!$self->{embedded} and defined $result) {
-        print "$result\n";
+        print "$result->[1] ($result->[0])\n";
     }
 
     return $result;
@@ -71,7 +71,7 @@ sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
     print STDERR "Fatal error: $err_msg\n";
-    return;
+    exit 1;
 }
 
 sub new_context {
@@ -102,17 +102,20 @@ sub pop_stack {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{variables}->{$name} = $value;
+    print "set_variable:\n", Dumper($context->{variables}), "\n";
 }
 
 sub get_variable {
     my ($self, $context, $name) = @_;
 
+    print "get_variable: $name\n", Dumper($context->{variables}), "\n";
+
     # look for local variables in current scope
     if (exists $context->{variables}->{$name}) {
-        return $context->{variables}->{$name}->[1];
+        return $context->{variables}->{$name};
     }
 
-    # look for variables in closing scopes
+    # look for variables in enclosing scopes
     if (defined $context->{parent_context}) {
         my $var = $self->get_variable($context->{parent_context}, $name);
         return $var if defined $var;
@@ -120,11 +123,11 @@ sub get_variable {
 
     # and finally look for global variables
     if (exists $self->{stack}->[0]->{variables}->{$name}) {
-        return $self->{stack}->[0]->{variables}->{$name}->[1];
+        return $self->{stack}->[0]->{variables}->{$name};
     }
 
     # otherwise it's an undefined variable
-    return 0;
+    return undef;
 }
 
 sub interpret_ast {
@@ -177,7 +180,8 @@ sub unary_op {
             $debug_msg =~ s/\$a/$value/g;
             print $debug_msg, "\n";
         }
-        return $eval_unary_op{$data->[0]}->($value);
+        # TODO Check $value->[0] for 'NUM' or 'STRING'
+        return ['NUM', $eval_unary_op{$data->[0]}->($value->[1])];
     }
     return;
 }
@@ -194,8 +198,8 @@ sub binary_op {
             $debug_msg =~ s/\$b/$right_value/g;
             print $debug_msg, "\n";
         }
-
-        return $eval_binary_op{$data->[0]}->($left_value, $right_value);
+        # TODO Check $left_value->[0] and $right_value->[0] for 'NUM' or 'STRING'
+        return ['NUM', $eval_binary_op{$data->[0]}->($left_value->[1], $right_value->[1])];
     }
     return;
 }
@@ -212,7 +216,7 @@ sub func_definition {
     }
 
     $context->{functions}->{$name} = [$parameters, $statements];
-    return 0;
+    return ['NUM', 0];
 }
 
 sub func_call {
@@ -243,10 +247,9 @@ sub func_call {
             return $self->error($context, "Missing argument $parameters->[$i] to function $name.\n");
         }
 
-        my $value = $self->statement($context, $arg); # this ought to be an expression, but
-                                                      # let's see where this goes (imagine `if`
-                                                      # statements returning the value of its branches...)
-        $arg = ['NUM', $value];
+        $arg = $self->statement($context, $arg); # this ought to be an expression, but
+                                                 # let's see where this goes (imagine `if` statements
+                                                 # returning the value of their branches...)
 
         $new_context->{variables}->{$parameters->[$i]} = $arg;
     }
@@ -276,18 +279,42 @@ sub statement {
         return $result;
     }
 
-    return $value if $ins eq 'NUM';
-    return $value if $ins eq 'STRING';
+    return ['NUM',    $value] if $ins eq 'NUM';
+    return ['STRING', $value] if $ins eq 'STRING';
+
+    if ($ins eq 'VAR') {
+        my $initializer = $data->[2];
+        my $right_value = undef;
+
+        if ($initializer) {
+            $right_value = $self->statement($context, $initializer);
+        } else {
+            $right_value = ['VAR', undef];
+        }
+
+        $self->set_variable($context, $value, $right_value);
+        return $right_value;
+    }
 
     if ($ins eq 'ASSIGN') {
         my $left_token  = $value;
         my $right_value = $self->statement($context, $data->[2]);
-        $self->set_variable($context, $left_token->[1], [$left_token->[0], $right_value]);
+        $self->set_variable($context, $left_token->[1], $right_value);
         return $right_value;
     }
 
     if ($ins eq 'IDENT') {
-        return $self->get_variable($context, $value);
+        my $var = $self->get_variable($context, $value);
+
+        if (not defined $var) {
+            $self->error($context, "Attempt to use undeclared variable `$value`");
+        }
+
+        if (not defined $var->[1]) {
+            $self->error($context, "Attempt to use undefined variable `$value`");
+        }
+
+        return $var;
     }
 
     if ($ins eq 'FUNCDEF') {
@@ -302,22 +329,38 @@ sub statement {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if (not exists $context->{variables}->{$tok_value}) {
-            $context->{variables}->{$tok_value} = ['NUM', 0];
+        my $var = $self->get_variable($context, $tok_value);
+
+        if (not defined $var) {
+            $self->error($context, "Attempt to prefix-increment undeclared variable `$tok_value`");
         }
 
-        return ++$context->{variables}->{$tok_value}->[1];
+        if (not defined $var->[1]) {
+            $self->error($context, "Attempt to prefix-increment undefined variable `$tok_value`");
+        }
+
+        # TODO check type
+        $var->[1]++;
+        return $var;
     }
 
     if ($ins eq 'PREFIX_SUB') {
         my $token = $value;
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if (not exists $context->{variables}->{$tok_value}) {
-            $context->{variables}->{$tok_value} = ['NUM', 0];
+        my $var = $self->get_variable($context, $tok_value);
+
+        if (not defined $var) {
+            $self->error($context, "Attempt to prefix-decrement undeclared variable `$tok_value`");
         }
 
-        return --$context->{variables}->{$tok_value}->[1];
+        if (not defined $var->[1]) {
+            $self->error($context, "Attempt to prefix-decrement undefined variable `$tok_value`");
+        }
+
+        # TODO check type
+        $var->[1]--;
+        return $var;
     }
 
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
@@ -336,24 +379,42 @@ sub statement {
 
     if ($ins eq 'POSTFIX_ADD') {
         my $token = $data->[1];
-        my ($type, $value) = ($token->[0], $token->[1]);
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if (not exists $context->{variables}->{$value}) {
-            $context->{variables}->{$value} = ['NUM', 0];
+        my $var = $self->get_variable($context, $tok_value);
+
+        if (not defined $var) {
+            $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
         }
 
-        return $context->{variables}->{$value}->[1]++;
+        if (not defined $var->[1]) {
+            $self->error($context, "Attempt to postfix-increment undefined variable `$tok_value`");
+        }
+
+        # TODO check type
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]++;
+        return $temp_var;
     }
 
     if ($ins eq 'POSTFIX_SUB') {
         my $token = $data->[1];
-        my ($type, $value) = ($token->[0], $token->[1]);
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
-        if (not exists $context->{variables}->{$value}) {
-            $context->{variables}->{$value} = ['NUM', 0];
+        my $var = $self->get_variable($context, $tok_value);
+
+        if (not defined $var) {
+            $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
         }
 
-        return $context->{variables}->{$value}->[1]--;
+        if (not defined $var->[1]) {
+            $self->error($context, "Attempt to postfix-increment undefined variable `$tok_value`");
+        }
+
+        # TODO check type
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]--;
+        return $temp_var;
     }
 
     return;
