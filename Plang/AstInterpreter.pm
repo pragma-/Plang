@@ -337,6 +337,34 @@ sub is_truthy {
     return;
 }
 
+# TODO: do this much more efficiently
+sub parse_string {
+    my ($self, $string) = @_;
+
+    use Plang::Interpreter;
+    my $interpreter = Plang::Interpreter->new;
+    my $program = $interpreter->parse_string($string);
+    my $statements = $program->[0]->[1];
+
+    return $statements;
+}
+
+sub interpolate_string {
+    my ($self, $context, $string) = @_;
+
+    my $new_string = "";
+    while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
+        my ($text, $interpolate) = ($1, $2);
+        my $ast = $self->parse_string($interpolate);
+        my $result = $self->interpret_ast($context, $ast);
+        $new_string .= $text . $result->[1];
+    }
+
+    $string =~ /\G(.*)/gc;
+    $new_string .= $1;
+    return $new_string;
+}
+
 sub statement {
     my ($self, $context, $data) = @_;
     return if not $data;
@@ -355,7 +383,11 @@ sub statement {
 
     # literals
     return ['NUM',    $value] if $ins eq 'NUM';
-    return ['STRING', $value] if $ins eq 'STRING';
+
+    if ($ins eq 'STRING') {
+        $value = $self->interpolate_string($context, $value);
+        return ['STRING', $value];
+    }
 
     # variable declaration
     if ($ins eq 'VAR') {
