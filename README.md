@@ -95,7 +95,7 @@ is evaluated for each type.
 
 Type | Truthiness
 --- | ---
-nil | `nil` is always false.
+Nil | The `nil` value is always false.
 Number | false when value is `0`;true otherwise.
 String | false when value is empty string; true otherwise.
 Boolean | false when value is `false`; true otherwise.
