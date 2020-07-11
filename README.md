@@ -150,7 +150,7 @@ consideration about allowing a way to write to the enclosing scope's identifiers
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier IdentifierList (StatementGroup | Statement)
-    IdentifierList     ::= "(" (Identifier ","?) ")"
+    IdentifierList     ::= "(" (Identifier ","?)* ")"
 
 A function definition is created by using the `fn` keyword followed by an identifer,
 then a list of identifiers enclosed in parentheses. The comma in the list of identifiers
