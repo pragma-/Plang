@@ -85,6 +85,7 @@ Operator | Description | Type
 \<=  | Less or equal     | Infix (left-to-right)
 \>   | Greater           | Infix (left-to-right)
 \<   | Less              | Infix (left-to-right)
+?:   | Conditional       | Infix ternary (right-to-left)
 =    | Assignment        | Infix (right-to-left)
 
 ### Statements and StatementGroups
