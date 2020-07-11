@@ -36,6 +36,7 @@ Here's a helpful table of contents:
 * [Debugging](#debugging)
   * [DEBUG environment variable](#debug-environment-variable)
   * [Testing the lexer](#testing-the-lexer)
+* [Example Plang scripts](#example-plang-scripts)
 <!-- md-toc-end -->
 
 ## Implementation
