@@ -159,15 +159,18 @@ consideration about allowing a way to write to the enclosing scope's identifiers
     IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
 A function definition is created by using the `fn` keyword followed by an identifer,
-then a list of identifiers, each with an optional default initializer, enclosed in parentheses.
-The comma in the list of identifiers is optional. The body of the function can be either a
-group of statements enclosed in braces or it can be a single statement.
+then an identifier list, and finally either a group of statements or a single statement.
+
+An identifier list is a list of identifiers enclosed in parentheses. The list is separated
+by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
+be followed by an optional initializer to create a default value.
 
 Plang functions automatically return the value of the last statement or statement group.
 You may use the `return` keyword to return the value of an ealier statement.
 
 To call a function, write its identifier followed by a list of arguments enclosed in
-parentheses. Arguments may be any valid expression.
+parentheses. The argument list is separated the same way as the identifier list. Arguments
+may be any valid expression.
 
 The `fn` statement returns a reference to the function.
 
