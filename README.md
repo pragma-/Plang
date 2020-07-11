@@ -156,12 +156,12 @@ consideration about allowing a way to write to the enclosing scope's identifiers
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier IdentifierList (StatementGroup | Statement)
-    IdentifierList     ::= "(" (Identifier ","?)* ")"
+    IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
 A function definition is created by using the `fn` keyword followed by an identifer,
-then a list of identifiers enclosed in parentheses. The comma in the list of identifiers
-is optional. The body of the function can be either a group of statements enclosed in
-braces or it can be a single statement.
+then a list of identifiers, each with an optional default initializer, enclosed in parentheses.
+The comma in the list of identifiers is optional. The body of the function can be either a
+group of statements enclosed in braces or it can be a single statement.
 
 Plang functions automatically return the value of the last statement or statement group.
 You may use the `return` keyword to return the value of an ealier statement.
@@ -180,6 +180,11 @@ Another trivial example, adding two numbers:
 
     $ ./plang <<< 'fn add(a, b) a + b; add(2, 3)'
       5
+
+Default arguments:
+
+    $ ./plang <<< 'fn add(a, b = 10) a + b; add(5);
+      15
 
 #### Built-in functions
 Function | Parameters | Description
