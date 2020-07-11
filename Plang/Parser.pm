@@ -20,6 +20,7 @@ sub initialize {
 
     $self->{debug} = $ENV{DEBUG} // 0;
 
+    # set up internal debugging subroutines
     if ($self->{debug}) {
         $self->{clean} = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
         $self->{dprint} = sub { my $level = shift; print "|  " x $self->{indent}, @_ if $level <= $self->{debug} };
@@ -64,7 +65,6 @@ sub backtrack {
     $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
-
         my $count = @{$self->{backtrack}};
         $self->{dprint}->(5, "[$count] backtracking to position $self->{current_token}: ");
 
@@ -76,6 +76,7 @@ sub backtrack {
         my $rule = pop @{$self->{current_rule}};
         $self->{dprint}->(1, "<- Backtracked $rule\n");
     }
+    return;
 }
 
 # advance to the next rule (pops and discards one backtrack)
