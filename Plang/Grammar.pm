@@ -392,6 +392,18 @@ sub Prefix {
         return ['IDENT', $token->[1]];
     }
 
+    if ($token = $parser->consume('SQUOTE_STRING_I')) {
+        $token->[1] =~ s/^\$//;
+        $token->[1] =~ s/^\'|\'$//g;
+        return ['STRING_I', $token->[1]];
+    }
+
+    if ($token = $parser->consume('DQUOTE_STRING_I')) {
+        $token->[1] =~ s/^\$//;
+        $token->[1] =~ s/^\"|\"$//g;
+        return ['STRING_I', $token->[1]];
+    }
+
     if ($token = $parser->consume('SQUOTE_STRING')) {
         $token->[1] =~ s/^\'|\'$//g;
         return ['STRING', $token->[1]];

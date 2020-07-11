@@ -383,8 +383,10 @@ sub statement {
 
     # literals
     return ['NUM',    $value] if $ins eq 'NUM';
+    return ['STRING', $value] if $ins eq 'STRING';
 
-    if ($ins eq 'STRING') {
+    # interpolated string
+    if ($ins eq 'STRING_I') {
         $value = $self->interpolate_string($context, $value);
         return ['STRING', $value];
     }
