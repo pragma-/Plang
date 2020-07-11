@@ -29,6 +29,7 @@ Here's a helpful table of contents:
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
     * [Variables](#variables)
+      * [String interpolation](#string-interpolation)
       * [Types](#types)
       * [Scoping](#scoping)
   * [Functions](#functions)
@@ -159,6 +160,12 @@ Variables that have not yet been assigned a value will produce an error.
 
     $ ./plang <<< 'var a = 5; var b; a + b'
       Error: `b` not defined.
+
+##### String interpolation
+Plang supports interpolating statements into strings.
+
+    $ ./plang <<< 'var a = 42; "hello {a + 1} world"
+      hello 43 world (STRING)
 
 ##### Types
 At this stage, there are seven types planned: reference, array, table, string, number, boolean and nil.
