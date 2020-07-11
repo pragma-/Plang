@@ -136,8 +136,6 @@ sub interpret_ast {
 
     my $result;  # result of final statement
 
-    print Dumper 'ast result:', Dumper $result;
-
     foreach my $node (@$ast) {
         my $instruction = $node->[0];
 
