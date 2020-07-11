@@ -165,6 +165,8 @@ You may use the `return` keyword to return the value of an ealier statement.
 To call a function, write its identifier followed by a list of arguments enclosed in
 parentheses. Arguments may be any valid expression.
 
+The `fn` statement returns a reference to the function.
+
 For example, a function to square a value:
 
     $ ./plang <<< 'fn square(x) x * x; square(2 + 2)'
@@ -189,7 +191,7 @@ The value is an integer representing verbosity, where higher values are more ver
 
     $ DEBUG=1 ./plang <<< '1 + 2'  # minimal (though still a quite a bit) output
 <!-- -->
-    $ DEBUG=5 ./plang <<< '1 + 2'  # very verbose debugging output
+    $ DEBUG=10 ./plang <<< '1 + 2'  # most verbose debugging output
 
 ### Testing the lexer
 You can pass `--dumptokens` as a command-line argument to display a flat-list
