@@ -71,27 +71,27 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
-Operator | Description | Type
---- | --- | ---
-\(\) | Function call     |
-\+\+ | Postfix increment | Postfix
-\-\- | Postfix decrement | Postfix
-\+\+ | Prefix increment  | Prefix
-\-\- | Prefix decrement  | Prefix
-!    | Logical negation  | Prefix
-\*   | Product           | Infix (left-to-right)
-/    | Division          | Infix (left-to-right)
-%    | Remainder         | Infix (left-to-right)
-\*\* | Exponent          | Infix (right-to-left)
-\+   | Addition          | Infix (left-to-right)
-\-   | Subtraction       | Infix (left-to-right)
-==   | Equality          | Infix (left-to-right)
-\>=  | Greater or equal  | Infix (left-to-right)
-\<=  | Less or equal     | Infix (left-to-right)
-\>   | Greater           | Infix (left-to-right)
-\<   | Less              | Infix (left-to-right)
-?:   | Conditional       | Infix ternary (right-to-left)
-=    | Assignment        | Infix (right-to-left)
+Precedence | Operator | Description | Type
+--- | --- | --- | ---
+8 | \(\) | Function call     |
+7 | \+\+ | Postfix increment | Postfix
+7 | \-\- | Postfix decrement | Postfix
+6 | \+\+ | Prefix increment  | Prefix
+6 | \-\- | Prefix decrement  | Prefix
+6 | !    | Logical negation  | Prefix
+5 | \*\* | Exponent          | Infix (right-to-left)
+5 | %    | Remainder         | Infix (left-to-right)
+4 | \*   | Product           | Infix (left-to-right)
+4 | /    | Division          | Infix (left-to-right)
+3 | \+   | Addition          | Infix (left-to-right)
+3 | \-   | Subtraction       | Infix (left-to-right)
+2 | ==   | Equality          | Infix (left-to-right)
+2 | \>=  | Greater or equal  | Infix (left-to-right)
+2 | \<=  | Less or equal     | Infix (left-to-right)
+2 | \>   | Greater           | Infix (left-to-right)
+2 | \<   | Less              | Infix (left-to-right)
+2 | ?:   | Conditional       | Infix ternary (right-to-left)
+1 | =    | Assignment        | Infix (right-to-left)
 
 #### Truthiness
 For the logical operators (==, >=, <=, <, >, etc), this is how truthiness
@@ -174,7 +174,7 @@ Currently implemented are:
 ###### Numbers
     Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
 
-`Number`s are things like -100, +4.20, 2001, etc. We all know what numbers are!
+`Number`s are things like `-100`, `+4.20`, `2001`, etc. We all know what numbers are!
 
 In Plang, the `Number` type is equivalent to a double-precision type.
 
