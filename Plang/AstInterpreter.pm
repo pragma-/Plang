@@ -26,16 +26,9 @@ sub initialize {
     $self->{recursions}    = 0;
 }
 
-# runs a new Plang program with a fresh environment
-sub run {
-    my ($self, $ast) = @_;
-
-    $self->{ast} = $ast if defined $ast;
-
-    if (not $self->{ast}) {
-        print STDERR "No program to run.\n";
-        return;
-    }
+# creates a fresh environment for a Plang program
+sub init_program {
+    my ($self) = @_;
 
     # stack for function calls
     $self->{stack} = [];
@@ -47,34 +40,92 @@ sub run {
     # which contains global variables and functions
     $self->push_stack($context);
 
+    return $context;
+}
+
+# runs a new Plang program with a fresh environment
+sub run {
+    my ($self, $ast) = @_;
+
+    $self->{ast} = $ast if defined $ast;
+
+    if (not $self->{ast}) {
+        print STDERR "No program to run.\n";
+        return;
+    }
+
+    # create a fresh environment
+    my $context = $self->init_program;
+
     # grab our program's statements
     my $program    = $self->{ast}->[0];
     my $statements = $program->[1];
 
     # interpret the statements
     my $result = $self->interpret_ast($context, $statements);
+    $result = $self->handle_statement_results($result, 1);
+    return $result;
+}
 
-    # automatically print the result of the program unless we're
-    # running in embedded mode
-    if (!$self->{embedded} and defined $result) {
-        print "$result->[1] ($result->[0])\n";
+# handles any special results from a statement
+sub handle_statement_results {
+    my ($self, $results, $print_any) = @_;
+
+    return if not defined $results;
+
+    if (ref $results->[0] eq 'ARRAY') {
+        my $ret;
+        foreach my $result (@$results) {
+            $ret = $self->handle_statement_result($result, $print_any);
+        }
+        return $ret;
+    } else {
+        return $self->handle_statement_result($results, $print_any);
+    }
+}
+
+# handles one statement result
+sub handle_statement_result {
+    my ($self, $result, $print_any) = @_;
+    $print_any ||= 0;
+
+    return if not defined $result;
+
+    # if Plang is embedded into a larger app return the result
+    # to the larger app so it can handle it itself
+    return $result if $self->{embedded};
+
+    if ($result->[0] eq 'ERROR') {
+        print STDERR $result->[1], "\n";
+        exit 1;
     }
 
-    return $result;
+    if ($result->[0] eq 'WARNING') {
+        print STDERR $result->[1], "\n";
+        return;
+    }
+
+    if ($result->[0] eq 'STDOUT') {
+        print $result->[1];
+        return;
+    }
+
+    return $result unless $print_any;
+
+    print "$result->[1]\n";
+    return;
 }
 
 sub warning {
     my ($self, $context, $warn_msg) = @_;
     chomp $warn_msg;
-    print STDERR "Warning: $warn_msg\n";
-    return;
+    return ['WARNING', "Warning: $warn_msg\n"];
 }
 
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
-    print STDERR "Fatal error: $err_msg\n";
-    exit 1;
+    return ['ERROR', "Fatal error: $err_msg\n"];
 }
 
 sub new_context {
@@ -144,10 +195,15 @@ sub interpret_ast {
 
         if ($instruction eq 'STMT') {
             $result = $self->statement($context, $node->[1]);
+            $result = $self->handle_statement_results($result);
         }
 
         if ($self->{debug} >= 3) {
-            print "Statement result: $result->[1] ($result->[0])\n";
+            if (defined $result) {
+                print "Statement result: $result->[1] ($result->[0])\n";
+            } else {
+                print "Statement result: none\n";
+            }
         }
     }
 
@@ -222,37 +278,69 @@ sub func_definition {
 }
 
 my %func_builtins = (
-    'print' => \&func_builtin_print,
-    'println' => \&func_builtin_println,
+    'print'   => {
+        params => [qw/statement/],
+        subref => \&func_builtin_print,
+    },
+    'println' => {
+        params => [qw/statement/],
+        subref => \&func_builtin_println,
+    },
 );
 
+sub func_builtin_print {
+    my ($self, $name, $arguments) = @_;
+    my $output = $arguments->[0]->[1];
+    return ['STDOUT', $output];
+}
+
+sub func_builtin_println {
+    my ($self, $name, $arguments) = @_;
+    my $output .= $arguments->[0]->[1] . "\n";
+    return ['STDOUT', $output];
+}
+
+sub add_function_builtin {
+    my ($self, $name, $parameters, $subref) = @_;
+    # TODO warn/error if overwriting?
+    $func_builtins{$name} = { params => $parameters, subref => $subref };
+}
+
+sub call_builtin_function {
+    my ($self, $context, $data, $name) = @_;
+
+    my $parameters = $func_builtins{$name}->{params};
+    my $func       = $func_builtins{$name}->{subref};
+    my $arguments  = $data->[2];
+
+    my $ret = $self->process_func_call_arguments($context, $name, $parameters, $arguments);
+
+    if (defined $ret) {
+        if ($ret->[0] eq 'ERROR') {
+            return [$ret];
+        }
+
+        return [$ret, $func->($self, $name, $arguments)];
+    } else {
+        return $func->($self, $name, $arguments);
+    }
+}
+
 sub process_func_call_arguments {
-    my ($self, $context, $parameters, $arguments) = @_;
+    my ($self, $context, $name, $parameters, $arguments) = @_;
 
     for (my $i = 0; $i < @$parameters; $i++) {
+        if (not defined $arguments->[$i]) {
+            return $self->error($context, "Missing argument `$parameters->[$i]` to function `$name`.\n");
+        }
+
         $arguments->[$i] = $self->statement($context, $arguments->[$i]);
     }
 
     if (@$arguments > @$parameters) {
-        $self->warning($context, "Extra arguments provided to function println (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
+        return $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
     }
-}
 
-sub func_builtin_print {
-    my ($self, $context, $data) = @_;
-    my @parameters = qw/expr/;
-    my $arguments = $data->[2];
-    $self->process_func_call_arguments($context, \@parameters, $arguments);
-    print $arguments->[0]->[1];
-    return;
-}
-
-sub func_builtin_println {
-    my ($self, $context, $data) = @_;
-    my @parameters = qw/expr/;
-    my $arguments = $data->[2];
-    $self->process_func_call_arguments($context, \@parameters, $arguments);
-    print $arguments->[0]->[1], "\n";
     return;
 }
 
@@ -265,12 +353,16 @@ sub func_call {
     my $func;
 
     if (exists $context->{functions}->{$name}) {
+        # local function
         $func = $context->{functions}->{$name};
     } elsif (exists $self->{stack}->[0]->{functions}->{$name}) {
+        # global function
         $func = $self->{stack}->[0]->{functions}->{$name};
     } elsif (exists $func_builtins{$name}) {
-        return $func_builtins{$name}->($self, $context, $data);
+        # builtin function
+        return $self->call_builtin_function($context, $data, $name);
     } else {
+        # undefined function
         return $self->error($context, "Undefined function `$name`.");
     }
 
@@ -286,7 +378,7 @@ sub func_call {
             if (defined $parameters->[$i]->[1]) {
                 $arg = $parameters->[$i]->[1];
             } else {
-                return $self->error($context, "Missing argument $parameters->[$i]->[0] to function $name.\n");
+                return $self->error($context, "Missing argument `$parameters->[$i]->[0]` to function `$name`.\n");
             }
         }
 
@@ -298,7 +390,7 @@ sub func_call {
     }
 
     if (@$arguments > @$parameters) {
-        $self->warning($context, "Extra arguments provided to function $name (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
+        $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
     }
 
 

@@ -127,13 +127,14 @@ sub parse {
     # iterates over tokens returned by lexer
     my $token_iter = $self->{lexer}->tokens($input_iter);
     $self->{ast}   = $self->{parser}->parse($token_iter);
+    return $self->{ast};
 }
 
 sub parse_stream {
     my ($self, $stream) = @_;
     # iterates over lines of the stream
     my $input_iter = sub { <$stream> };
-    $self->parse($input_iter);
+    return $self->parse($input_iter);
 }
 
 sub parse_string {
@@ -141,7 +142,7 @@ sub parse_string {
     # iterates over lines of the string
     my @lines = split /\n/, $string;
     my $input_iter = sub { shift @lines };
-    $self->parse($input_iter);
+    return $self->parse($input_iter);
 }
 
 sub handle_parse_errors {
