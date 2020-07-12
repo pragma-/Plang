@@ -115,7 +115,8 @@ sub alternate_statement {
 
 # Grammar: Statement =     StatementGroup
 #                        | VariableDeclaration
-#                        | FunctionDefition
+#                        | FunctionDefinition
+#                        | ReturnStatement
 #                        | Expression TERM
 #                        | TERM
 sub Statement {
@@ -140,6 +141,9 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'Statement: FunctionDefinition'));
     return if $parser->errored;
 
+    return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,     'Statement: ReturnStatement'));
+    return if $parser->errored;
+
     return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
     return if $parser->errored;
 
@@ -148,12 +152,12 @@ sub Statement {
     {
         if ($parser->consume('TERM')) {
             $parser->advance;
-            return ['NOP', 'null statement'];
+            return ['NOP', undef];
         }
     }
 
     $parser->advance;
-    return ['NOP', 'null statement'];
+    return ['NOP', undef];
 }
 
 # Grammar: StatementGroup = L_BRACE Statement* R_BRACE
@@ -308,6 +312,26 @@ sub IdentifierList {
     # not reached
     $parser->backtrack;
 }
+
+# Grammar: ReturnStatement ::= KEYWORD_return Statement
+sub ReturnStatement {
+    my ($parser) = @_;
+
+    $parser->try('ReturnStatement');
+
+    {
+        if ($parser->consume('KEYWORD_return')) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+
+            $parser->advance;
+            return ['RET', $statement];
+        }
+    }
+
+    $parser->backtrack;
+}
+
 
 my %precedence_table = (
     ASSIGNMENT  => 1,
