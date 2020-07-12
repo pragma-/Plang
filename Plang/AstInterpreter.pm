@@ -317,11 +317,14 @@ sub call_builtin_function {
 
     if (defined $ret) {
         if ($ret->[0] eq 'ERROR') {
-            return [$ret];
+            # return error
+            return $ret;
         }
 
+        # return warning and result of function
         return [$ret, $func->($self, $name, $arguments)];
     } else {
+        # return result of function
         return $func->($self, $name, $arguments);
     }
 }
