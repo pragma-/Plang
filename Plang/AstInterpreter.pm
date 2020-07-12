@@ -91,17 +91,19 @@ sub handle_statement_result {
 
     return if not defined $result;
 
+    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 7;
+
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself
     return $result if $self->{embedded};
 
     if ($result->[0] eq 'ERROR') {
-        print STDERR $result->[1], "\n";
+        print STDERR $result->[1];
         exit 1;
     }
 
     if ($result->[0] eq 'WARNING') {
-        print STDERR $result->[1], "\n";
+        print STDERR $result->[1];
         return;
     }
 
@@ -315,36 +317,36 @@ sub call_builtin_function {
 
     my $ret = $self->process_func_call_arguments($context, $name, $parameters, $arguments);
 
-    if (defined $ret) {
-        if ($ret->[0] eq 'ERROR') {
-            # return error
-            return $ret;
-        }
-
-        # return warning and result of function
-        return [$ret, $func->($self, $name, $arguments)];
-    } else {
-        # return result of function
-        return $func->($self, $name, $arguments);
+    if ($ret->[0] eq 'ERROR') {
+        # return error
+        return $ret;
     }
+
+    # return result of function
+    return $func->($self, $name, $ret);
 }
 
 sub process_func_call_arguments {
     my ($self, $context, $name, $parameters, $arguments) = @_;
+
+    my $evaluated_arguments;
 
     for (my $i = 0; $i < @$parameters; $i++) {
         if (not defined $arguments->[$i]) {
             return $self->error($context, "Missing argument `$parameters->[$i]` to function `$name`.\n");
         }
 
-        $arguments->[$i] = $self->statement($context, $arguments->[$i]);
+        $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
     }
 
     if (@$arguments > @$parameters) {
-        return $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
+        return [
+            $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated."),
+            $evaluated_arguments,
+        ];
     }
 
-    return;
+    return $evaluated_arguments;
 }
 
 sub func_call {
@@ -352,6 +354,8 @@ sub func_call {
 
     my $name      = $data->[1];
     my $arguments = $data->[2];
+
+    print "Calling function $name with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 5;
 
     my $func;
 
@@ -392,8 +396,9 @@ sub func_call {
         $new_context->{variables}->{$parameters->[$i]->[0]} = $arg;
     }
 
+    my $warning;
     if (@$arguments > @$parameters) {
-        $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
+        $warning = $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
     }
 
 
@@ -402,12 +407,18 @@ sub func_call {
         return $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
     }
 
+    print "new context: ", Dumper($new_context), "\n" if $self->{debug} >= 5;
+
     # invoke the function
     $self->push_stack($context);
     my $result = $self->interpret_ast($new_context, $statements);;
     $self->{recursion}--;
     $self->pop_stack;
-    return $result;
+    if ($warning) {
+        return [$warning, $result];
+    } else {
+        return $result;
+    }
 }
 
 sub is_truthy {
@@ -467,7 +478,7 @@ sub statement {
     my $ins   = $data->[0];
     my $value = $data->[1];
 
-    print "stmt ins: $ins\n" if $self->{debug} >= 4;
+    print "stmt ins: $ins (value: $value)\n" if $self->{debug} >= 4;
 
     # statement group
     if ($ins eq 'STMT_GROUP') {
