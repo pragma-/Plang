@@ -65,11 +65,27 @@ sub Program {
     $parser->try('Program: Statement+');
     my @statements;
 
+    my $MAX_ERRORS = 3; # TODO make this customizable
+    my $errors;
+    my $failed = 0;
     while (defined $parser->next_token('peek')) {
         $parser->clear_error;
 
         my $statement = Statement($parser);
-        next if $parser->errored;
+
+        if ($parser->errored) {
+            last if ++$errors > $MAX_ERRORS;
+            next;
+        }
+
+        if (not $statement or $statement->[0] eq 'NOP') {
+            if (++$failed >= 2) {
+                my $token = $parser->current_or_last_token;
+                my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
+                return error($parser, "Unexpected $name");
+            }
+        }
+
 
         if ($statement and $statement->[0] ne 'NOP') {
             push @statements, $statement;
