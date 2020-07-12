@@ -47,8 +47,10 @@ sub init_program {
 sub run {
     my ($self, $ast) = @_;
 
+    # ast can be supplied via new() or via this run() subroutine
     $self->{ast} = $ast if defined $ast;
 
+    # make sure we were given a program
     if (not $self->{ast}) {
         print STDERR "No program to run.\n";
         return;
@@ -63,71 +65,21 @@ sub run {
 
     # interpret the statements
     my $result = $self->interpret_ast($context, $statements);
-    $result = $self->handle_statement_results($result, 1);
-    return $result;
-}
 
-# handles any special results from a statement
-sub handle_statement_results {
-    my ($self, $results, $print_any) = @_;
-
-    return if not defined $results;
-
-    if (ref $results->[0] eq 'ARRAY') {
-        my $ret;
-        foreach my $result (@$results) {
-            $ret = $self->handle_statement_result($result, $print_any);
-        }
-        return $ret;
-    } else {
-        return $self->handle_statement_result($results, $print_any);
-    }
-}
-
-# handles one statement result
-sub handle_statement_result {
-    my ($self, $result, $print_any) = @_;
-    $print_any ||= 0;
-
-    return if not defined $result;
-
-    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 7;
-
-    # if Plang is embedded into a larger app return the result
-    # to the larger app so it can handle it itself
+    # return result to parent program if we're embedded
     return $result if $self->{embedded};
 
-    if ($result->[0] eq 'ERROR') {
-        print STDERR $result->[1];
-        exit 1;
-    }
+    # return success if there's no result to print
+    return if not defined $result;
 
-    if ($result->[0] eq 'WARNING') {
-        print STDERR $result->[1];
-        return;
-    }
-
-    if ($result->[0] eq 'STDOUT') {
-        print $result->[1];
-        return;
-    }
-
-    return $result unless $print_any;
-
-    print "$result->[1]\n";
-    return;
-}
-
-sub warning {
-    my ($self, $context, $warn_msg) = @_;
-    chomp $warn_msg;
-    return ['WARNING', "Warning: $warn_msg\n"];
+    # handle final statement (print last value of program if not Nil)
+    return $self->handle_statement_result($result, 1);
 }
 
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
-    return ['ERROR', "Fatal error: $err_msg\n"];
+    die "Fatal error: $err_msg\n";
 }
 
 sub new_context {
@@ -158,7 +110,7 @@ sub pop_stack {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{variables}->{$name} = $value;
-    print "set_variable:\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
+    print "set_variable $name\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
 }
 
 sub get_variable {
@@ -190,30 +142,67 @@ sub interpret_ast {
 
     print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
 
-    my $result;  # result of final statement
+    my $last_statement_result = eval {
+        my $result;
+        foreach my $node (@$ast) {
+            my $instruction = $node->[0];
 
-    foreach my $node (@$ast) {
-        my $instruction = $node->[0];
+            if ($instruction eq 'STMT') {
+                $result = $self->statement($context, $node->[1]);
+                $result = $self->handle_statement_result($result) if defined $result;
+                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
+            }
 
-        if ($instruction eq 'STMT') {
-            $result = $self->statement($context, $node->[1]);
-            $result = $self->handle_statement_results($result);
-        }
-
-        if ($self->{debug} >= 3) {
-            if (defined $result) {
-                print "Statement result: $result->[1] ($result->[0])\n";
-            } else {
-                print "Statement result: none\n";
+            if ($self->{debug} >= 3) {
+                if (defined $result) {
+                    print "Statement result: ", defined $result->[1] ? $result->[1] : 'undef', " ($result->[0])\n";
+                } else {
+                    print "Statement result: none\n";
+                }
             }
         }
+
+        return $result;
+    };
+
+    if ($@) {
+        return ['ERROR', $@];
     }
 
-    return $result; # return result of final statement
+    return $last_statement_result; # return result of final statement
+}
+
+# handles one statement result
+sub handle_statement_result {
+    my ($self, $result, $print_any) = @_;
+    $print_any ||= 0;
+
+    return if not defined $result;
+
+    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
+    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
+
+    # if Plang is embedded into a larger app return the result
+    # to the larger app so it can handle it itself
+    return $result if $self->{embedded};
+
+    # print to stdout and consume result by returning nothing
+    if ($result->[0] eq 'STDOUT') {
+        print $result->[1];
+        return;
+    }
+
+    # return result unless we should print any result
+    return $result unless $print_any;
+
+    # print the result if possible and then consume it
+    print "$result->[1]\n" if defined $result->[1];
+    return;
 }
 
 my %eval_unary_op = (
     'NOT' => sub { int ! $_[0] },
+    'NEG' => sub {     - $_[0] },
 );
 
 my %eval_binary_op = (
@@ -271,21 +260,19 @@ sub func_definition {
     my $parameters = $data->[2];
     my $statements = $data->[3];
 
-    if (exists $context->{functions}->{$name}) {
-        $self->warning($context, "Overwriting existing function `$name`.\n");
-    }
-
+    # TODO warn or error about overwriting existing functions?
     $context->{functions}->{$name} = [$parameters, $statements];
-    return ['VAR', undef]; # TODO return reference to function
+    return ['FUNCREF', undef]; # TODO return reference to function
 }
 
 my %func_builtins = (
     'print'   => {
-        params => [qw/statement/],
+        # [['param1 name', default value], ['param2 name', default value], [...]]
+        params => [['statement', undef]],
         subref => \&func_builtin_print,
     },
     'println' => {
-        params => [qw/statement/],
+        params => [['statement', undef]],
         subref => \&func_builtin_println,
     },
 );
@@ -315,15 +302,9 @@ sub call_builtin_function {
     my $func       = $func_builtins{$name}->{subref};
     my $arguments  = $data->[2];
 
-    my $ret = $self->process_func_call_arguments($context, $name, $parameters, $arguments);
+    my $evaled_args = $self->process_func_call_arguments($context, $name, $parameters, $arguments);
 
-    if ($ret->[0] eq 'ERROR') {
-        # return error
-        return $ret;
-    }
-
-    # return result of function
-    return $func->($self, $name, $ret);
+    return $func->($self, $name, $evaled_args);
 }
 
 sub process_func_call_arguments {
@@ -333,17 +314,20 @@ sub process_func_call_arguments {
 
     for (my $i = 0; $i < @$parameters; $i++) {
         if (not defined $arguments->[$i]) {
-            return $self->error($context, "Missing argument `$parameters->[$i]` to function `$name`.\n");
+            # no argument provided
+            if (defined $parameters->[$i]->[1]) {
+                # found default argument
+                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[1]);
+                $context->{variables}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
+            } else {
+                # no argument or default argument
+                $self->error($context, "Missing argument `$parameters->[$i]->[0]` to function `$name`.\n"),
+            }
+        } else {
+            # argument provided
+            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
+            $context->{variables}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
         }
-
-        $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-    }
-
-    if (@$arguments > @$parameters) {
-        return [
-            $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated."),
-            $evaluated_arguments,
-        ];
     }
 
     return $evaluated_arguments;
@@ -355,7 +339,8 @@ sub func_call {
     my $name      = $data->[1];
     my $arguments = $data->[2];
 
-    print "Calling function $name with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 5;
+    $Data::Dumper::Indent = 0 if $self->{debug} >= 5;
+    print "Calling function `$name` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 5;
 
     my $func;
 
@@ -370,41 +355,20 @@ sub func_call {
         return $self->call_builtin_function($context, $data, $name);
     } else {
         # undefined function
-        return $self->error($context, "Undefined function `$name`.");
+        $self->error($context, "Undefined function `$name`.");
     }
 
     my $parameters = $func->[0];
     my $statements = $func->[1];
 
-    my $new_context = $self->new_context;
+    my $new_context = $self->new_context($context); # TODO do we want context to be parent of new_context?
 
-    for (my $i = 0; $i < @$parameters; $i++) {
-        my $arg = $arguments->[$i];
-
-        if (not defined $arg) {
-            if (defined $parameters->[$i]->[1]) {
-                $arg = $parameters->[$i]->[1];
-            } else {
-                return $self->error($context, "Missing argument `$parameters->[$i]->[0]` to function `$name`.\n");
-            }
-        }
-
-        $arg = $self->statement($context, $arg); # this ought to be an expression, but
-                                                 # let's see where this goes (imagine `if` statements
-                                                 # returning the value of their branches...)
-
-        $new_context->{variables}->{$parameters->[$i]->[0]} = $arg;
-    }
-
-    my $warning;
-    if (@$arguments > @$parameters) {
-        $warning = $self->warning($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . "). Extra arguments will not be evaluated.");
-    }
+    my $ret = $self->process_func_call_arguments($new_context, $name, $parameters, $arguments);
 
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
-        return $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
+        $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
     }
 
     print "new context: ", Dumper($new_context), "\n" if $self->{debug} >= 5;
@@ -414,19 +378,13 @@ sub func_call {
     my $result = $self->interpret_ast($new_context, $statements);;
     $self->{recursion}--;
     $self->pop_stack;
-    if ($warning) {
-        return [$warning, $result];
-    } else {
-        return $result;
-    }
+    return $result;
 }
 
 sub is_truthy {
     my ($self, $context, $expr) = @_;
 
     my $result = $self->statement($context, $expr);
-
-    $self->error($context, 'No truthiness to check for...') if not $result;
 
     if ($result->[0] eq 'NUM') {
         return $result->[1] == 1;
@@ -478,7 +436,7 @@ sub statement {
     my $ins   = $data->[0];
     my $value = $data->[1];
 
-    print "stmt ins: $ins (value: $value)\n" if $self->{debug} >= 4;
+    print "stmt ins: $ins (value: ", Dumper($value), "\n" if $self->{debug} >= 4;
 
     # statement group
     if ($ins eq 'STMT_GROUP') {
@@ -519,6 +477,11 @@ sub statement {
         } else {
             return $self->interpret_ast($context, [$data->[3]]);
         }
+    }
+
+    # return
+    if ($ins eq 'RET') {
+        return ['RETURN', $self->statement($context, $value->[1])];
     }
 
     # if/else
