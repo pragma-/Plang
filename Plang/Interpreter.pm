@@ -157,7 +157,7 @@ sub handle_parse_errors {
         } else {
             # embedded: return them as a string
             my $errors = join "\n", @{$self->{parser}->{errors}};
-            $errors .= "\n$count error" . $count == 1 ? '' : 's' . ".\n";
+            $errors .= "\n$count error" . ($count == 1 ? '' : 's') . ".\n";
             return $errors;
         }
     }
