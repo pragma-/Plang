@@ -392,11 +392,9 @@ sub Expression {
         goto EXPRESSION_FAIL if not $left;
 
         while (1) {
-            my $cur = $parser->current_or_last_token;
-            last if $precedence < get_precedence $cur->[0];
-
             my $token = $parser->next_token('peek');
             last if not defined $token;
+            last if $precedence >= get_precedence $token->[0];
 
             $left = Infix($parser, $left, $precedence);
             return if $parser->errored;
