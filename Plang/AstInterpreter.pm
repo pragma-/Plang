@@ -244,7 +244,9 @@ sub unary_op {
         }
 
         if ($value->[0] eq 'NUM') {
-            return ['NUM', $eval_unary_op_NUM{$data->[0]}->($value->[1])];
+            if (exists $eval_unary_op_NUM{$op}) {
+                return ['NUM', $eval_unary_op_NUM{$op}->($value->[1])];
+            }
         }
 
         $self->error($context, "Cannot apply unary operator $op to type $value->[0]\n");
@@ -266,11 +268,15 @@ sub binary_op {
         }
 
         if ($left_value->[0] eq 'NUM' and $right_value->[0] eq 'NUM') {
-            return ['NUM', $eval_binary_op_NUM{$data->[0]}->($left_value->[1], $right_value->[1])];
+            if (exists $eval_binary_op_NUM{$op}) {
+                return ['NUM', $eval_binary_op_NUM{$op}->($left_value->[1], $right_value->[1])];
+            }
         }
 
         if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
-            return ['STRING', $eval_binary_op_STRING{$data->[0]}->($left_value->[1], $right_value->[1])];
+            if (exists $eval_binary_op_STRING{$op}) {
+                return ['STRING', $eval_binary_op_STRING{$op}->($left_value->[1], $right_value->[1])];
+            }
         }
 
         $self->error($context, "Cannot apply binary operator $op (have types $left_value->[0] and $right_value->[0])");
