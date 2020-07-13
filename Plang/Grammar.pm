@@ -81,8 +81,12 @@ sub Program {
         if (not $statement or $statement->[0] eq 'NOP') {
             if (++$failed >= 2) {
                 my $token = $parser->current_or_last_token;
-                my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
-                return error($parser, "Unexpected $name");
+                if (defined $token) {
+                    my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
+                    return error($parser, "Unexpected $name");
+                } else {
+                    return error($parser, "Unexpected EOF");
+                }
             }
         }
 
