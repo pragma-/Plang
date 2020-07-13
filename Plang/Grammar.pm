@@ -363,6 +363,8 @@ my %token_precedence = (
     STAR_STAR    => $precedence_table{'EXPONENT'},
     PERCENT      => $precedence_table{'EXPONENT'},
     BANG         => $precedence_table{'PREFIX'},
+    MINUS        => $precedence_table{'PREFIX'},
+    PLUS         => $precedence_table{'PREFIX'},
     # PLUS_PLUS0   => $precedence_table{'PREFIX'}, # documentation
     # MINUS_MINUS0 => $precedence_table{'PREFIX'}, # documentation
     PLUS_PLUS    => $precedence_table{'POSTFIX'},
@@ -480,7 +482,9 @@ sub Prefix {
         }
     }
 
-    return $expr if $expr = UnaryOp($parser, 'BANG',        'NOT');
+    return $expr if $expr = UnaryOp($parser, 'BANG',   'NOT');
+    return $expr if $expr = UnaryOp($parser, 'MINUS',  'NEG');
+    return $expr if $expr = UnaryOp($parser, 'PLUS',   'POS');
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser, 0);

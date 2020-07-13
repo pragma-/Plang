@@ -203,6 +203,7 @@ sub handle_statement_result {
 my %eval_unary_op = (
     'NOT' => sub { int ! $_[0] },
     'NEG' => sub {     - $_[0] },
+    'POS' => sub {     + $_[0] },
 );
 
 my %eval_binary_op = (
@@ -328,6 +329,10 @@ sub process_func_call_arguments {
             $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
             $context->{variables}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
         }
+    }
+
+    if (@$arguments > @$parameters) {
+        $self->error($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
     }
 
     return $evaluated_arguments;
@@ -492,6 +497,8 @@ sub statement {
     if ($ins eq 'ASSIGN') {
         my $left_token  = $value;
         my $right_value = $self->statement($context, $data->[2]);
+        my $var = $self->get_variable($context, $value->[1]);
+        $self->error($context, "Attempt to use undeclared variable `$value->[1]`") if not defined $var;
         $self->set_variable($context, $left_token->[1], $right_value);
         return $right_value;
     }
@@ -563,6 +570,8 @@ sub statement {
 
     # unary operators
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
+    return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
+    return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
 
     # binary operators
     return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
@@ -576,6 +585,10 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+
+    # postfix array index [] notation
+    if ($ins eq 'IDX') {
+    }
 
     # postfix increment
     if ($ins eq 'POSTFIX_ADD') {
