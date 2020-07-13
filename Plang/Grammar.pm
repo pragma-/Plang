@@ -338,14 +338,14 @@ sub ReturnStatement {
 
 
 my %precedence_table = (
-    ASSIGNMENT  => 1,
-    CONDITIONAL => 2,
-    SUM         => 3,
-    PRODUCT     => 4,
-    EXPONENT    => 5,
-    PREFIX      => 6,
-    POSTFIX     => 7,
     CALL        => 8,
+    POSTFIX     => 7,
+    PREFIX      => 6,
+    EXPONENT    => 5,
+    PRODUCT     => 4,
+    SUM         => 3,
+    CONDITIONAL => 2,
+    ASSIGNMENT  => 1,
 );
 
 my %token_precedence = (
@@ -392,9 +392,11 @@ sub Expression {
         goto EXPRESSION_FAIL if not $left;
 
         while (1) {
+            my $cur = $parser->current_or_last_token;
+            last if $precedence < get_precedence $cur->[0];
+
             my $token = $parser->next_token('peek');
             last if not defined $token;
-            last if $precedence >= get_precedence $token->[0];
 
             $left = Infix($parser, $left, $precedence);
             return if $parser->errored;
