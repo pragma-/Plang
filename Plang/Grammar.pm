@@ -352,6 +352,7 @@ my %token_precedence = (
     ASSIGN       => $precedence_table{'ASSIGNMENT'},
     QUESTION     => $precedence_table{'CONDITIONAL'},
     EQ           => $precedence_table{'CONDITIONAL'},
+    NOT_EQ       => $precedence_table{'CONDITIONAL'},
     GREATER_EQ   => $precedence_table{'CONDITIONAL'},
     LESS_EQ      => $precedence_table{'CONDITIONAL'},
     LESS         => $precedence_table{'CONDITIONAL'},
@@ -547,6 +548,7 @@ sub Infix {
     return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',    'PRODUCT');
     return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',    'PRODUCT');
     return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      'ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'NOT_EQ',      'NEQ',    'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'EQ',     'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',     'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',     'CONDITIONAL');

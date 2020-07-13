@@ -200,13 +200,13 @@ sub handle_statement_result {
     return;
 }
 
-my %eval_unary_op = (
+my %eval_unary_op_NUM = (
     'NOT' => sub { int ! $_[0] },
     'NEG' => sub {     - $_[0] },
     'POS' => sub {     + $_[0] },
 );
 
-my %eval_binary_op = (
+my %eval_binary_op_NUM = (
     'ADD' => sub { $_[0]  + $_[1] },
     'SUB' => sub { $_[0]  - $_[1] },
     'MUL' => sub { $_[0]  * $_[1] },
@@ -214,10 +214,22 @@ my %eval_binary_op = (
     'REM' => sub { $_[0]  % $_[1] },
     'POW' => sub { $_[0] ** $_[1] },
     'EQ'  => sub { $_[0] == $_[1] },
+    'NEQ' => sub { $_[0] != $_[1] },
     'LT'  => sub { $_[0]  < $_[1] },
     'GT'  => sub { $_[0]  > $_[1] },
     'LTE' => sub { $_[0] <= $_[1] },
     'GTE' => sub { $_[0] >= $_[1] },
+);
+
+my %eval_binary_op_STRING = (
+    'ADD' => sub { $_[0]   . $_[1] },
+    'EQ'  => sub { $_[0]  eq $_[1] },
+    'NEQ' => sub { $_[0]  ne $_[1] },
+    'LT'  => sub { $_[0] cmp $_[1] },
+    'GT'  => sub { $_[0] cmp $_[1] },
+    'LTE' => sub { $_[0] cmp $_[1] },
+    'GTE' => sub { $_[0] cmp $_[1] },
+    'REM' => sub { index $_[0], $_[1] },
 );
 
 sub unary_op {
@@ -230,8 +242,12 @@ sub unary_op {
             $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
             print $debug_msg, "\n";
         }
-        # TODO Check $value->[0] for 'NUM' or 'STRING'
-        return ['NUM', $eval_unary_op{$data->[0]}->($value->[1])];
+
+        if ($value->[0] eq 'NUM') {
+            return ['NUM', $eval_unary_op_NUM{$data->[0]}->($value->[1])];
+        }
+
+        $self->error($context, "Cannot apply unary operator $op to type $value->[0]\n");
     }
     return;
 }
@@ -248,8 +264,16 @@ sub binary_op {
             $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
             print $debug_msg, "\n";
         }
-        # TODO Check $left_value->[0] and $right_value->[0] for 'NUM' or 'STRING'
-        return ['NUM', $eval_binary_op{$data->[0]}->($left_value->[1], $right_value->[1])];
+
+        if ($left_value->[0] eq 'NUM' and $right_value->[0] eq 'NUM') {
+            return ['NUM', $eval_binary_op_NUM{$data->[0]}->($left_value->[1], $right_value->[1])];
+        }
+
+        if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
+            return ['STRING', $eval_binary_op_STRING{$data->[0]}->($left_value->[1], $right_value->[1])];
+        }
+
+        $self->error($context, "Cannot apply binary operator $op (have types $left_value->[0] and $right_value->[0])");
     }
     return;
 }
@@ -581,6 +605,7 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
