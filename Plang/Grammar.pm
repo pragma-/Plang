@@ -348,7 +348,7 @@ my %precedence_table = (
     ASSIGNMENT  => 1,
 );
 
-my %token_precedence = (
+my %infix_token_precedence = (
     ASSIGN       => $precedence_table{'ASSIGNMENT'},
     QUESTION     => $precedence_table{'CONDITIONAL'},
     EQ           => $precedence_table{'CONDITIONAL'},
@@ -363,11 +363,6 @@ my %token_precedence = (
     SLASH        => $precedence_table{'PRODUCT'},
     STAR_STAR    => $precedence_table{'EXPONENT'},
     PERCENT      => $precedence_table{'EXPONENT'},
-    BANG         => $precedence_table{'PREFIX'},
-    MINUS        => $precedence_table{'PREFIX'},
-    PLUS         => $precedence_table{'PREFIX'},
-    # PLUS_PLUS0   => $precedence_table{'PREFIX'}, # documentation
-    # MINUS_MINUS0 => $precedence_table{'PREFIX'}, # documentation
     PLUS_PLUS    => $precedence_table{'POSTFIX'},
     MINUS_MINUS  => $precedence_table{'POSTFIX'},
     L_PAREN      => $precedence_table{'CALL'},
@@ -375,7 +370,7 @@ my %token_precedence = (
 
 sub get_precedence {
     my ($tokentype) = @_;
-    return $token_precedence{$tokentype} // 0;
+    return $infix_token_precedence{$tokentype} // 0;
 }
 
 sub Expression {
