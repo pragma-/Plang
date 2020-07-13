@@ -239,8 +239,7 @@ Default arguments:
 #### Built-in functions
 Function | Parameters | Description
 --- | --- | ---
-print | `expr` | Prints expression `expr` to standard output.
-println | `expr` | Prints expression `expr` to standard output, with a newline appended.
+print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 
 ## Debugging
 ### DEBUG environment variable

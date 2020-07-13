@@ -299,25 +299,15 @@ sub func_definition {
 my %func_builtins = (
     'print'   => {
         # [['param1 name', default value], ['param2 name', default value], [...]]
-        params => [['statement', undef]],
+        params => [['statement', undef], ['end', ['STRING', "\n"]]],
         subref => \&func_builtin_print,
-    },
-    'println' => {
-        params => [['statement', undef]],
-        subref => \&func_builtin_println,
     },
 );
 
 sub func_builtin_print {
     my ($self, $name, $arguments) = @_;
-    my $output = $arguments->[0]->[1];
-    return ['STDOUT', $output];
-}
-
-sub func_builtin_println {
-    my ($self, $name, $arguments) = @_;
-    my $output .= $arguments->[0]->[1] . "\n";
-    return ['STDOUT', $output];
+    my ($text, $end) = ($arguments->[0]->[1], $arguments->[1]->[1]);
+    return ['STDOUT', "$text$end"];
 }
 
 sub add_function_builtin {
