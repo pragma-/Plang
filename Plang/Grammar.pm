@@ -475,6 +475,10 @@ sub Prefix {
         return ['NUM', $token->[1]];
     }
 
+    if ($token = $parser->consume('HEX')) {
+        return ['NUM', hex $token->[1]];
+    }
+
     if ($token = $parser->consume('IDENT')) {
         return ['IDENT', $token->[1]];
     }
