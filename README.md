@@ -79,9 +79,6 @@ The value is an integer representing verbosity, where higher values are more ver
 <!-- -->
     $ DEBUG=10 ./plang <<< '1 + 2'  # most verbose debugging output
 
-## Example Plang scripts
-[Check out some examples!](examples/)
-
 ## Embedding Plang
 Plang is designed to be embedded into larger Perl applications. Here's how you can
 do that.
@@ -282,21 +279,21 @@ Function | Parameters | Description
 --- | --- | ---
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 
-#### String operations
+### String operations
 
-##### Interpolation
+#### Interpolation
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
 
       > var a = 42; $"hello {a + 1} world"
       hello 43 world
 
-##### Concatenation
+#### Concatenation
 To concatenate two strings, use the `&` operator. But consider using [interoplation](#interpolation) instead.
 
     > var a = "Plang"; var b = "Rocks!"; a & " " & b
       Plang Rocks!
 
-##### Indexing
+#### Indexing
 To get a specific character from a string, you can use postfix `[]` array notation.
 
     > "Hello!"[0]
@@ -304,13 +301,19 @@ To get a specific character from a string, you can use postfix `[]` array notati
 
 You can use negative numbers to start from the end.
 
-   > "Hello!"[-2]
-     o
+    > "Hello!"[-2]
+      o
 
-##### Substring
+#### Substring
 To extract a substring from a string, you can use the `..` range operator inside
 postfix `[]` array notation.
 
     > "Hello!"[1..4]
       ello
+
+#### Regular expressions
+You may use regular expressions on strings with the `~=` operator.
+
+## Example Plang scripts
+[Check out some examples!](examples/)
 
