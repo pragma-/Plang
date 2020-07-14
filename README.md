@@ -5,10 +5,9 @@ Why? Because I need a small, yet useful, scripting language I can embed into
 some Perl scripts I have; notably [PBot](https://github.com/pragma-/pbot), an IRC bot that I've been tinkering with
 for quite a while.
 
-I wanted to be able to allow text from external sources to be safely interpreted
+I want to be able to allow text from external sources to be safely interpreted
 in a sandbox environment with access to exposed Perl subroutines, with full control over
-how deep functions were allowed to recurse and how many iterations a loop could perform and
-such things like that.
+how deeply functions are allowed to recurse and such things like that.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
