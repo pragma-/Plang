@@ -134,7 +134,7 @@ P | Operator | Description | Type
 10 | =    | Assignment        | Infix (right-to-left)
 
 #### Truthiness
-For the logical operators (==, >=, <=, <, >, etc), this is how truthiness
+For the logical operators (==, ||, &&, etc), this is how truthiness
 is evaluated for each type.
 
 Type | Truthiness
