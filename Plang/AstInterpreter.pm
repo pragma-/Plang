@@ -142,6 +142,7 @@ sub interpret_ast {
 
     print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
 
+    # try
     my $last_statement_result = eval {
         my $result;
         foreach my $node (@$ast) {
@@ -165,11 +166,12 @@ sub interpret_ast {
         return $result;
     };
 
+    # catch
     if ($@) {
         return ['ERROR', $@];
     }
 
-    return $last_statement_result; # return result of final statement
+    return $last_statement_result;
 }
 
 # handles one statement result
@@ -655,6 +657,16 @@ sub statement {
         return $temp_var;
     }
 
+    # range operator
+    if ($ins eq 'RANGE') {
+        my ($to, $from) = ($data->[1], $data->[2]);
+
+        $to   = $self->statement($context, $to);
+        $from = $self->statement($context, $from);
+
+        return ['RANGE', $to, $from];
+    }
+
     # array notation
     if ($ins eq 'POSTFIX_ARRAY') {
         my $token = $data->[1];
@@ -679,7 +691,16 @@ sub statement {
         if ($var->[0] eq 'STRING') {
             my $value = $self->statement($context, $data->[2]->[1]);
 
-            if ($value->[0] eq 'NUM') {
+            if ($value->[0] eq 'RANGE') {
+                my $from = $value->[1];
+                my $to = $value->[2];
+
+                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
+                    return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+                } else {
+                    $self->error($context, "Invalid types to RANGE (have $from->[0] and $to->[0]) inside postfix [] notation");
+                }
+            } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
                 return ['STRING', substr($var->[1], $index, 1) // ""];
             } else {
@@ -690,7 +711,7 @@ sub statement {
         }
     }
 
-    return;
+    return $data;
 }
 
 1;

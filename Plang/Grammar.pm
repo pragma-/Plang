@@ -121,6 +121,7 @@ sub alternate_statement {
 #                        | VariableDeclaration
 #                        | FunctionDefinition
 #                        | ReturnStatement
+#                        | RangeStatement
 #                        | Expression TERM
 #                        | TERM
 sub Statement {
@@ -146,6 +147,9 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,     'Statement: ReturnStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
@@ -336,6 +340,29 @@ sub ReturnStatement {
     $parser->backtrack;
 }
 
+# Grammar: RangeStatement ::= Expression ".." Expression
+sub RangeStatement {
+    my ($parser) = @_;
+
+    $parser->try('RangeStatement');
+
+    {
+        my $from = Expression($parser);
+        return if $parser->errored;
+
+        if ($parser->consume('DOT_DOT')) {
+            my $to = Expression($parser);
+            return if $parser->errored;
+
+            if ($to) {
+                $parser->advance;
+                return ['RANGE', $from, $to];
+            }
+        }
+    }
+
+    $parser->backtrack;
+}
 
 my %precedence_table = (
     CALL        => 100,
