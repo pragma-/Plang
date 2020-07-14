@@ -7,7 +7,7 @@ for quite a while.
 
 I want to be able to allow text from external sources to be safely interpreted
 in a sandbox environment with access to exposed Perl subroutines, with full control over
-how deeply functions are allowed to recurse and such things like that.
+how deeply functions are allowed to recurse, et cetera.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
