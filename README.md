@@ -38,6 +38,7 @@ Here's a helpful table of contents:
   * [String operations](#string-operations)
     * [Interpolation](#interpolation)
     * [Concatenation](#concatenation)
+    * [Substring search](#substring-search)
     * [Indexing](#indexing)
     * [Substring](#substring)
     * [Regular expressions](#regular-expressions)
@@ -289,6 +290,12 @@ To concatenate two strings, use the `&` operator. But consider using [interoplat
 
     > var a = "Plang"; var b = "Rocks!"; a & " " & b
       Plang Rocks!
+
+#### Substring search
+To find the index of a substring within a string, use the `~` operator.
+
+    > "Hello world!" ~ "world"
+      6
 
 #### Indexing
 To get a positional character from a string, you can use postfix `[]` array notation.
