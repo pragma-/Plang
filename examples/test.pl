@@ -10,11 +10,11 @@
 # one-statement functions do not need braces
 fn square(x)    x * x
 
-println(square(4))
+print(square(4))
 
 # $"" and $'' strings evaluate statements inside {}s
 var foo = 4
-println($"square of {foo}: {square(foo)}")  # prints "square of 4: 16"
+print($"square of {foo}: {square(foo)}")  # prints "square of 4: 16"
 
 # commas and semi-colons are largely optional
 fn test
