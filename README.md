@@ -1,18 +1,14 @@
 # Plang
-Plang is an experimental foray into implementing a programming language in Perl.
+Plang is a pragmatic scripting language written in Perl.
 
-Why? Because I wanted a small, yet useful, scripting language I could embed into
+Why? Because I need a small, yet useful, scripting language I can embed into
 some Perl scripts I have; notably [PBot](https://github.com/pragma-/pbot), an IRC bot that I've been tinkering with
 for quite a while.
 
 I wanted to be able to allow text from external sources to be safely interpreted
-in a sandbox environment with access to exposed Perl subroutines.
-
-I originally tried using [PPI](https://metacpan.org/pod/PPI) to analyze and filter Perl subroutines
-and expressions, but it proved impossible to make the programs safe and still able to do anything.
-
-Since I've always wanted to explore how a scripting language is made and what kind of unique
-ideas I might come up with, I decided to start writing Plang.
+in a sandbox environment with access to exposed Perl subroutines, with full control over
+how deep functions were allowed to recurse and how many iterations a loop could perform and
+such things like that.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
