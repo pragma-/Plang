@@ -19,7 +19,6 @@ Here's a helpful table of contents:
 <!-- md-toc-begin -->
 * [Running Plang in the Bash shell](#running-plang-in-the-bash-shell)
   * [DEBUG environment variable](#debug-environment-variable)
-* [Example Plang scripts](#example-plang-scripts)
 * [Embedding Plang](#embedding-plang)
 * [The Plang Language (so far)](#the-plang-language-so-far)
   * [Expressions](#expressions)
@@ -36,11 +35,13 @@ Here's a helpful table of contents:
       * [Scoping](#scoping)
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
-    * [String operations](#string-operations)
-      * [Interpolation](#interpolation)
-      * [Concatenation](#concatenation)
-      * [Indexing](#indexing)
-      * [Substring](#substring)
+  * [String operations](#string-operations)
+    * [Interpolation](#interpolation)
+    * [Concatenation](#concatenation)
+    * [Indexing](#indexing)
+    * [Substring](#substring)
+    * [Regular expressions](#regular-expressions)
+* [Example Plang scripts](#example-plang-scripts)
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
