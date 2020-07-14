@@ -461,7 +461,7 @@ sub statement {
     my $ins   = $data->[0];
     my $value = $data->[1];
 
-    print "stmt ins: $ins (value: ", Dumper($value), "\n" if $self->{debug} >= 4;
+    print "stmt ins: $ins (value: ", Dumper($value), ")\n" if $self->{debug} >= 4;
 
     # statement group
     if ($ins eq 'STMT_GROUP') {
@@ -653,6 +653,41 @@ sub statement {
         my $temp_var = [$var->[0], $var->[1]];
         $var->[1]--;
         return $temp_var;
+    }
+
+    # array notation
+    if ($ins eq 'POSTFIX_ARRAY') {
+        my $token = $data->[1];
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
+
+        my $var;
+
+        if ($tok_type eq 'IDENT') {
+            $var = $self->get_variable($context, $tok_value);
+
+            if (not defined $var) {
+                $self->error($context, "Cannot use postfix [] notation on undeclared variable `$tok_value`");
+            }
+
+            if (not defined $var->[1]) {
+                $self->error($context, "Cannot use postfix [] notation on undefined variable `$tok_value`");
+            }
+        } else {
+            $var = $token;
+        }
+
+        if ($var->[0] eq 'STRING') {
+            my $value = $self->statement($context, $data->[2]->[1]);
+
+            if ($value->[0] eq 'NUM') {
+                my $index = $value->[1];
+                return ['STRING', substr($var->[1], $index, 1) // ""];
+            } else {
+                $self->error($context, "Invalid type $value->[0] inside postfix [] notation");
+            }
+        } else {
+            $self->error($context, "Cannot use postfix [] notation on type $var->[0]");
+        }
     }
 
     return;

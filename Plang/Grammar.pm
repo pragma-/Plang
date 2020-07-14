@@ -354,6 +354,7 @@ my %infix_token_precedence = (
     L_PAREN      => $precedence_table{'CALL'},
     PLUS_PLUS    => $precedence_table{'POSTFIX'},
     MINUS_MINUS  => $precedence_table{'POSTFIX'},
+    L_BRACKET    => $precedence_table{'POSTFIX'},
     STAR_STAR    => $precedence_table{'EXPONENT'},
     PERCENT      => $precedence_table{'EXPONENT'},
     STAR         => $precedence_table{'PRODUCT'},
@@ -591,6 +592,21 @@ sub Postfix {
         } else {
             return error($parser, "Postfix decrement must be used on Identifiers (got " . pretty_token($left->[0]) . ")");
         }
+    }
+
+    if ($parser->consume('L_BRACKET')) {
+        my $statement = Statement($parser);
+        return if $parser->errored;
+
+        if (not $statement or not defined $statement->[1]) {
+            return expected($parser, 'statement in [] brackets');
+        }
+
+        if (not $parser->consume('R_BRACKET')) {
+            return expected($parser, 'closing ] bracket');
+        }
+
+        return ['POSTFIX_ARRAY', $left, $statement];
     }
 
     return $left;
