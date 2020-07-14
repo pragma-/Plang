@@ -338,34 +338,38 @@ sub ReturnStatement {
 
 
 my %precedence_table = (
-    CALL        => 8,
-    POSTFIX     => 7,
-    PREFIX      => 6,
-    EXPONENT    => 5,
-    PRODUCT     => 4,
-    SUM         => 3,
-    CONDITIONAL => 2,
-    ASSIGNMENT  => 1,
+    CALL        => 100,
+    POSTFIX     => 70,
+    PREFIX      => 60,
+    EXPONENT    => 50,
+    PRODUCT     => 40,
+    SUM         => 30,
+    STRING      => 25,
+    CONDITIONAL => 20,
+    ASSIGNMENT  => 10,
 );
 
+# postfix is handled by Infix
 my %infix_token_precedence = (
-    ASSIGN       => $precedence_table{'ASSIGNMENT'},
-    QUESTION     => $precedence_table{'CONDITIONAL'},
+    L_PAREN      => $precedence_table{'CALL'},
+    PLUS_PLUS    => $precedence_table{'POSTFIX'},
+    MINUS_MINUS  => $precedence_table{'POSTFIX'},
+    STAR_STAR    => $precedence_table{'EXPONENT'},
+    PERCENT      => $precedence_table{'EXPONENT'},
+    STAR         => $precedence_table{'PRODUCT'},
+    SLASH        => $precedence_table{'PRODUCT'},
+    PLUS         => $precedence_table{'SUM'},
+    MINUS        => $precedence_table{'SUM'},
+    TILDE        => $precedence_table{'STRING'},
+    AMP          => $precedence_table{'STRING'},
     EQ           => $precedence_table{'CONDITIONAL'},
     NOT_EQ       => $precedence_table{'CONDITIONAL'},
     GREATER_EQ   => $precedence_table{'CONDITIONAL'},
     LESS_EQ      => $precedence_table{'CONDITIONAL'},
-    LESS         => $precedence_table{'CONDITIONAL'},
     GREATER      => $precedence_table{'CONDITIONAL'},
-    PLUS         => $precedence_table{'SUM'},
-    MINUS        => $precedence_table{'SUM'},
-    STAR         => $precedence_table{'PRODUCT'},
-    SLASH        => $precedence_table{'PRODUCT'},
-    STAR_STAR    => $precedence_table{'EXPONENT'},
-    PERCENT      => $precedence_table{'EXPONENT'},
-    PLUS_PLUS    => $precedence_table{'POSTFIX'},
-    MINUS_MINUS  => $precedence_table{'POSTFIX'},
-    L_PAREN      => $precedence_table{'CALL'},
+    LESS         => $precedence_table{'CONDITIONAL'},
+    QUESTION     => $precedence_table{'CONDITIONAL'},
+    ASSIGN       => $precedence_table{'ASSIGNMENT'},
 );
 
 sub get_precedence {
@@ -564,6 +568,8 @@ sub Infix {
     return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',    'CONDITIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',    'EXPONENT',     1);
     return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',    'EXPONENT');
+    return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX', 'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'AMP',         'STRCAT', 'STRING');
 
     return Postfix($parser, $left, $precedence);
 }

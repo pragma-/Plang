@@ -222,14 +222,14 @@ my %eval_binary_op_NUM = (
 );
 
 my %eval_binary_op_STRING = (
-    'ADD' => sub { $_[0]   . $_[1] },
-    'EQ'  => sub { $_[0]  eq $_[1] },
-    'NEQ' => sub { $_[0]  ne $_[1] },
-    'LT'  => sub { $_[0] cmp $_[1] },
-    'GT'  => sub { $_[0] cmp $_[1] },
-    'LTE' => sub { $_[0] cmp $_[1] },
-    'GTE' => sub { $_[0] cmp $_[1] },
-    'REM' => sub { index $_[0], $_[1] },
+    'EQ'     => sub { $_[0]  eq $_[1] },
+    'NEQ'    => sub { $_[0]  ne $_[1] },
+    'LT'     => sub { $_[0] cmp $_[1] },
+    'GT'     => sub { $_[0] cmp $_[1] },
+    'LTE'    => sub { $_[0] cmp $_[1] },
+    'GTE'    => sub { $_[0] cmp $_[1] },
+    'STRCAT' => sub { $_[0]   . $_[1] },
+    'STRIDX' => sub { index $_[0], $_[1] },
 );
 
 sub unary_op {
@@ -606,6 +606,8 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a & $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
 
     # postfix array index [] notation
     if ($ins eq 'IDX') {

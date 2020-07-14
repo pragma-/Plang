@@ -71,27 +71,34 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
+The precedence values are large to give me some space to add new operators with
+new precedence. When the dust settles, the values will be made more sensible.
+Reminds me of ancient Basics like GW-BASIC and Basica that used line numbering!
+
 P | Operator | Description | Type
 --- | --- | --- | ---
-8 | \(\) | Function call     |
-7 | \+\+ | Postfix increment | Postfix
-7 | \-\- | Postfix decrement | Postfix
-6 | \+\+ | Prefix increment  | Prefix
-6 | \-\- | Prefix decrement  | Prefix
-6 | !    | Logical negation  | Prefix
-5 | \*\* | Exponent          | Infix (right-to-left)
-5 | %    | Remainder         | Infix (left-to-right)
-4 | \*   | Product           | Infix (left-to-right)
-4 | /    | Division          | Infix (left-to-right)
-3 | \+   | Addition          | Infix (left-to-right)
-3 | \-   | Subtraction       | Infix (left-to-right)
-2 | ==   | Equality          | Infix (left-to-right)
-2 | \>=  | Greater or equal  | Infix (left-to-right)
-2 | \<=  | Less or equal     | Infix (left-to-right)
-2 | \>   | Greater           | Infix (left-to-right)
-2 | \<   | Less              | Infix (left-to-right)
-2 | ?:   | Conditional       | Infix ternary (right-to-left)
-1 | =    | Assignment        | Infix (right-to-left)
+100 | () | Function call    |
+70 | ++ | Post-increment    | Postfix
+70 | -- | Post-decrement    | Postfix
+60 | ++ | Pre-increment     | Prefix
+60 | -- | Pre-decrement     | Prefix
+60 | !    | Logical negation  | Prefix
+50 | ** | Exponent          | Infix (right-to-left)
+50 | %    | Remainder         | Infix (left-to-right)
+40 | *   | Product           | Infix (left-to-right)
+40 | /    | Division          | Infix (left-to-right)
+30 | +   | Addition          | Infix (left-to-right)
+30 | -   | Subtraction       | Infix (left-to-right)
+25 | &   | String concatenation | Infix (left-to-right)
+25 | ~    | Substring index      | Infix (left-to-right)
+20 | ==   | Equality          | Infix (left-to-right)
+20 | !=   | Inequality        | Infix (left-to-right)
+20 | >=  | Greater or equal  | Infix (left-to-right)
+20 | <=  | Less or equal     | Infix (left-to-right)
+20 | >   | Greater           | Infix (left-to-right)
+20 | <   | Less              | Infix (left-to-right)
+20 | ?:   | Conditional       | Infix ternary (right-to-left)
+10 | =    | Assignment        | Infix (right-to-left)
 
 #### Truthiness
 For the logical operators (==, >=, <=, <, >, etc), this is how truthiness
