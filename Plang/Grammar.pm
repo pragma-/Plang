@@ -422,6 +422,19 @@ sub BinaryOp {
     }
 }
 
+sub expand_escapes {
+    my ($string) = @_;
+    $string =~ s/\\(
+    (?:[arnt'"\\]) |               # Single char escapes
+    (?:[ul].) |                    # uc or lc next char
+    (?:x[0-9a-fA-F]{2}) |          # 2 digit hex escape
+    (?:x\{[0-9a-fA-F]+\}) |        # more than 2 digit hex
+    (?:\d{2,3}) |                  # octal
+    (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
+    )/"qq|\\$1|"/geex;
+    return $string;
+}
+
 sub Prefix {
     my ($parser, $precedence) = @_;
     my ($token, $expr);
@@ -443,17 +456,17 @@ sub Prefix {
     if ($token = $parser->consume('DQUOTE_STRING_I')) {
         $token->[1] =~ s/^\$//;
         $token->[1] =~ s/^\"|\"$//g;
-        return ['STRING_I', $token->[1]];
+        return ['STRING_I', expand_escapes($token->[1])];
     }
 
     if ($token = $parser->consume('SQUOTE_STRING')) {
         $token->[1] =~ s/^\'|\'$//g;
-        return ['STRING', $token->[1]];
+        return ['STRING', expand_escapes($token->[1])];
     }
 
     if ($token = $parser->consume('DQUOTE_STRING')) {
         $token->[1] =~ s/^\"|\"$//g;
-        return ['STRING', $token->[1]];
+        return ['STRING', expand_escapes($token->[1])];
     }
 
     if ($parser->consume('MINUS_MINUS')) {
