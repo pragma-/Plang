@@ -291,7 +291,7 @@ To concatenate two strings, use the `&` operator. But consider using [interoplat
       Plang Rocks!
 
 #### Indexing
-To get a specific character from a string, you can use postfix `[]` array notation.
+To get a positional character from a string, you can use postfix `[]` array notation.
 
     > "Hello!"[0]
       H
