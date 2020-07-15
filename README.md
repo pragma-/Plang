@@ -118,7 +118,7 @@ P | Operator | Description | Type
 20 | == | Equality          | Infix (left-to-right)
 20 | != | Inequality        | Infix (left-to-right)
 17 | && | Logical and       | Infix (left-to-right)
-16 | || | Logical or        | Infix (left-to-right)
+16 | \|\| | Logical or        | Infix (left-to-right)
 15 | ?: | Conditional       | Infix ternary (right-to-left)
 10 | =  | Assignment        | Infix (right-to-left)
 10 | += | Addition assignment     | Infix (right-to-left)
