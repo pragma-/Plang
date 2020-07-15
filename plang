@@ -7,8 +7,9 @@ use strict;
 use lib '.';
 
 use Data::Dumper;
-
 use Plang::Interpreter;
+
+print "This script reads from standard input.\n" and exit if @ARGV;
 
 # example of setting up a simple straight-forward Plang interpreter
 sub plang {
