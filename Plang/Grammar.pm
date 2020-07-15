@@ -372,8 +372,17 @@ my %precedence_table = (
     PRODUCT     => 40,
     SUM         => 30,
     STRING      => 25,
-    CONDITIONAL => 20,
+    RELATIONAL  => 23,
+    EQUALITY    => 20,
+    LOGICAL_AND => 17,
+    LOGICAL_OR  => 16,
+    CONDITIONAL => 15,
     ASSIGNMENT  => 10,
+    STRING_CAT  => 7,
+    COMMA       => 5,
+    LOW_NOT     => 4,
+    LOW_AND     => 3,
+    LOW_OR      => 2,
 );
 
 # postfix is handled by Infix
@@ -390,14 +399,26 @@ my %infix_token_precedence = (
     MINUS        => $precedence_table{'SUM'},
     TILDE        => $precedence_table{'STRING'},
     AMP          => $precedence_table{'STRING'},
-    EQ           => $precedence_table{'CONDITIONAL'},
-    NOT_EQ       => $precedence_table{'CONDITIONAL'},
-    GREATER_EQ   => $precedence_table{'CONDITIONAL'},
-    LESS_EQ      => $precedence_table{'CONDITIONAL'},
-    GREATER      => $precedence_table{'CONDITIONAL'},
-    LESS         => $precedence_table{'CONDITIONAL'},
+    GREATER_EQ   => $precedence_table{'RELATIONAL'},
+    LESS_EQ      => $precedence_table{'RELATIONAL'},
+    GREATER      => $precedence_table{'RELATIONAL'},
+    LESS         => $precedence_table{'RELATIONAL'},
+    EQ           => $precedence_table{'EQUALITY'},
+    NOT_EQ       => $precedence_table{'EQUALITY'},
+    AMP_AMP      => $precedence_table{'LOGICAL_AND'},
+    PIPE_PIPE    => $precedence_table{'LOGICAL_OR'},
     QUESTION     => $precedence_table{'CONDITIONAL'},
     ASSIGN       => $precedence_table{'ASSIGNMENT'},
+    PLUS_EQ      => $precedence_table{'ASSIGNMENT'},
+    MINUS_EQ     => $precedence_table{'ASSIGNMENT'},
+    STAR_EQ      => $precedence_table{'ASSIGNMENT'},
+    SLASH_EQ     => $precedence_table{'ASSIGNMENT'},
+    AMP_EQ       => $precedence_table{'ASSIGNMENT'},
+    COMMA        => $precedence_table{'COMMA'},
+    NOT          => $precedence_table{'LOW_NOT'},
+    AND          => $precedence_table{'LOW_AND'},
+    OR           => $precedence_table{'LOW_OR'},
+
 );
 
 sub get_precedence {
@@ -530,6 +551,7 @@ sub Prefix {
     return $expr if $expr = UnaryOp($parser, 'BANG',   'NOT');
     return $expr if $expr = UnaryOp($parser, 'MINUS',  'NEG');
     return $expr if $expr = UnaryOp($parser, 'PLUS',   'POS');
+    return $expr if $expr = UnaryOp($parser, 'NOT',    'NOT');
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser, 0);
@@ -544,6 +566,7 @@ sub Infix {
     my ($parser, $left, $precedence) = @_;
     my $expr;
 
+    # function call
     if ($parser->consume('L_PAREN')) {
         my $arguments = [];
         while (1) {
@@ -587,21 +610,30 @@ sub Infix {
     }
 
     # binary operators
-    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',    'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',    'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',    'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',    'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      'ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'NOT_EQ',      'NEQ',    'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'EQ',     'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',     'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',     'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',    'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',    'CONDITIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',    'EXPONENT',     1);
-    return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',    'EXPONENT');
-    return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX', 'STRING');
-    return $expr if $expr = BinaryOp($parser, $left, 'AMP',         'STRCAT', 'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',        'EXPONENT',     1);
+    return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',        'EXPONENT');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',        'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',        'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',        'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',        'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX',     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'AMP',         'STRCAT',     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',        'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',        'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',         'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',         'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'NOT_EQ',      'NEQ',        'EQUALITY');
+    return $expr if $expr = BinaryOp($parser, $left, 'AMP_AMP',     'AND',        'LOGICAL_AND');
+    return $expr if $expr = BinaryOp($parser, $left, 'PIPE_PIPE',   'OR',         'LOGICAL_OR');
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'EQ',         'EQUALITY');
+    return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      'ASSIGN',     'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS_EQ',     'ADD_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS_EQ',    'SUB_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_EQ',     'MUL_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH_EQ',    'DIV_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'AMP_EQ',      'CAT_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'AND',         'AND',        'LOW_AND');
+    return $expr if $expr = BinaryOp($parser, $left, 'OR',          'OR',         'LOW_OR');
 
     return Postfix($parser, $left, $precedence);
 }

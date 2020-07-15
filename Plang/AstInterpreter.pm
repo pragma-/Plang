@@ -209,27 +209,27 @@ my %eval_unary_op_NUM = (
 );
 
 my %eval_binary_op_NUM = (
-    'ADD' => sub { $_[0]  + $_[1] },
-    'SUB' => sub { $_[0]  - $_[1] },
+    'POW' => sub { $_[0] ** $_[1] },
+    'REM' => sub { $_[0]  % $_[1] },
     'MUL' => sub { $_[0]  * $_[1] },
     'DIV' => sub { $_[0]  / $_[1] },
-    'REM' => sub { $_[0]  % $_[1] },
-    'POW' => sub { $_[0] ** $_[1] },
+    'ADD' => sub { $_[0]  + $_[1] },
+    'SUB' => sub { $_[0]  - $_[1] },
+    'GTE' => sub { $_[0] >= $_[1] },
+    'LTE' => sub { $_[0] <= $_[1] },
+    'GT'  => sub { $_[0]  > $_[1] },
+    'LT'  => sub { $_[0]  < $_[1] },
     'EQ'  => sub { $_[0] == $_[1] },
     'NEQ' => sub { $_[0] != $_[1] },
-    'LT'  => sub { $_[0]  < $_[1] },
-    'GT'  => sub { $_[0]  > $_[1] },
-    'LTE' => sub { $_[0] <= $_[1] },
-    'GTE' => sub { $_[0] >= $_[1] },
 );
 
 my %eval_binary_op_STRING = (
     'EQ'     => sub { $_[0]  eq $_[1] },
     'NEQ'    => sub { $_[0]  ne $_[1] },
-    'LT'     => sub { $_[0] cmp $_[1] },
-    'GT'     => sub { $_[0] cmp $_[1] },
-    'LTE'    => sub { $_[0] cmp $_[1] },
-    'GTE'    => sub { $_[0] cmp $_[1] },
+    'LT'     => sub { ($_[0] cmp $_[1]) == -1 },
+    'GT'     => sub { ($_[0] cmp $_[1]) ==  1 },
+    'LTE'    => sub { ($_[0] cmp $_[1]) <=  0 },
+    'GTE'    => sub { ($_[0] cmp $_[1]) >=  0 },
     'STRCAT' => sub { $_[0]   . $_[1] },
     'STRIDX' => sub { index $_[0], $_[1] },
 );
@@ -416,7 +416,7 @@ sub is_truthy {
     my $result = $self->statement($context, $expr);
 
     if ($result->[0] eq 'NUM') {
-        return $result->[1] == 1;
+        return $result->[1] != 0;
     }
 
     if ($result->[0] eq 'STRING') {
@@ -424,7 +424,7 @@ sub is_truthy {
     }
 
     if ($result->[0] eq 'BOOL') {
-        return $result->[1] == 1;
+        return $result->[1] != 0;
     }
 
     return;
@@ -580,26 +580,40 @@ sub statement {
         return $var;
     }
 
+    # short-circuiting logical and
+    if ($ins eq 'AND') {
+        my $left_value = $self->statement($context, $data->[1]);
+        return ['NUM', 0] if not $self->is_truthy($context, $left_value);
+        return $self->statement($context, $data->[2]);
+    }
+
+    # short-circuiting logical or
+    if ($ins eq 'OR') {
+        my $left_value = $self->statement($context, $data->[1]);
+        return $left_value if $self->is_truthy($context, $left_value);
+        return $self->statement($context, $data->[2]);
+    }
+
     # unary operators
-    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '! $a'));
+    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '!/not $a'));
     return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
     return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
 
     # binary operators
-    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a & $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
 
     # postfix increment
     if ($ins eq 'POSTFIX_ADD') {
@@ -709,7 +723,7 @@ sub assignment {
     # plain variable
     if ($left_value->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $left_value->[1]);
-        $self->error($context, "Attempt to use undeclared variable `$left_value->[1]`") if not defined $var;
+        $self->error($context, "Attempt to assign to undeclared variable `$left_value->[1]`") if not defined $var;
         $self->set_variable($context, $left_value->[1], $right_value);
         return $right_value;
     }
