@@ -283,7 +283,7 @@ print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. Th
 #### Relational operations
 The relational operators behave as expected. There is no need to compare against `-1`, `0` or `1`.
 
-    > "cat" > "dog"
+    > "blue" < "red"
       1
 
 #### Interpolation
