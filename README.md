@@ -93,7 +93,6 @@ These are the operators implemented so far, from highest to lowest precedence.
 
 The precedence values are large to give me some space to add new operators with
 new precedence. When the dust settles, the values will be made more sensible.
-Reminds me of ancient Basics like GW-BASIC and Basica that used line numbering!
 
 P | Operator | Description | Type
 --- | --- | --- | ---
@@ -103,23 +102,38 @@ P | Operator | Description | Type
 70 | -- | Post-decrement    | Postfix
 60 | ++ | Pre-increment     | Prefix
 60 | -- | Pre-decrement     | Prefix
-60 | !    | Logical negation  | Prefix
+60 | !  | Logical negation  | Prefix
 50 | ** | Exponent          | Infix (right-to-left)
-50 | %    | Remainder         | Infix (left-to-right)
-40 | *   | Product           | Infix (left-to-right)
-40 | /    | Division          | Infix (left-to-right)
-30 | +   | Addition          | Infix (left-to-right)
-30 | -   | Subtraction       | Infix (left-to-right)
-25 | &   | String concatenation | Infix (left-to-right)
-25 | ~    | Substring index      | Infix (left-to-right)
-20 | ==   | Equality          | Infix (left-to-right)
-20 | !=   | Inequality        | Infix (left-to-right)
-20 | >=  | Greater or equal  | Infix (left-to-right)
-20 | <=  | Less or equal     | Infix (left-to-right)
-20 | >   | Greater           | Infix (left-to-right)
-20 | <   | Less              | Infix (left-to-right)
-20 | ?:   | Conditional       | Infix ternary (right-to-left)
-10 | =    | Assignment        | Infix (right-to-left)
+50 | %  | Remainder         | Infix (left-to-right)
+40 | *  | Product           | Infix (left-to-right)
+40 | /  | Division          | Infix (left-to-right)
+30 | +  | Addition          | Infix (left-to-right)
+30 | -  | Subtraction       | Infix (left-to-right)
+25 | &  | String concatenation | Infix (left-to-right)
+25 | ~  | Substring index      | Infix (left-to-right)
+23 | >= | Greater or equal  | Infix (left-to-right)
+23 | <= | Less or equal     | Infix (left-to-right)
+23 | >  | Greater           | Infix (left-to-right)
+23 | <  | Less              | Infix (left-to-right)
+20 | == | Equality          | Infix (left-to-right)
+20 | != | Inequality        | Infix (left-to-right)
+17 | && | Logical and       | Infix (left-to-right)
+16 | || | Logical or        | Infix (left-to-right)
+15 | ?: | Conditional       | Infix ternary (right-to-left)
+10 | =  | Assignment        | Infix (right-to-left)
+10 | += | Addition assignment     | Infix (right-to-left)
+10 | -= | Subtraction assignment  | Infix (right-to-left)
+10 | \*= | Product assignment     | Infix (right-to-left)
+10 | /= | Division assignment     | Infix (right-to-left)
+7  | &= | String concat ssignment | Infix (right-to-left)
+5  | ,  | Comma             | Infex (left-to-right)
+4  | not | Logical negation | Prefix
+3  | and | Logical and      | Infix (left-to-right)
+2  | or  | Logical or       | Infix (left-to-right)
+
+`!`, `&&`, and `||` have high precedence such that they are useful in constructing an expression;
+`not`, `and`, and `or` have low precedence such that they are useful for flow control between
+what are essentially different expressions.
 
 #### Truthiness
 For the logical operators (==, ||, &&, etc), this is how truthiness
