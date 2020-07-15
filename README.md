@@ -80,7 +80,7 @@ The value is an integer representing verbosity, where higher values are more ver
 Plang is designed to be embedded into larger Perl applications. Here's how you can
 do that.
 
-Actually, I will get around to documenting this soon. In the meantime, take a look
+I will get around to documenting this soon. In the meantime, take a look
 at [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
 for a rough idea of how it's done.
 
@@ -126,7 +126,7 @@ P | Operator | Description | Type
 10 | \*= | Product assignment     | Infix (right-to-left)
 10 | /= | Division assignment     | Infix (right-to-left)
 7  | &= | String concat ssignment | Infix (right-to-left)
-5  | ,  | Comma             | Infex (left-to-right)
+5  | ,  | Comma             | Infix (left-to-right)
 4  | not | Logical negation | Prefix
 3  | and | Logical and      | Infix (left-to-right)
 2  | or  | Logical or       | Infix (left-to-right)
