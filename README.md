@@ -35,6 +35,7 @@ Here's a helpful table of contents:
   * [Functions](#functions)
     * [Built-in functions](#built-in-functions)
   * [String operations](#string-operations)
+    * [Relational operations](#relational-operations)
     * [Interpolation](#interpolation)
     * [Concatenation](#concatenation)
     * [Substring search](#substring-search)
@@ -279,6 +280,11 @@ Function | Parameters | Description
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 
 ### String operations
+#### Relational operations
+The relational operators behave as expected. There is no need to compare against `-1`, `0` or `1`.
+
+    > "cat" > "dog"
+      1
 
 #### Interpolation
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
