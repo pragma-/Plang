@@ -517,26 +517,14 @@ sub statement {
 
     # assignment
     if ($ins eq 'ASSIGN') {
-        my $left_token  = $value;
-        my $right_value = $self->statement($context, $data->[2]);
-        my $var = $self->get_variable($context, $value->[1]);
-        $self->error($context, "Attempt to use undeclared variable `$value->[1]`") if not defined $var;
-        $self->set_variable($context, $left_token->[1], $right_value);
-        return $right_value;
+        return $self->assignment($context, $data);
     }
 
     # variable
     if ($ins eq 'IDENT') {
         my $var = $self->get_variable($context, $value);
-
-        if (not defined $var) {
-            $self->error($context, "Attempt to use undeclared variable `$value`");
-        }
-
-        if (not defined $var->[1]) {
-            $self->error($context, "Attempt to use undefined variable `$value`");
-        }
-
+        $self->error($context, "Attempt to use undeclared variable `$value`") if not defined $var;
+        $self->error($context, "Attempt to use undefined variable `$value`")  if not defined $var->[1];
         return $var;
     }
 
@@ -610,10 +598,6 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a & $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
-
-    # postfix array index [] notation
-    if ($ins eq 'IDX') {
-    }
 
     # postfix increment
     if ($ins eq 'POSTFIX_ADD') {
@@ -712,6 +696,81 @@ sub statement {
     }
 
     return $data;
+}
+
+sub assignment {
+    my ($self, $context, $data) = @_;
+
+    my $left_value  = $data->[1];
+    my $right_value = $self->statement($context, $data->[2]);
+
+    # plain variable
+    if ($left_value->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $left_value->[1]);
+        $self->error($context, "Attempt to use undeclared variable `$left_value->[1]`") if not defined $var;
+        $self->set_variable($context, $left_value->[1], $right_value);
+        return $right_value;
+    }
+
+    # postfix-array notation
+    if ($left_value->[0] eq 'POSTFIX_ARRAY') {
+        my $token = $left_value->[1];
+        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
+
+        my $var;
+
+        if ($tok_type eq 'IDENT') {
+            $var = $self->get_variable($context, $tok_value);
+
+            if (not defined $var) {
+                $self->error($context, "Cannot assign to postfix [] notation on undeclared variable `$tok_value`");
+            }
+        } else {
+            $var = $token;
+        }
+
+        if ($var->[0] eq 'STRING') {
+            my $value = $self->statement($context, $left_value->[2]->[1]);
+
+            if ($value->[0] eq 'RANGE') {
+                my $from = $value->[1];
+                my $to   = $value->[2];
+
+                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
+                    if ($right_value->[0] eq 'STRING') {
+                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
+                        return ['STRING', $var->[1]];
+                    } elsif ($right_value->[0] eq 'NUM') {
+                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
+                        return ['STRING', $var->[1]];
+                    } else {
+                        $self->error($context, "Cannot assign from type $right_value->[0] to type $left_value->[0] with RANGE in postfix [] notation");
+                    }
+                } else {
+                    $self->error($context, "Invalid types to RANGE (have $from->[0] and $to->[0]) inside assignment postfix [] notation");
+                }
+            } elsif ($value->[0] eq 'NUM') {
+                my $index = $value->[1];
+                if ($right_value->[0] eq 'STRING') {
+                    substr ($var->[1], $index, 1) = $right_value->[1];
+                    return ['STRING', $var->[1]];
+                } elsif ($right_value->[0] eq 'NUM') {
+                    substr ($var->[1], $index, 1) = chr $right_value->[1];
+                    return ['STRING', $var->[1]];
+                } else {
+                    $self->error($context, "Cannot assign from type $right_value->[0] to type $left_value->[0] with postfix [] notation");
+                }
+            } else {
+                $self->error($context, "Invalid type $value->[0] inside assignment postfix [] notation");
+            }
+        } else {
+            $self->error($context, "Cannot assign to postfix [] notation on type $var->[0]");
+        }
+    }
+
+    # a statement
+    my $eval = $self->statement($context, $data->[1]);
+    $self->error($context, "Cannot assign to non-lvalue type $eval->[0]");
 }
 
 1;
