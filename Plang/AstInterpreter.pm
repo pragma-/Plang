@@ -277,6 +277,8 @@ sub binary_op {
 
         if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
             if (exists $eval_binary_op_STRING{$op}) {
+                $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
+                $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
                 return ['STRING', $eval_binary_op_STRING{$op}->($left_value->[1], $right_value->[1])];
             }
         }
