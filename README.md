@@ -307,12 +307,22 @@ You can use negative numbers to start from the end.
     > "Hello!"[-2]
       o
 
+You can assign to the above notation to replace the character instead.
+
+    > "Hello!"[0] = "J"
+      Jello!
+
 #### Substring
 To extract a substring from a string, you can use the `..` range operator inside
 postfix `[]` array notation.
 
     > "Hello!"[1..4]
       ello
+
+You can assign to the above notation to replace the substring instead.
+
+    > "Good-bye!"[5..7] = "day"
+      Good-day!
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
