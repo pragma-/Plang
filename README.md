@@ -88,18 +88,6 @@ for a rough idea of how it's done.
 ### Expressions
 Expressions perform arithmetic, logical or assignment operations.
 
-    > 1 * 2 + (3 * 4)        # arithmetic expressions
-      14
-<!-- -->
-    > 1 + 2 == 4 - 1         # logical expressions
-      1
-
-    > 3 > 5
-      0
-<!-- -->
-    > a = 5; b = 10; a + b   # assignment expressions
-      15
-
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
