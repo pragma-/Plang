@@ -102,7 +102,7 @@ sub initialize {
     $self->{parser}->add_rule(\&Program);
 
     $self->{parser}->define_keywords(
-        'var',
+        'var', 'true', 'false',
         'fn', 'return',
         'if', 'else',
     );

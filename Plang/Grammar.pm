@@ -58,7 +58,7 @@ sub expected {
     }
 }
 
-# Grammar: Program = Statement+
+# Grammar: Program ::= Statement+
 sub Program {
     my ($parser) = @_;
 
@@ -117,7 +117,7 @@ sub alternate_statement {
     }
 }
 
-# Grammar: Statement =     StatementGroup
+# Grammar: Statement ::=   StatementGroup
 #                        | VariableDeclaration
 #                        | FunctionDefinition
 #                        | ReturnStatement
@@ -168,7 +168,7 @@ sub Statement {
     return ['NOP', undef];
 }
 
-# Grammar: StatementGroup = L_BRACE Statement* R_BRACE
+# Grammar: StatementGroup ::= L_BRACE Statement* R_BRACE
 sub StatementGroup {
     my ($parser) = @_;
 
@@ -198,7 +198,7 @@ sub StatementGroup {
     $parser->backtrack;
 }
 
-# Grammar: VariableDeclaration = KEYWORD_var IDENT Initializer?
+# Grammar: VariableDeclaration ::= KEYWORD_var IDENT Initializer?
 sub VariableDeclaration {
     my ($parser) = @_;
 
@@ -222,7 +222,7 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-#Grammar: Initializer = ASSIGN Expression
+#Grammar: Initializer ::= ASSIGN Expression
 sub Initializer {
     my ($parser) = @_;
 
@@ -243,7 +243,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: FunctionDefinition = KEYWORD_fn IDENT IdentifierList (StatementGroup | Statement)
+# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT IdentifierList (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -291,7 +291,7 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList = L_PAREN (IDENT Initializer? COMMA?)* R_PAREN
+# Grammar: IdentifierList ::= L_PAREN (IDENT Initializer? COMMA?)* R_PAREN
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -491,6 +491,14 @@ sub expand_escapes {
 sub Prefix {
     my ($parser, $precedence) = @_;
     my ($token, $expr);
+
+    if ($token = $parser->consume('KEYWORD_true')) {
+        return ['BOOL', 1];
+    }
+
+    if ($token = $parser->consume('KEYWORD_false')) {
+        return ['BOOL', 0];
+    }
 
     if ($token = $parser->consume('NUM')) {
         return ['NUM', $token->[1]];

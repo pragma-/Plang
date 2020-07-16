@@ -184,6 +184,9 @@ sub handle_statement_result {
     $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
     print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
 
+    $result = ['STRING', $self->output_value($result)];
+
+
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself
     return $result if $self->{embedded};
@@ -203,35 +206,35 @@ sub handle_statement_result {
 }
 
 my %eval_unary_op_NUM = (
-    'NOT' => sub { int ! $_[0] },
-    'NEG' => sub {     - $_[0] },
-    'POS' => sub {     + $_[0] },
+    'NOT' => sub { ['BOOL', int ! $_[0]] },
+    'NEG' => sub { ['NUM',      - $_[0]] },
+    'POS' => sub { ['NUM',      + $_[0]] },
 );
 
 my %eval_binary_op_NUM = (
-    'POW' => sub { $_[0] ** $_[1] },
-    'REM' => sub { $_[0]  % $_[1] },
-    'MUL' => sub { $_[0]  * $_[1] },
-    'DIV' => sub { $_[0]  / $_[1] },
-    'ADD' => sub { $_[0]  + $_[1] },
-    'SUB' => sub { $_[0]  - $_[1] },
-    'GTE' => sub { $_[0] >= $_[1] },
-    'LTE' => sub { $_[0] <= $_[1] },
-    'GT'  => sub { $_[0]  > $_[1] },
-    'LT'  => sub { $_[0]  < $_[1] },
-    'EQ'  => sub { $_[0] == $_[1] },
-    'NEQ' => sub { $_[0] != $_[1] },
+    'POW' => sub { ['NUM',  $_[0] ** $_[1]] },
+    'REM' => sub { ['NUM',  $_[0]  % $_[1]] },
+    'MUL' => sub { ['NUM',  $_[0]  * $_[1]] },
+    'DIV' => sub { ['NUM',  $_[0]  / $_[1]] },
+    'ADD' => sub { ['NUM',  $_[0]  + $_[1]] },
+    'SUB' => sub { ['NUM',  $_[0]  - $_[1]] },
+    'GTE' => sub { ['BOOL', $_[0] >= $_[1]] },
+    'LTE' => sub { ['BOOL', $_[0] <= $_[1]] },
+    'GT'  => sub { ['BOOL', $_[0]  > $_[1]] },
+    'LT'  => sub { ['BOOL', $_[0]  < $_[1]] },
+    'EQ'  => sub { ['BOOL', $_[0] == $_[1]] },
+    'NEQ' => sub { ['BOOL', $_[0] != $_[1]] },
 );
 
 my %eval_binary_op_STRING = (
-    'EQ'     => sub { $_[0]  eq $_[1] },
-    'NEQ'    => sub { $_[0]  ne $_[1] },
-    'LT'     => sub { ($_[0] cmp $_[1]) == -1 },
-    'GT'     => sub { ($_[0] cmp $_[1]) ==  1 },
-    'LTE'    => sub { ($_[0] cmp $_[1]) <=  0 },
-    'GTE'    => sub { ($_[0] cmp $_[1]) >=  0 },
-    'STRCAT' => sub { $_[0]   . $_[1] },
-    'STRIDX' => sub { index $_[0], $_[1] },
+    'EQ'     => sub { ['BOOL',    $_[0]  eq $_[1]] },
+    'NEQ'    => sub { ['BOOL',    $_[0]  ne $_[1]] },
+    'LT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) == -1] },
+    'GT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) ==  1] },
+    'LTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) <=  0] },
+    'GTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) >=  0] },
+    'STRCAT' => sub { ['STRING',  $_[0]   . $_[1]] },
+    'STRIDX' => sub { ['NUM', index $_[0], $_[1]] },
 );
 
 sub unary_op {
@@ -245,9 +248,9 @@ sub unary_op {
             print $debug_msg, "\n";
         }
 
-        if ($value->[0] eq 'NUM') {
+        if ($self->is_arithmetic_type($value)) {
             if (exists $eval_unary_op_NUM{$op}) {
-                return ['NUM', $eval_unary_op_NUM{$op}->($value->[1])];
+                return $eval_unary_op_NUM{$op}->($value->[1]);
             }
         }
 
@@ -269,9 +272,9 @@ sub binary_op {
             print $debug_msg, "\n";
         }
 
-        if ($left_value->[0] eq 'NUM' and $right_value->[0] eq 'NUM') {
+        if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
             if (exists $eval_binary_op_NUM{$op}) {
-                return ['NUM', $eval_binary_op_NUM{$op}->($left_value->[1], $right_value->[1])];
+                return $eval_binary_op_NUM{$op}->($left_value->[1], $right_value->[1]);
             }
         }
 
@@ -279,7 +282,7 @@ sub binary_op {
             if (exists $eval_binary_op_STRING{$op}) {
                 $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
                 $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
-                return ['STRING', $eval_binary_op_STRING{$op}->($left_value->[1], $right_value->[1])];
+                return $eval_binary_op_STRING{$op}->($left_value->[1], $right_value->[1]);
             }
         }
 
@@ -306,12 +309,22 @@ my %func_builtins = (
         params => [['statement', undef], ['end', ['STRING', "\n"]]],
         subref => \&func_builtin_print,
     },
+    'type'   => {
+        params => [['expr', undef]],
+        subref => \&func_builtin_type,
+    },
 );
 
 sub func_builtin_print {
     my ($self, $name, $arguments) = @_;
     my ($text, $end) = ($arguments->[0]->[1], $arguments->[1]->[1]);
     return ['STDOUT', "$text$end"];
+}
+
+sub func_builtin_type {
+    my ($self, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+    return ['STRING', "$expr->[0]"];
 }
 
 sub add_function_builtin {
@@ -450,7 +463,7 @@ sub interpolate_string {
         my ($text, $interpolate) = ($1, $2);
         my $ast = $self->parse_string($interpolate);
         my $result = $self->interpret_ast($context, $ast);
-        $new_string .= $text . $result->[1];
+        $new_string .= $text . $self->output_value($result);
     }
 
     $string =~ /\G(.*)/gc;
@@ -477,6 +490,7 @@ sub statement {
     # literals
     return ['NUM',    $value] if $ins eq 'NUM';
     return ['STRING', $value] if $ins eq 'STRING';
+    return ['BOOL',   $value] if $ins eq 'BOOL';
 
     # interpolated string
     if ($ins eq 'STRING_I') {
@@ -583,7 +597,7 @@ sub statement {
     # short-circuiting logical and
     if ($ins eq 'AND') {
         my $left_value = $self->statement($context, $data->[1]);
-        return ['NUM', 0] if not $self->is_truthy($context, $left_value);
+        return $left_value if not $self->is_truthy($context, $left_value);
         return $self->statement($context, $data->[2]);
     }
 
@@ -714,6 +728,22 @@ sub statement {
     return $data;
 }
 
+sub output_value {
+    my ($self, $value) = @_;
+
+    # booleans should say 'true' or 'false'
+    if ($value->[0] eq 'BOOL') {
+        if ($value->[1] == 0) {
+            return 'false';
+        } else {
+            return 'true';
+        }
+    }
+
+    # STRING and NUM returned as-is
+    return $value->[1];
+}
+
 sub assignment {
     my ($self, $context, $data) = @_;
 
@@ -747,6 +777,8 @@ sub assignment {
 
         if ($var->[0] eq 'STRING') {
             my $value = $self->statement($context, $left_value->[2]->[1]);
+
+            print "value: ", Dumper($value), "\n";
 
             if ($value->[0] eq 'RANGE') {
                 my $from = $value->[1];
@@ -787,6 +819,12 @@ sub assignment {
     # a statement
     my $eval = $self->statement($context, $data->[1]);
     $self->error($context, "Cannot assign to non-lvalue type $eval->[0]");
+}
+
+sub is_arithmetic_type {
+    my ($self, $value) = @_;
+    return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
+    return 0;
 }
 
 1;
