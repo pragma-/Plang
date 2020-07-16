@@ -278,13 +278,14 @@ Default arguments:
 Function | Parameters | Description
 --- | --- | ---
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
+type | `expr` | Returns the type of an expression, as a string.
 
 ### String operations
 #### Relational operations
 The relational operators behave as expected. There is no need to compare against `-1`, `0` or `1`.
 
     > "blue" < "red"
-      1
+      true
 
 #### Interpolation
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
@@ -317,8 +318,8 @@ You can use negative numbers to start from the end.
 
 You can assign to the above notation to replace the character instead.
 
-    > "Hello!"[0] = "J"
-      Jello!
+    > "Hello!"[0] = "Jee"
+      Jeeello!
 
 #### Substring
 To extract a substring from a string, you can use the `..` range operator inside
@@ -329,8 +330,8 @@ postfix `[]` array notation.
 
 You can assign to the above notation to replace the substring instead.
 
-    > "Good-bye!"[5..7] = "day"
-      Good-day!
+    > "Good-bye!"[5..7] = "night"
+      Good-night!
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
