@@ -184,9 +184,6 @@ sub handle_statement_result {
     $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
     print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
 
-    $result = ['STRING', $self->output_value($result)];
-
-
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself
     return $result if $self->{embedded};
@@ -201,7 +198,7 @@ sub handle_statement_result {
     return $result unless $print_any;
 
     # print the result if possible and then consume it
-    print "$result->[1]\n" if defined $result->[1];
+    print $self->output_value($result), "\n" if defined $result->[1];
     return;
 }
 
@@ -777,8 +774,6 @@ sub assignment {
 
         if ($var->[0] eq 'STRING') {
             my $value = $self->statement($context, $left_value->[2]->[1]);
-
-            print "value: ", Dumper($value), "\n";
 
             if ($value->[0] eq 'RANGE') {
                 my $from = $value->[1];
