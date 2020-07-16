@@ -30,6 +30,7 @@ Here's a helpful table of contents:
       * [Types](#types)
         * [Number](#number)
         * [String](#string)
+        * [Boolean](#boolean)
         * [Nil](#nil)
       * [Scoping](#scoping)
   * [Functions](#functions)
@@ -227,6 +228,11 @@ In Plang, the `Number` type is equivalent to a double-precision type.
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no difference between the quotes.
+
+###### Boolean
+    Boolean ::= "true" | "false"
+
+A `Boolean` is either true or false.
 
 ###### Nil
      Nil ::= "Nil"
