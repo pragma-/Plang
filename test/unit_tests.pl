@@ -34,19 +34,18 @@ END
     ['type(nil)',                                                        ['STRING', 'Nil',            ]],
 );
 
-my @pass;
-my @fail;
-
-use Plang::Interpreter;
-
 use Data::Dumper;
 $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse  = 1;
 $Data::Dumper::Useqq  = 1;
 
+use Plang::Interpreter;
 my $plang = Plang::Interpreter->new(embedded => 1);
 
 print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";
+
+my @pass;
+my @fail;
 
 my $i = 0;
 foreach my $test (@tests) {
