@@ -16,16 +16,16 @@ $Data::Dumper::Useqq  = 1;
 my $plang = Plang::Interpreter->new(embedded => 1);
 
 my @tests = (
-    ['1 + 4 * 3 + 2 * 4', ['NUM', 21]],
-    ['"hi"', ['STRING', "hi"]],
-    ['"hello world" ~ "world"', ['NUM', 6]],
-    ['"hello world" ~ "bye"', ['NUM', -1]],
-    ['"hi " . 0x263a', ['STRING', 'hi ☺']],
-    ['fn fib(n) n == 1 ? 1 : n == 2 ? 1 : fib(n-1) + fib(n-2); fib(12)', ['NUM', 144]],
-    ['1 == 1', ['BOOL', 1]],
-    ['fn square(x) x * x; var a = 5; $"square of {a} = {square(a)}"', ['STRING', 'square of 5 = 25']],
-    ['var a = fn 5 + 5; a()', ['NUM', 10]],
-    ['var a = fn (a, b) a + b; a(10, 20)', ['NUM', 30]],
+    ['1 + 4 * 3 + 2 * 4',                                                ['NUM',    21                ]],
+    ['"hi"',                                                             ['STRING', "hi"              ]],
+    ['"hello world" ~ "world"',                                          ['NUM',    6                 ]],
+    ['"hello world" ~ "bye"',                                            ['NUM',    -1                ]],
+    ['"hi " . 0x263a',                                                   ['STRING', 'hi ☺'            ]],
+    ['fn fib(n) n == 1 ? 1 : n == 2 ? 1 : fib(n-1) + fib(n-2); fib(12)', ['NUM',    144               ]],
+    ['1 == 1',                                                           ['BOOL',   1                 ]],
+    ['fn square(x) x * x; var a = 5; $"square of {a} = {square(a)}"',    ['STRING', 'square of 5 = 25']],
+    ['var a = fn 5 + 5; a()',                                            ['NUM',    10                ]],
+    ['var a = fn (a, b) a + b; a(10, 20)',                               ['NUM',    30                ]],
     [ <<'END'
 fn test
   (x y)
@@ -35,7 +35,7 @@ fn test
 }
 test(2 3)  # prints 5
 END
-        , ['NUM', 5]],
+        ,                                                                ['NUM', 5                    ]],
 );
 
 my @pass;
