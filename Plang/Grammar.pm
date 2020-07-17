@@ -589,11 +589,20 @@ sub Infix {
     if ($parser->consume('L_PAREN')) {
         my $arguments = [];
         while (1) {
-            my $expr = Expression($parser);
+            my $arg;
+
+            # try a function definition
+            $arg = FunctionDefinition($parser);
             return if $parser->errored;
 
-            if ($expr) {
-                push @{$arguments}, $expr;
+            # otherwise try an expression
+            if (not defined $arg) {
+                $arg = Expression($parser);
+                return if $parser->errored;
+            }
+
+            if ($arg) {
+                push @{$arguments}, $arg;
                 $parser->consume('COMMA');
                 next;
             }
