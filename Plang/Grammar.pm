@@ -222,7 +222,7 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-#Grammar: Initializer ::= ASSIGN Expression
+#Grammar: Initializer ::= ASSIGN Statement
 sub Initializer {
     my ($parser) = @_;
 
@@ -230,7 +230,7 @@ sub Initializer {
 
     {
         if ($parser->consume('ASSIGN')) {
-            my $expr = Expression($parser);
+            my $expr = Statement($parser);
             return if $parser->errored;
 
             if ($expr) {
@@ -243,7 +243,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT IdentifierList (StatementGroup | Statement)
+# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -252,9 +252,14 @@ sub FunctionDefinition {
     {
         if ($parser->consume('KEYWORD_fn')) {
             my $token = $parser->consume('IDENT');
-            return expected($parser, 'Identifier for function name') if not $token;
 
-            my $name = $token->[1];
+            my $name;
+
+            if ($token) {
+                $name = $token->[1];
+            } else {
+                $name = "#anonymous";
+            }
 
             my $identlist = IdentifierList($parser);
             return if $parser->errored;

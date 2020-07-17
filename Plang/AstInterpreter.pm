@@ -376,6 +376,10 @@ sub func_definition {
 
     my $func = ['FUNC', [$parameters, $statements]];
 
+    if ($name eq '#anonymous') {
+        $name = "$func";
+    }
+
     if (exists $context->{locals}->{$name}) {
         $self->error($context, "Cannot define function `$name` with same name as existing local");
     }
@@ -488,6 +492,10 @@ sub statement {
     my $value = $data->[1];
 
     print "stmt ins: $ins (value: ", Dumper($value), ")\n" if $self->{debug} >= 4;
+
+    if ($ins eq 'STMT') {
+        return $self->statement($context, $data->[1]);
+    }
 
     # statement group
     if ($ins eq 'STMT_GROUP') {
