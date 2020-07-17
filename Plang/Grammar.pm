@@ -243,7 +243,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList (StatementGroup | Statement)
+# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -263,6 +263,8 @@ sub FunctionDefinition {
 
             my $identlist = IdentifierList($parser);
             return if $parser->errored;
+
+            $identlist = [] if not defined $identlist;
 
             $parser->try('FunctionDefinition body: StatementGroup');
 
@@ -303,7 +305,7 @@ sub IdentifierList {
     $parser->try('IdentifierList');
 
     {
-        return expected($parser, '"(" to begin Identifier List') if not $parser->consume('L_PAREN');
+        goto IDENTLIST_FAIL if not $parser->consume('L_PAREN');
 
         my $identlist = [];
         while (1) {
@@ -315,14 +317,14 @@ sub IdentifierList {
                 next;
             }
             last if $parser->consume('R_PAREN');
-            return expected($parser, 'Identifier, "," or ")" in Identifier List');
+            goto IDENTLIST_FAIL;
         }
 
         $parser->advance;
         return $identlist;
     }
 
-    # not reached
+  IDENTLIST_FAIL:
     $parser->backtrack;
 }
 
