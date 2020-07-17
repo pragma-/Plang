@@ -253,9 +253,9 @@ consideration about allowing a way to write to the enclosing scope's identifiers
     FunctionDefinition ::= "fn" Identifier? IdentifierList? (StatementGroup | Statement)
     IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
-A function definition is created by using the `fn` keyword followed by: an identifer (which may be omitted),
-an identifier list (which may be omitted if there are no parameters desired), and finally either a
-group of statements or a single statement.
+A function definition is created by using the `fn` keyword followed by: an identifer (which may
+be omitted to create an anonymous function), an identifier list (which may be omitted if there
+are no parameters desired), and finally either a group of statements or a single statement.
 
 An identifier list is a list of identifiers enclosed in parentheses. The list is separated
 by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
