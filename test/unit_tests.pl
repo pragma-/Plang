@@ -36,6 +36,7 @@ END
     ['"Good-bye!"[5..7] = "night"',                                      ['STRING', 'Good-night!'     ]],
     ['"Hello!"[0] = "Jee"',                                              ['STRING', 'Jeeello!'        ]],
     ['"Hello!"[0]',                                                      ['STRING', 'H'               ]],
+    ['var a',                                                            ['NIL',    undef             ]],
 );
 
 use Data::Dumper;
