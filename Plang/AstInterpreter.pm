@@ -37,7 +37,7 @@ sub init_program {
     my $context = $self->new_context;
 
     # first context pushed onto the stack is the global context
-    # which contains global variables and functions
+    # which contains global variables and functions (which are variables)
     $self->push_stack($context);
 
     return $context;
@@ -86,8 +86,7 @@ sub new_context {
     my ($self, $parent_context) = @_;
 
     return {
-        variables => {},
-        functions => {},
+        locals => {},
         parent_context => $parent_context,
     };
 }
@@ -109,28 +108,28 @@ sub pop_stack {
 
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
-    $context->{variables}->{$name} = $value;
-    print "set_variable $name\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
+    $context->{locals}->{$name} = $value;
+    print "set_variable $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
 }
 
 sub get_variable {
     my ($self, $context, $name) = @_;
 
-    print "get_variable: $name\n", Dumper($context->{variables}), "\n" if $self->{debug} >= 6;
-    # look for local variables in current scope
-    if (exists $context->{variables}->{$name}) {
-        return $context->{variables}->{$name};
+    print "get_variable: $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
+    # look for local locals in current scope
+    if (exists $context->{locals}->{$name}) {
+        return $context->{locals}->{$name};
     }
 
-    # look for variables in enclosing scopes
+    # look for locals in enclosing scopes
     if (defined $context->{parent_context}) {
         my $var = $self->get_variable($context->{parent_context}, $name);
         return $var if defined $var;
     }
 
-    # and finally look for global variables
-    if (exists $self->{stack}->[0]->{variables}->{$name}) {
-        return $self->{stack}->[0]->{variables}->{$name};
+    # and finally look for global locals
+    if (exists $self->{stack}->[0]->{locals}->{$name}) {
+        return $self->{stack}->[0]->{locals}->{$name};
     }
 
     # otherwise it's an undefined variable
@@ -202,6 +201,13 @@ sub handle_statement_result {
     return;
 }
 
+my %pretty_type = (
+    'NUM'    => 'Number',
+    'STRING' => 'String',
+    'BOOL'   => 'Boolean',
+    'FUNC'   => 'Function',
+);
+
 my %eval_unary_op_NUM = (
     'NOT' => sub { ['BOOL', int ! $_[0]] },
     'NEG' => sub { ['NUM',      - $_[0]] },
@@ -251,7 +257,7 @@ sub unary_op {
             }
         }
 
-        $self->error($context, "Cannot apply unary operator $op to type $value->[0]\n");
+        $self->error($context, "Cannot apply unary operator $op to type $pretty_type{$value->[0]}\n");
     }
     return;
 }
@@ -283,21 +289,9 @@ sub binary_op {
             }
         }
 
-        $self->error($context, "Cannot apply binary operator $op (have types $left_value->[0] and $right_value->[0])");
+        $self->error($context, "Cannot apply binary operator $op (have types $pretty_type{$left_value->[0]} and $pretty_type{$right_value->[0]})");
     }
     return;
-}
-
-sub func_definition {
-    my ($self, $context, $data) = @_;
-
-    my $name       = $data->[1];
-    my $parameters = $data->[2];
-    my $statements = $data->[3];
-
-    # TODO warn or error about overwriting existing functions?
-    $context->{functions}->{$name} = [$parameters, $statements];
-    return ['FUNCREF', undef]; # TODO return reference to function
 }
 
 my %func_builtins = (
@@ -321,7 +315,22 @@ sub func_builtin_print {
 sub func_builtin_type {
     my ($self, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['STRING', "$expr->[0]"];
+
+    if ($expr->[0] eq 'FUNC') {
+        my $result = "$pretty_type{$expr->[0]} (";
+        my $params = $expr->[1]->[0];
+        foreach my $param (@{$params}) {
+            if (defined $param->[1]) {
+                $result .= "$param->[0] = $param->[1]->[1], "; # TODO evaluate default arg
+            } else {
+                $result .= "$param->[0], ";
+            }
+        }
+        $result =~ s/,\s$/)/;
+        return ['STRING', $result];
+    } else {
+        return ['STRING', $pretty_type{$expr->[0]}];
+    }
 }
 
 sub add_function_builtin {
@@ -353,7 +362,7 @@ sub process_func_call_arguments {
             if (defined $parameters->[$i]->[1]) {
                 # found default argument
                 $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[1]);
-                $context->{variables}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
+                $context->{locals}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
             } else {
                 # no argument or default argument
                 $self->error($context, "Missing argument `$parameters->[$i]->[0]` to function `$name`.\n"),
@@ -361,7 +370,7 @@ sub process_func_call_arguments {
         } else {
             # argument provided
             $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-            $context->{variables}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
+            $context->{locals}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
         }
     }
 
@@ -370,6 +379,23 @@ sub process_func_call_arguments {
     }
 
     return $evaluated_arguments;
+}
+
+sub func_definition {
+    my ($self, $context, $data) = @_;
+
+    my $name       = $data->[1];
+    my $parameters = $data->[2];
+    my $statements = $data->[3];
+
+    my $func = ['FUNC', [$parameters, $statements]];
+
+    if (exists $context->{locals}->{$name}) {
+        $self->error($context, "Cannot define function `$name` with same name as existing local");
+    }
+
+    $context->{locals}->{$name} = $func;
+    return $func;
 }
 
 sub func_call {
@@ -383,12 +409,12 @@ sub func_call {
 
     my $func;
 
-    if (exists $context->{functions}->{$name}) {
+    if (exists $context->{locals}->{$name}) {
         # local function
-        $func = $context->{functions}->{$name};
-    } elsif (exists $self->{stack}->[0]->{functions}->{$name}) {
+        $func = $context->{locals}->{$name};
+    } elsif (exists $self->{stack}->[0]->{locals}->{$name}) {
         # global function
-        $func = $self->{stack}->[0]->{functions}->{$name};
+        $func = $self->{stack}->[0]->{locals}->{$name};
     } elsif (exists $func_builtins{$name}) {
         # builtin function
         return $self->call_builtin_function($context, $data, $name);
@@ -397,10 +423,14 @@ sub func_call {
         $self->error($context, "Undefined function `$name`.");
     }
 
-    my $parameters = $func->[0];
-    my $statements = $func->[1];
+    if ($func->[0] ne 'FUNC') {
+        $self->error($context, "Cannot invoke `$name` as a function (have type $pretty_type{$func->[0]})");
+    }
 
-    my $new_context = $self->new_context($context); # TODO do we want context to be parent of new_context?
+    my $parameters = $func->[1]->[0];
+    my $statements = $func->[1]->[1];
+
+    my $new_context = $self->new_context($context);
 
     my $ret = $self->process_func_call_arguments($new_context, $name, $parameters, $arguments);
 
@@ -709,16 +739,16 @@ sub statement {
                 if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
                     return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have $from->[0] and $to->[0]) inside postfix [] notation");
+                    $self->error($context, "Invalid types to RANGE (have $pretty_type{$from->[0]} and $pretty_type{$to->[0]}) inside postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
                 return ['STRING', substr($var->[1], $index, 1) // ""];
             } else {
-                $self->error($context, "Invalid type $value->[0] inside postfix [] notation");
+                $self->error($context, "Invalid type $pretty_type{$value->[0]} inside postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot use postfix [] notation on type $var->[0]");
+            $self->error($context, "Cannot use postfix [] notation on type $pretty_type{$var->[0]}");
         }
     }
 
@@ -787,10 +817,10 @@ sub assignment {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
                         return ['STRING', $var->[1]];
                     } else {
-                        $self->error($context, "Cannot assign from type $right_value->[0] to type $left_value->[0] with RANGE in postfix [] notation");
+                        $self->error($context, "Cannot assign from type $pretty_type{$right_value->[0]} to type $pretty_type{$left_value->[0]} with RANGE in postfix [] notation");
                     }
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have $from->[0] and $to->[0]) inside assignment postfix [] notation");
+                    $self->error($context, "Invalid types to RANGE (have $pretty_type{$from->[0]} and $pretty_type{$to->[0]}) inside assignment postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
@@ -801,19 +831,19 @@ sub assignment {
                     substr ($var->[1], $index, 1) = chr $right_value->[1];
                     return ['STRING', $var->[1]];
                 } else {
-                    $self->error($context, "Cannot assign from type $right_value->[0] to type $left_value->[0] with postfix [] notation");
+                    $self->error($context, "Cannot assign from type $pretty_type{$right_value->[0]} to type $pretty_type{$left_value->[0]} with postfix [] notation");
                 }
             } else {
-                $self->error($context, "Invalid type $value->[0] inside assignment postfix [] notation");
+                $self->error($context, "Invalid type $pretty_type{$value->[0]} inside assignment postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot assign to postfix [] notation on type $var->[0]");
+            $self->error($context, "Cannot assign to postfix [] notation on type $pretty_type{$var->[0]}");
         }
     }
 
     # a statement
     my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "Cannot assign to non-lvalue type $eval->[0]");
+    $self->error($context, "Cannot assign to non-lvalue type $pretty_type{$eval->[0]}");
 }
 
 sub is_arithmetic_type {

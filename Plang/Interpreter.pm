@@ -87,7 +87,7 @@ sub initialize {
         ['L_BRACE',          qr{\G(   \{                  )}x],
         ['R_BRACE',          qr{\G(   \}                  )}x],
         ['HEX',              qr{\G(   0[xX][0-9a-fA-F]+   )}x],
-        ['NUM',              qr{\G(   [0-9]*[.,]?[0-9]+   )}x],
+        ['NUM',              qr{\G(   [0-9]*[.]?[0-9Ee]+  )}x],
         ['NOT',              qr{\G(   not                 )}x],
         ['AND',              qr{\G(   and                 )}x],
         ['OR',               qr{\G(   or                  )}x],
