@@ -573,13 +573,12 @@ sub statement {
             $self->error($context, "Attempt to prefix-increment undeclared variable `$tok_value`");
         }
 
-        if (not defined $var->[1]) {
-            $self->error($context, "Attempt to prefix-increment undefined variable `$tok_value`");
+        if ($self->is_arithmetic_type($var)) {
+            $var->[1]++;
+            return $var;
         }
 
-        # TODO check type
-        $var->[1]++;
-        return $var;
+        $self->error($context, "Cannot apply prefix-increment to type $pretty_type{$var->[0]}");
     }
 
     # prefix decrement
@@ -593,13 +592,12 @@ sub statement {
             $self->error($context, "Attempt to prefix-decrement undeclared variable `$tok_value`");
         }
 
-        if (not defined $var->[1]) {
-            $self->error($context, "Attempt to prefix-decrement undefined variable `$tok_value`");
+        if ($self->is_arithmetic_type($var)) {
+            $var->[1]--;
+            return $var;
         }
 
-        # TODO check type
-        $var->[1]--;
-        return $var;
+        $self->error($context, "Cannot apply prefix-decrement to type $pretty_type{$var->[0]}");
     }
 
     # short-circuiting logical and
@@ -648,14 +646,13 @@ sub statement {
             $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
         }
 
-        if (not defined $var->[1]) {
-            $self->error($context, "Attempt to postfix-increment undefined variable `$tok_value`");
+        if ($self->is_arithmetic_type($var)) {
+            my $temp_var = [$var->[0], $var->[1]];
+            $var->[1]++;
+            return $temp_var;
         }
 
-        # TODO check type
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]++;
-        return $temp_var;
+        $self->error($context, "Cannot apply postfix-increment to type $pretty_type{$var->[0]}");
     }
 
     # postfix decrement
@@ -669,14 +666,13 @@ sub statement {
             $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
         }
 
-        if (not defined $var->[1]) {
-            $self->error($context, "Attempt to postfix-increment undefined variable `$tok_value`");
+        if ($self->is_arithmetic_type($var)) {
+            my $temp_var = [$var->[0], $var->[1]];
+            $var->[1]--;
+            return $temp_var;
         }
 
-        # TODO check type
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]--;
-        return $temp_var;
+        $self->error($context, "Cannot apply postfix-decrement to type $pretty_type{$var->[0]}");
     }
 
     # range operator

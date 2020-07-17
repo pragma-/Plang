@@ -111,7 +111,7 @@ P | Operator | Description | Type
 40 | /  | Division          | Infix (left-to-right)
 30 | +  | Addition          | Infix (left-to-right)
 30 | -  | Subtraction       | Infix (left-to-right)
-25 | &  | String concatenation | Infix (left-to-right)
+25 | .  | String concatenation | Infix (left-to-right)
 25 | ~  | Substring index      | Infix (left-to-right)
 23 | >= | Greater or equal  | Infix (left-to-right)
 23 | <= | Less or equal     | Infix (left-to-right)
@@ -127,7 +127,7 @@ P | Operator | Description | Type
 10 | -= | Subtraction assignment  | Infix (right-to-left)
 10 | \*= | Product assignment     | Infix (right-to-left)
 10 | /= | Division assignment     | Infix (right-to-left)
-7  | &= | String concat ssignment | Infix (right-to-left)
+7  | .= | String concat ssignment | Infix (right-to-left)
 5  | ,  | Comma             | Infix (left-to-right)
 4  | not | Logical negation | Prefix
 3  | and | Logical and      | Infix (left-to-right)
@@ -181,6 +181,9 @@ Keyword | Description
 var | variable declaration
 fn | function definition
 return | return value from function
+true | a Boolean with a true value
+false | a Boolean with a false value
+nil | a Nil with a nil value
 
 #### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
@@ -300,9 +303,9 @@ When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed
       hello 43 world
 
 #### Concatenation
-To concatenate two strings, use the `&` operator. But consider using [interoplation](#interpolation) instead.
+To concatenate two strings, use the `.` operator. But consider using [interoplation](#interpolation) instead.
 
-    > var a = "Plang"; var b = "Rocks!"; a & " " & b
+    > var a = "Plang"; var b = "Rocks!"; a . " " . b
       Plang Rocks!
 
 #### Substring search

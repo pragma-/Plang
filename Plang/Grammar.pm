@@ -398,7 +398,7 @@ my %infix_token_precedence = (
     PLUS         => $precedence_table{'SUM'},
     MINUS        => $precedence_table{'SUM'},
     TILDE        => $precedence_table{'STRING'},
-    AMP          => $precedence_table{'STRING'},
+    DOT          => $precedence_table{'STRING'},
     GREATER_EQ   => $precedence_table{'RELATIONAL'},
     LESS_EQ      => $precedence_table{'RELATIONAL'},
     GREATER      => $precedence_table{'RELATIONAL'},
@@ -629,7 +629,7 @@ sub Infix {
     return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',        'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',        'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX',     'STRING');
-    return $expr if $expr = BinaryOp($parser, $left, 'AMP',         'STRCAT',     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'STRCAT',     'STRING');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',        'RELATIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',        'RELATIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',         'RELATIONAL');

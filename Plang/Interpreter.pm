@@ -45,6 +45,8 @@ sub initialize {
         ['SQUOTE_STRING_I',  qr{\G(   \$'(?:[^'\\]|\\.)*' )}x],
         ['DQUOTE_STRING',    qr{\G(   "(?:[^"\\]|\\.)*"   )}x],
         ['SQUOTE_STRING',    qr{\G(   '(?:[^'\\]|\\.)*'   )}x],
+        ['EQ_TILDE',         qr{\G(   =~                  )}x],
+        ['BANG_TILDE',       qr{\G(   !~                  )}x],
         ['NOT_EQ',           qr{\G(   !=                  )}x],
         ['GREATER_EQ',       qr{\G(   >=                  )}x],
         ['LESS_EQ',          qr{\G(   <=                  )}x],
