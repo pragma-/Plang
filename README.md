@@ -290,6 +290,8 @@ Anonymous functions:
     > var adder = fn (a, b) a + b; adder(10, 20)
       30
 
+For more examples of function syntax, see [this short Plang script.](examples/examples.pl)
+
 #### Built-in functions
 Function | Parameters | Description
 --- | --- | ---
