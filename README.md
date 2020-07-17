@@ -190,7 +190,8 @@ nil | a Nil with a nil value
     Initializer         ::= "=" Expression
 
 Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
-may optionally have an initializer that assigns a default value.
+may optionally have an initializer that assigns a default value. Without an initializer, the value of
+variables will default to `nil`, which has type `Nil`.
 
 The `var` statement returns the value of the variable.
 
