@@ -3,7 +3,12 @@
 use warnings;
 use strict;
 
-use lib '..';
+BEGIN {
+    use File::Basename;
+    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
+    unshift @INC, "$home/..";
+}
+
 use utf8;
 
 my @tests = (
