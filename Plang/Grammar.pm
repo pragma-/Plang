@@ -512,7 +512,7 @@ sub Prefix {
     }
 
     if ($token = $parser->consume('NUM')) {
-        return ['NUM', $token->[1]];
+        return ['NUM', $token->[1] + 0];
     }
 
     if ($token = $parser->consume('HEX')) {
