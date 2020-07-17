@@ -315,22 +315,7 @@ sub func_builtin_print {
 sub func_builtin_type {
     my ($self, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-
-    if ($expr->[0] eq 'FUNC') {
-        my $result = "$pretty_type{$expr->[0]} (";
-        my $params = $expr->[1]->[0];
-        foreach my $param (@{$params}) {
-            if (defined $param->[1]) {
-                $result .= "$param->[0] = $param->[1]->[1], "; # TODO evaluate default arg
-            } else {
-                $result .= "$param->[0], ";
-            }
-        }
-        $result =~ s/,\s$/)/;
-        return ['STRING', $result];
-    } else {
-        return ['STRING', $pretty_type{$expr->[0]}];
-    }
+    return ['STRING', $pretty_type{$expr->[0]}];
 }
 
 sub add_function_builtin {
@@ -407,20 +392,16 @@ sub func_call {
     $Data::Dumper::Indent = 0 if $self->{debug} >= 5;
     print "Calling function `$name` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 5;
 
-    my $func;
+    my $func = $self->get_variable($context, $name);
 
-    if (exists $context->{locals}->{$name}) {
-        # local function
-        $func = $context->{locals}->{$name};
-    } elsif (exists $self->{stack}->[0]->{locals}->{$name}) {
-        # global function
-        $func = $self->{stack}->[0]->{locals}->{$name};
-    } elsif (exists $func_builtins{$name}) {
-        # builtin function
-        return $self->call_builtin_function($context, $data, $name);
-    } else {
-        # undefined function
-        $self->error($context, "Undefined function `$name`.");
+    if (not defined $func) {
+        if (exists $func_builtins{$name}) {
+            # builtin function
+            return $self->call_builtin_function($context, $data, $name);
+        } else {
+            # undefined function
+            $self->error($context, "Undefined function `$name`.");
+        }
     }
 
     if ($func->[0] ne 'FUNC') {
