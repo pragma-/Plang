@@ -127,7 +127,7 @@ P | Operator | Description | Type
 10 | -= | Subtraction assignment  | Infix (right-to-left)
 10 | \*= | Product assignment     | Infix (right-to-left)
 10 | /= | Division assignment     | Infix (right-to-left)
-7  | .= | String concat ssignment | Infix (right-to-left)
+7  | .= | String concat assignment | Infix (right-to-left)
 5  | ,  | Comma             | Infix (left-to-right)
 4  | not | Logical negation | Prefix
 3  | and | Logical and      | Infix (left-to-right)
