@@ -6,15 +6,6 @@ use strict;
 use lib '..';
 use utf8;
 
-use Plang::Interpreter;
-
-use Data::Dumper;
-$Data::Dumper::Indent = 0;
-$Data::Dumper::Terse  = 1;
-$Data::Dumper::Useqq  = 1;
-
-my $plang = Plang::Interpreter->new(embedded => 1);
-
 my @tests = (
     ['1 + 4 * 3 + 2 * 4',                                                ['NUM',    21                ]],
     ['"hi"',                                                             ['STRING', "hi"              ]],
@@ -45,6 +36,15 @@ END
 
 my @pass;
 my @fail;
+
+use Plang::Interpreter;
+
+use Data::Dumper;
+$Data::Dumper::Indent = 0;
+$Data::Dumper::Terse  = 1;
+$Data::Dumper::Useqq  = 1;
+
+my $plang = Plang::Interpreter->new(embedded => 1);
 
 print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";
 
