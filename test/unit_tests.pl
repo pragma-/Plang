@@ -32,6 +32,10 @@ END
     ['type("hi")',                                                       ['STRING', 'String'          ]],
     ['type(42)',                                                         ['STRING', 'Number'          ]],
     ['type(nil)',                                                        ['STRING', 'Nil',            ]],
+    ['"Hello!"[1..4]',                                                   ['STRING', 'ello',           ]],
+    ['"Good-bye!"[5..7] = "night"',                                      ['STRING', 'Good-night!'     ]],
+    ['"Hello!"[0] = "Jee"',                                              ['STRING', 'Jeeello!'        ]],
+    ['"Hello!"[0]',                                                      ['STRING', 'H'               ]],
 );
 
 use Data::Dumper;
@@ -57,7 +61,7 @@ foreach my $test (@tests) {
     $expected = Dumper ($expected);
 
     if ($result ne $expected) {
-        push @fail, [$test->[0], $result, $expected];
+        push @fail, [$test->[0], $expected, $result];
         print "Test $i failed.\n";
     } else {
         push @pass, $test;
@@ -70,8 +74,8 @@ print "\nPass: ", scalar @pass, "; Fail: ", scalar @fail, "\n";
 
 foreach my $failure (@fail) {
     print "\nFAILURE: ",  $failure->[0], "\n";
-    print "Expected: ", $failure->[1], "\n";
-    print "Got: ",      $failure->[2], "\n";
+    print "Expected: ",   $failure->[1], "\n";
+    print "Got: ",        $failure->[2], "\n";
 }
 
 exit 1 if @fail;
