@@ -42,6 +42,8 @@ END
     ['"Hello!"[0] = "Jee"',                                              ['STRING', 'Jeeello!'        ]],
     ['"Hello!"[0]',                                                      ['STRING', 'H'               ]],
     ['var a',                                                            ['NIL',    undef             ]],
+    ['1e2 + 1e3',                                                        ['NUM',    1100              ]],
+    ['1e-4',                                                             ['NUM',    0.0001            ]],
 );
 
 use Data::Dumper;
