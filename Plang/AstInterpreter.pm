@@ -116,18 +116,18 @@ sub get_variable {
     my ($self, $context, $name) = @_;
 
     print "get_variable: $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
-    # look for local locals in current scope
+    # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
         return $context->{locals}->{$name};
     }
 
-    # look for locals in enclosing scopes
+    # look for variables in enclosing scopes
     if (defined $context->{parent_context}) {
         my $var = $self->get_variable($context->{parent_context}, $name);
         return $var if defined $var;
     }
 
-    # and finally look for global locals
+    # and finally look for global variables
     if (exists $self->{stack}->[0]->{locals}->{$name}) {
         return $self->{stack}->[0]->{locals}->{$name};
     }
@@ -202,6 +202,7 @@ sub handle_statement_result {
 }
 
 my %pretty_type = (
+    'NIL'    => 'Nil',
     'NUM'    => 'Number',
     'STRING' => 'String',
     'BOOL'   => 'Boolean',
@@ -514,7 +515,7 @@ sub statement {
         if ($initializer) {
             $right_value = $self->statement($context, $initializer);
         } else {
-            $right_value = ['VAR', undef];
+            $right_value = ['NIL', undef];
         }
 
         $self->set_variable($context, $value, $right_value);
@@ -548,7 +549,6 @@ sub statement {
     if ($ins eq 'IDENT') {
         my $var = $self->get_variable($context, $value);
         $self->error($context, "Attempt to use undeclared variable `$value`") if not defined $var;
-        $self->error($context, "Attempt to use undefined variable `$value`")  if not defined $var->[1];
         return $var;
     }
 
