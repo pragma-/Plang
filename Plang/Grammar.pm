@@ -492,6 +492,10 @@ sub Prefix {
     my ($parser, $precedence) = @_;
     my ($token, $expr);
 
+    if ($token = $parser->consume('KEYWORD_nil')) {
+        return ['NIL', undef];
+    }
+
     if ($token = $parser->consume('KEYWORD_true')) {
         return ['BOOL', 1];
     }
