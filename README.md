@@ -187,7 +187,7 @@ nil | a Nil with a nil value
 
 #### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
-    Initializer         ::= "=" Expression
+    Initializer         ::= "=" Statement
 
 Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
 may optionally have an initializer that assigns a default value. Without an initializer, the value of
@@ -250,11 +250,11 @@ consideration about allowing a way to write to the enclosing scope's identifiers
 `nonlocal` are potential keywords.
 
 ### Functions
-    FunctionDefinition ::= "fn" Identifier IdentifierList (StatementGroup | Statement)
+    FunctionDefinition ::= "fn" Identifier? IdentifierList (StatementGroup | Statement)
     IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
-A function definition is created by using the `fn` keyword followed by an identifer,
-then an identifier list, and finally either a group of statements or a single statement.
+A function definition is created by using the `fn` keyword followed by: an identifer (which may be omitted),
+an identifier list, and finally either a group of statements or a single statement.
 
 An identifier list is a list of identifiers enclosed in parentheses. The list is separated
 by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
@@ -283,6 +283,11 @@ Default arguments:
 
     > fn add(a, b = 10) a + b; add(5);
       15
+
+Anonymous functions:
+
+    > var adder = fn (a, b) a + b; adder(10, 20)
+      30
 
 #### Built-in functions
 Function | Parameters | Description
