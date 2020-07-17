@@ -1,6 +1,6 @@
 /* This is a Plang script that demonstrates some examples
  *
- * You can run it via ./plang < test/test.pl
+ * You can run it via ./plang < examples/examples.pl
  *
  * This is a block comment, by the way.
  */
