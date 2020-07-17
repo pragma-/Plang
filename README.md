@@ -82,9 +82,9 @@ The value is an integer representing verbosity, where higher values are more ver
 Plang is designed to be embedded into larger Perl applications. Here's how you can
 do that.
 
-I will get around to documenting this soon. In the meantime, take a look
-at [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
-for a rough idea of how it's done.
+I will get around to documenting this soon. In the meantime, take a look at [this
+unit-test script](test/unit_tests.pl) for a simple example. For a more advanced example, see
+ [PBot's Plang plugin.](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
 
 ## The Plang Language (so far)
 ### Expressions
@@ -290,7 +290,7 @@ Anonymous functions:
     > var adder = fn (a, b) a + b; adder(10, 20)
       30
 
-For more examples of function syntax, see [this short Plang script.](examples/examples.pl)
+For more examples of function syntax, see [this short Plang script](examples/examples.pl) or [this unit-test script.](test/unit_tests.pl)
 
 #### Built-in functions
 Function | Parameters | Description
