@@ -35,7 +35,12 @@ fn test
 }
 test(2 3)  # prints 5
 END
-        ,                                                                ['NUM', 5                    ]],
+        ,                                                                ['NUM',    5                 ]],
+    ['type(fn)',                                                         ['STRING', 'Function'        ]],
+    ['type(1==1)',                                                       ['STRING', 'Boolean'         ]],
+    ['type("hi")',                                                       ['STRING', 'String'          ]],
+    ['type(42)',                                                         ['STRING', 'Number'          ]],
+    ['type(nil)',                                                        ['STRING', 'Nil',            ]],
 );
 
 my @pass;
