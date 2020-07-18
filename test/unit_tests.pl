@@ -44,6 +44,32 @@ END
     ['var a',                                                            ['NIL',    undef             ]],
     ['1e2 + 1e3',                                                        ['NUM',    1100              ]],
     ['1e-4',                                                             ['NUM',    0.0001            ]],
+    [ <<'END'
+# closure test
+fn counter() {
+  var i = 0  # counter variable
+  fn ++i     # final statement returns anonymous function taking no arguments, with one statement body `++i`
+}
+
+# these contain their own copies of the anonymous function `++i` returned by counter()
+var count1 = counter()
+var count2 = counter()
+
+# these should increment their own `i` that was in scope at the time `fn ++i` was returned by counter()
+$"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}";
+END
+        ,                                                                ['STRING', '1 2 3 1 4 2'     ]],
+    [<<'END'
+# another closure test
+var x = "global"
+fn outer {
+  var x = "outer";
+  fn inner { print(x); }
+  inner();
+}
+outer();
+END
+        ,                                                                ['STDOUT', "outer\n"         ]],
 );
 
 use Data::Dumper;
@@ -70,12 +96,12 @@ foreach my $test (@tests) {
 
     if ($result ne $expected) {
         push @fail, [$test->[0], $expected, $result];
-        print "Test $i failed.\n";
+        print "X";
     } else {
         push @pass, $test;
         print ".";
-        print "\n" if $i % 70 == 0;
     }
+    print "\n" if $i % 70 == 0;
 }
 
 print "\nPass: ", scalar @pass, "; Fail: ", scalar @fail, "\n";

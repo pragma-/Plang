@@ -337,7 +337,7 @@ sub func_definition {
     my $parameters = $data->[2];
     my $statements = $data->[3];
 
-    my $func = ['FUNC', [$parameters, $statements]];
+    my $func = ['FUNC', [$context, $parameters, $statements]];
 
     if ($name eq '#anonymous') {
         $name = "$func";
@@ -376,12 +376,14 @@ sub func_call {
         $self->error($context, "Cannot invoke `$name` as a function (have type $pretty_type{$func->[0]})");
     }
 
-    my $parameters = $func->[1]->[0];
-    my $statements = $func->[1]->[1];
+    my $closure    = $func->[1]->[0];
+    my $parameters = $func->[1]->[1];
+    my $statements = $func->[1]->[2];
 
-    my $new_context = $self->new_context($context);
+    my $new_context = $self->new_context($closure);
+    $new_context->{locals} = { %{$context->{locals}} };
+
     my $ret = $self->process_func_call_arguments($new_context, $name, $parameters, $arguments);
-    print "new context: ", Dumper($new_context), "\n" if $self->{debug} >= 5;
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
