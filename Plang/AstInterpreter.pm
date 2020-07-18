@@ -26,23 +26,6 @@ sub initialize {
     $self->{recursions}    = 0;
 }
 
-# creates a fresh environment for a Plang program
-sub init_program {
-    my ($self) = @_;
-
-    # stack for function calls
-    $self->{stack} = [];
-
-    # current evaluation context
-    my $context = $self->new_context;
-
-    # first context pushed onto the stack is the global context
-    # which contains global variables and functions (which are variables)
-    $self->push_stack($context);
-
-    return $context;
-}
-
 # runs a new Plang program with a fresh environment
 sub run {
     my ($self, $ast) = @_;
@@ -56,8 +39,8 @@ sub run {
         return;
     }
 
-    # create a fresh environment
-    my $context = $self->init_program;
+    # create a fresh empty environment
+    my $context = $self->new_context;
 
     # grab our program's statements
     my $program    = $self->{ast}->[0];
@@ -83,27 +66,12 @@ sub error {
 }
 
 sub new_context {
-    my ($self, $parent_context) = @_;
+    my ($self, $parent) = @_;
 
     return {
         locals => {},
-        parent_context => $parent_context,
+        parent => $parent,
     };
-}
-
-sub new_scope {
-    my ($self, $context) = @_;
-    return $self->new_context($context);
-}
-
-sub push_stack {
-    my ($self, $context) = @_;
-    push @{$self->{stack}}, $context;
-}
-
-sub pop_stack {
-    my ($self) = @_;
-    return pop @{$self->{stack}};
 }
 
 sub set_variable {
@@ -122,14 +90,9 @@ sub get_variable {
     }
 
     # look for variables in enclosing scopes
-    if (defined $context->{parent_context}) {
-        my $var = $self->get_variable($context->{parent_context}, $name);
+    if (defined $context->{parent}) {
+        my $var = $self->get_variable($context->{parent}, $name);
         return $var if defined $var;
-    }
-
-    # and finally look for global variables
-    if (exists $self->{stack}->[0]->{locals}->{$name}) {
-        return $self->{stack}->[0]->{locals}->{$name};
     }
 
     # otherwise it's an undefined variable
@@ -417,22 +380,18 @@ sub func_call {
     my $statements = $func->[1]->[1];
 
     my $new_context = $self->new_context($context);
-
     my $ret = $self->process_func_call_arguments($new_context, $name, $parameters, $arguments);
-
+    print "new context: ", Dumper($new_context), "\n" if $self->{debug} >= 5;
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
         $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
     }
 
-    print "new context: ", Dumper($new_context), "\n" if $self->{debug} >= 5;
 
     # invoke the function
-    $self->push_stack($context);
     my $result = $self->interpret_ast($new_context, $statements);;
     $self->{recursion}--;
-    $self->pop_stack;
     return $result;
 }
 
@@ -499,7 +458,7 @@ sub statement {
 
     # statement group
     if ($ins eq 'STMT_GROUP') {
-        my $new_context = $self->new_scope($context);
+        my $new_context = $self->new_context($context);
         my $result = $self->interpret_ast($new_context, $value);
         return $result;
     }
