@@ -26,13 +26,12 @@ Here's a helpful table of contents:
   * [Statements and StatementGroups](#statements-and-statementgroups)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
-    * [Variables](#variables)
-      * [Types](#types)
-        * [Number](#number)
-        * [String](#string)
-        * [Boolean](#boolean)
-        * [Nil](#nil)
-      * [Scoping](#scoping)
+  * [Variables](#variables)
+    * [Types](#types)
+      * [Number](#number)
+      * [String](#string)
+      * [Boolean](#boolean)
+      * [Nil](#nil)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
     * [Default arguments](#default-arguments)
@@ -41,6 +40,7 @@ Here's a helpful table of contents:
     * [Currying](#currying)
     * [Lazy evaluation](#lazy-evaluation)
     * [Built-in functions](#built-in-functions)
+  * [Scoping](#scoping)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
     * [Interpolation](#interpolation)
@@ -191,7 +191,7 @@ true | a Boolean with a true value
 false | a Boolean with a false value
 nil | a Nil with a nil value
 
-#### Variables
+### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
     Initializer         ::= "=" Statement
 
@@ -217,7 +217,7 @@ Variables that have not yet been assigned a value will produce an error.
     > var a = 5; var b; a + b
       Error: `b` not defined.
 
-##### Types
+#### Types
 At this stage, there are seven types planned: reference, array, table, string, number, boolean and nil.
 
 Types of variables are inferred from the type of their value. All variables are simply declared with `var`
@@ -225,35 +225,30 @@ and no type specifier.
 
 Currently implemented are:
 
-###### Number
+##### Number
     Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
 
 `Number`s are things like `-100`, `+4.20`, `2001`, etc. We all know what numbers are!
 
 In Plang, the `Number` type is equivalent to a double-precision type.
 
-###### String
+##### String
     String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
     StringContents ::= TODO
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no difference between the quotes.
 
-###### Boolean
+##### Boolean
     Boolean ::= "true" | "false"
 
 A `Boolean` is either true or false.
 
-###### Nil
+##### Nil
      Nil ::= "Nil"
 
 The `Nil` type signifies that there is no value. All logical comparisons against `Nil` produce
 `Nil`.
-
-##### Scoping
-Variables are lexically scoped. A statement group introduces a new lexical scope. There is some
-consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
-`nonlocal` are potential keywords.
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier? IdentifierList? (StatementGroup | Statement)
@@ -322,6 +317,11 @@ Function | Parameters | Description
 --- | --- | ---
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 type | `expr` | Returns the type of an expression, as a string.
+
+### Scoping
+Functions and variables are lexically scoped. A statement group introduces a new lexical scope. There is some
+consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
+`nonlocal` are potential keywords.
 
 ### String operations
 #### Relational operations
