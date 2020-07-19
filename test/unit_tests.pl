@@ -11,7 +11,12 @@ BEGIN {
 
 use utf8;
 
+# format is:
+# ['code', ['expected type', 'expected value'], ['STDOUT', 'expected output']]
+# the ['STDOUT', ''] field can be omitted if no output is expected
 my @tests = (
+    ['print("hello", " ") print("world")  42',
+        ['NUM', 42], ['STDOUT', "hello world\n" ]],
     ['1 + 4 * 3 + 2 * 4',
         ['NUM', 21 ]],
     ['"hi"',
@@ -32,16 +37,20 @@ my @tests = (
         ['NUM', 10 ]],
     ['var a = fn (a, b) a + b; a(10, 20)',
         ['NUM', 30 ]],
-    [ <<'END'
+    [ <<'CODE'
+# semi-colons and commas are largely optional
+# (but recommended, this test just proves that they
+# can still be omitted for these cases)
 fn test
-  (x y)
+  (x y) # no comma
 {
-  var a = x
-  a + y
+  var a = x   # no semi-colons here
+  a + y       # or here
 }
-test(2 3)  # prints 5
-END
-        , ['NUM', 5 ]],
+test(2 3)     # prints 5
+CODE
+        ,
+        ['NUM', 5             ]],
     ['type(fn)',
         ['STRING', 'Function' ]],
     ['type(1==1)',
@@ -93,13 +102,17 @@ fn outer {
 outer();
 CODE
         ,
-        ['STDOUT', "outer\n"   ]],
+        ['NIL', undef], ['STDOUT', "outer\n" ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
-        ['NUM',    7   ]],
+        ['NUM', 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
         ['ERROR',  "Fatal error: Cannot invoke `7` as a function (have type Number)\n" ]],
     ['var a = fn (x) fn (y) x + y;  a(3)(4)',
-        ['NUM',    7   ]],
+        ['NUM', 7 ]],
+    ['fn force(f) f(); var lazy = fn 1 + 1; force(lazy)',
+        ['NUM', 2 ]],
+    ['fn force(f)f(); fn a(x){print("a");x}; var lazy = fn 1 + a(2); print("b"); force(lazy)',
+        ['NUM', 3], ['STDOUT', "b\na\n"]],
 );
 
 use Data::Dumper;
@@ -107,8 +120,29 @@ $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse  = 1;
 $Data::Dumper::Useqq  = 1;
 
+# create our $plang object in embedded mode
 use Plang::Interpreter;
 my $plang = Plang::Interpreter->new(embedded => 1);
+
+# override the Plang builtin `print` function so we can collect
+# the output for testing, instead of printing it
+$plang->{interpreter}->add_function_builtin('print',
+    # these are the parameters we want: `stmt` and `end`.
+    # `stmt` has no default value; `end` has default value [STRING, "\n"]
+    [['stmt', undef], ['end', ['STRING', "\n"]]],
+    # subref to our function that will override the `print` function
+    \&print_override);
+
+# we'll collect the output in here
+my $output;
+
+# our overridden `print` function
+sub print_override {
+    my ($plang, $name, $arguments) = @_;
+    my ($stmt, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    $output .= "$stmt$end";
+    return ['NIL', undef];
+}
 
 print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";
 
@@ -118,14 +152,24 @@ my @fail;
 my $i = 0;
 foreach my $test (@tests) {
     $i++;
-    my $result   = $plang->interpret_string($test->[0]);
-    my $expected = $test->[1];
+    $output = "";
+    my $result     = $plang->interpret_string($test->[0]);
+    my $expected   = $test->[1];
+    my $stdout     = ['STDOUT', $output];
+    my $exp_stdout = $test->[2] // ['STDOUT', ''];
 
-    $result   = Dumper ($result);
-    $expected = Dumper ($expected);
+    $result     = Dumper ($result);
+    $expected   = Dumper ($expected);
+    $stdout     = Dumper ($stdout);
+    $exp_stdout = Dumper ($exp_stdout);
 
-    if ($result ne $expected) {
-        push @fail, [$test->[0], $expected, $result];
+    my $passed = 0;
+
+    ++$passed if $result eq $expected;
+    ++$passed if $stdout eq $exp_stdout;
+
+    if ($passed != 2) {
+        push @fail, [$test->[0], $expected, $result, $exp_stdout, $stdout];
         print "X";
     } else {
         push @pass, $test;
@@ -136,10 +180,15 @@ foreach my $test (@tests) {
 
 print "\nPass: ", scalar @pass, "; Fail: ", scalar @fail, "\n";
 
+$i = 0;
 foreach my $failure (@fail) {
-    print "\nFAILURE: ",  $failure->[0], "\n";
-    print "Expected: ",   $failure->[1], "\n";
-    print "Got: ",        $failure->[2], "\n";
+    $i++;
+    print '-' x 70, "\n";
+    print "FAILURE $i: ", $failure->[0], "\n";
+    print " Expected: ", $failure->[1], "\n";
+    print "      Got: ", $failure->[2], "\n";
+    print "Expected Stdout: ", $failure->[3], "\n";
+    print "     Got Stdout: ", $failure->[4], "\n";
 }
 
 exit 1 if @fail;
