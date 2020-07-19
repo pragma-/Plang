@@ -268,7 +268,7 @@ sub func_builtin_print {
     my ($self, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
-    return ['STRING', "$text$end"];
+    return ['NIL', undef];
 }
 
 sub func_builtin_type {
