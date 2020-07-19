@@ -300,10 +300,10 @@ The `fn` statement returns a reference to the newly defined function.
 #### Closures
 The following snippet:
 
-    fn counter { var i = 0; fn ++i; }
-    var count1 = counter();
-    var count2 = counter();
-    $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}";
+    fn counter { var i = 0; fn ++i }
+    var count1 = counter()
+    var count2 = counter()
+    $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}"
 
 produces the output:
 
