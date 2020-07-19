@@ -34,6 +34,12 @@ Here's a helpful table of contents:
         * [Nil](#nil)
       * [Scoping](#scoping)
   * [Functions](#functions)
+    * [Trivial examples](#trivial-examples)
+    * [Default arguments](#default-arguments)
+    * [Anonymous functions](#anonymous-functions)
+    * [Closures](#closures)
+    * [Currying](#currying)
+    * [Lazy evaluation](#lazy-evaluation)
     * [Built-in functions](#built-in-functions)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
@@ -268,29 +274,48 @@ To call a function, write its identifier followed by a list of arguments enclose
 parentheses. The argument list is separated the same way as the identifier list. Arguments
 may be any valid expression.
 
-The `fn` statement returns a reference to the function.
+The `fn` statement returns a reference to the newly defined function.
 
-For example, a function to square a value:
-
+#### Trivial examples
     > fn square(x) x * x; square(2 + 2)
       16
-
-Another trivial example, adding two numbers:
-
-    > fn add(a, b) a + b; add(2, 3)'
+<!-- -->
+    > fn add(a, b) a + b; add(2, 3)
       5
 
-Default arguments:
-
+#### Default arguments
     > fn add(a, b = 10) a + b; add(5);
       15
 
-Anonymous functions:
-
+#### Anonymous functions
     > var adder = fn (a, b) a + b; adder(10, 20)
       30
+<!-- -->
+    > (fn (a, b) a + b)(1, 2)
+      3
+<!-- -->
+    > (fn 42)()
+      42
 
-For more examples of function syntax, see [this short Plang script](examples/examples.pl) or [this unit-test script.](test/unit_tests.pl)
+#### Closures
+The following snippet:
+
+    fn counter { var i = 0; fn ++i; }
+    var count1 = counter();
+    var count2 = counter();
+    $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}";
+
+produces the output:
+
+    1 2 3 1 4 2
+
+#### Currying
+    > var a = fn (x) fn (y) x + y;  a(3)(4)
+      7
+
+#### Lazy evaluation
+    > fn force(f) f(); var lazy = fn 1 + 1; force(lazy)
+      2
 
 #### Built-in functions
 Function | Parameters | Description
