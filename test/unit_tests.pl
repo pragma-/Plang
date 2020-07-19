@@ -118,7 +118,7 @@ fn outer {
 outer();
 CODE
         ,
-        ['STRING', "outer\n"], ['STDOUT', "outer\n" ]],
+        ['NIL', undef], ['STDOUT', "outer\n" ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
         ['NUM', 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
@@ -157,7 +157,7 @@ sub print_override {
     my ($plang, $name, $arguments) = @_;
     my ($stmt, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
     $output .= "$stmt$end"; # append the print output to our $output
-    return ['STRING', "$stmt$end"]; # the Plang `print` function returns [STRING, $output]
+    return ['NIL', undef];
 }
 
 print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";
