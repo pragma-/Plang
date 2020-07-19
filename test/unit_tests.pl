@@ -29,6 +29,12 @@ my @tests = (
         ['STRING', 'hi ☺' ]],
     ['fn fib(n) n == 1 ? 1 : n == 2 ? 1 : fib(n-1) + fib(n-2); fib(12)',
         ['NUM', 144 ]],
+    ['print("hi") && 42',
+        ['NUM', 42], ['STDOUT', "hi\n"]],
+    ['print("", "") && 42',
+        ['STRING', '']],
+    ['print("", "") || 42',
+        ['NUM', 42]],
     ['1 == 1',
         ['BOOL', 1 ]],
     ['fn square(x) x * x; var a = 5; $"square of {a} = {square(a)}"',
@@ -42,12 +48,12 @@ my @tests = (
 # (but recommended, this test just proves that they
 # can still be omitted for these cases)
 fn test
-  (x y) # no comma
+  (x y)       # no comma
 {
   var a = x   # no semi-colons here
   a + y       # or here
 }
-test(2 3)     # prints 5
+test(2 3)     # prints 5 (yep no comma)
 CODE
         ,
         ['NUM', 5             ]],
@@ -102,7 +108,7 @@ fn outer {
 outer();
 CODE
         ,
-        ['NIL', undef], ['STDOUT', "outer\n" ]],
+        ['STRING', "outer\n"], ['STDOUT', "outer\n" ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
         ['NUM', 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
@@ -140,8 +146,8 @@ my $output;
 sub print_override {
     my ($plang, $name, $arguments) = @_;
     my ($stmt, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
-    $output .= "$stmt$end";
-    return ['NIL', undef];
+    $output .= "$stmt$end"; # append the print output to our $output
+    return ['STRING', "$stmt$end"]; # the Plang `print` function returns [STRING, $output]
 }
 
 print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";

@@ -150,12 +150,6 @@ sub handle_statement_result {
     # to the larger app so it can handle it itself
     return $result if $self->{embedded};
 
-    # print to stdout and consume result by returning nothing
-    if ($result->[0] eq 'STDOUT') {
-        print $result->[1];
-        return;
-    }
-
     # return result unless we should print any result
     return $result unless $print_any;
 
@@ -273,7 +267,8 @@ my %func_builtins = (
 sub func_builtin_print {
     my ($self, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
-    return ['STDOUT', "$text$end"];
+    print "$text$end";
+    return ['STRING', "$text$end"];
 }
 
 sub func_builtin_type {
