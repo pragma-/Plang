@@ -68,7 +68,7 @@ To interpret a string of Plang code:
       Hello world!
 
 Plang automatically prints the value of the last statement of the program. To prevent this,
-use the `return` keyword (or construct any statement that doesn't yield a value) as the last statement.
+use the `nil` keyword (or construct any statement that doesn't yield a value) as the last statement.
 
 You can pass `--dumptokens` as a command-line argument to display a flat-list
 of all the tokens as they are encountered.
