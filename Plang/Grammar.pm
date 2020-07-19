@@ -573,7 +573,7 @@ sub Prefix {
     return $expr if $expr = UnaryOp($parser, 'NOT',    'NOT');
 
     if ($token = $parser->consume('L_PAREN')) {
-        my $expr = Expression($parser, 0);
+        my $expr = Expression($parser);
         return expected($parser, '")"') if not $parser->consume('R_PAREN');
         return $expr;
     }
@@ -611,7 +611,7 @@ sub Infix {
             return expected($parser, 'Expression or closing ")" for function call argument list');
         }
 
-        return ['CALL', $left->[1], $arguments];
+        return ['CALL', $left, $arguments];
     }
 
     # ternary conditional operator

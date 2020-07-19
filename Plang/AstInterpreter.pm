@@ -272,7 +272,7 @@ my %func_builtins = (
 
 sub func_builtin_print {
     my ($self, $name, $arguments) = @_;
-    my ($text, $end) = ($arguments->[0]->[1], $arguments->[1]->[1]);
+    my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     return ['STDOUT', "$text$end"];
 }
 
@@ -340,7 +340,9 @@ sub func_definition {
     my $func = ['FUNC', [$context, $parameters, $statements]];
 
     if ($name eq '#anonymous') {
-        $name = "$func";
+        $name = "anonfunc$func";
+        $name =~ s/ARRAY\(/@/;
+        $name =~ s/\)$//;
     }
 
     if (exists $context->{locals}->{$name}) {
@@ -354,26 +356,32 @@ sub func_definition {
 sub func_call {
     my ($self, $context, $data) = @_;
 
-    my $name      = $data->[1];
+    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
+
+    my $target    = $data->[1];
     my $arguments = $data->[2];
+    my $func;
 
-    $Data::Dumper::Indent = 0 if $self->{debug} >= 5;
-    print "Calling function `$name` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 5;
-
-    my $func = $self->get_variable($context, $name);
+    if ($target->[0] eq 'IDENT') {
+        print "Calling function `$target->[1]` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
+        $func = $self->get_variable($context, $target->[1]);
+    } else {
+        print "Calling anonymous function with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
+        $func = $self->statement($context, $target);
+    }
 
     if (not defined $func) {
-        if (exists $func_builtins{$name}) {
+        if ($target->[0] eq 'IDENT' and exists $func_builtins{$target->[1]}) {
             # builtin function
-            return $self->call_builtin_function($context, $data, $name);
+            return $self->call_builtin_function($context, $data, $target->[1]);
         } else {
             # undefined function
-            $self->error($context, "Undefined function `$name`.");
+            $self->error($context, "Undefined function `" . $self->output_value($target) . "`.");
         }
     }
 
     if ($func->[0] ne 'FUNC') {
-        $self->error($context, "Cannot invoke `$name` as a function (have type $pretty_type{$func->[0]})");
+        $self->error($context, "Cannot invoke `" . $self->output_value($func) . "` as a function (have type $pretty_type{$func->[0]})");
     }
 
     my $closure    = $func->[1]->[0];
@@ -383,13 +391,12 @@ sub func_call {
     my $new_context = $self->new_context($closure);
     $new_context->{locals} = { %{$context->{locals}} };
 
-    my $ret = $self->process_func_call_arguments($new_context, $name, $parameters, $arguments);
+    my $ret = $self->process_func_call_arguments($new_context, $target->[1], $parameters, $arguments);
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
         $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
     }
-
 
     # invoke the function
     my $result = $self->interpret_ast($new_context, $statements);;
@@ -704,13 +711,18 @@ sub statement {
 sub output_value {
     my ($self, $value) = @_;
 
-    # booleans should say 'true' or 'false'
+    # booleans
     if ($value->[0] eq 'BOOL') {
         if ($value->[1] == 0) {
             return 'false';
         } else {
             return 'true';
         }
+    }
+
+    # functions
+    if ($value->[0] eq 'FUNC') {
+        return 'Function';
     }
 
     # STRING and NUM returned as-is
