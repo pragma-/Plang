@@ -50,8 +50,10 @@ sub run {
     if ($opt{repl}) {
         $self->{repl_context} ||= $self->new_context;
         $context = $self->{repl_context};
+        $self->{repl} = 1;
     } else {
         $context = $self->new_context;
+        $self->{repl} = 0;
     }
 
     # grab our program's statements
@@ -318,7 +320,7 @@ sub func_definition {
         $name =~ s/\)$//;
     }
 
-    if (exists $context->{locals}->{$name}) {
+    if (!$self->{repl} and exists $context->{locals}->{$name}) {
         $self->error($context, "Cannot define function `$name` with same name as existing local");
     }
 
@@ -469,7 +471,7 @@ sub statement {
             $right_value = ['NIL', undef];
         }
 
-        if ($self->get_variable($context, $value, locals_only => 1)) {
+        if (!$self->{repl} and $self->get_variable($context, $value, locals_only => 1)) {
             $self->error($context, "Cannot redeclare existing local `$value`");
         }
 
@@ -792,32 +794,34 @@ sub statement {
 }
 
 sub output_value {
-    my ($self, $value, %opt) = @_;
+    my ($self, $value) = @_;
 
-    if ($opt{repl}) {
-        use Data::Dumper;
-        $Data::Dumper::Indent = 0;
-        $Data::Dumper::Terse  = 1;
-        $Data::Dumper::Useqq  = 1;
-        return Dumper ($value);
+    my $result = "";
+
+    if ($self->{repl}) {
+        $result .= "[" . $self->pretty_type($value) . "] ";
     }
 
     # booleans
     if ($value->[0] eq 'BOOL') {
         if ($value->[1] == 0) {
-            return 'false';
+            $result .= 'false';
         } else {
-            return 'true';
+            $result .= 'true';
         }
     }
 
     # functions
-    if ($value->[0] eq 'FUNC') {
-        return 'Function';
+    elsif ($value->[0] eq 'FUNC') {
+        $result .= 'Function';
     }
 
     # STRING and NUM returned as-is
-    return $value->[1];
+    else {
+        $result .= $value->[1];
+    }
+
+    return $result;
 }
 
 sub assignment {
