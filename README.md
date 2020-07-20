@@ -41,6 +41,8 @@ Here's a helpful table of contents:
     * [Lazy evaluation](#lazy-evaluation)
     * [Built-in functions](#built-in-functions)
   * [Scoping](#scoping)
+  * [if/else statement](#ifelse-statement)
+  * [while/next/last statement](#whilenextlast-statement)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
     * [Interpolation](#interpolation)
@@ -190,6 +192,11 @@ return | return value from function
 true | a Boolean with a true value
 false | a Boolean with a false value
 nil | a Nil with a nil value
+if | conditional if statement
+else | else branch of a conditional if statement
+while | loop while a condition is true
+last | break out of the loop
+next | jump to the next iteration of the loop
 
 ### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
@@ -323,6 +330,34 @@ Functions and variables are lexically scoped. A statement group introduces a new
 consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
 `nonlocal` are potential keywords.
 
+### if/else statement
+    IfStatement ::= "if" "(" Statement ")" Statement ("else" Statement)?
+
+The `if` statement expects a condition expression in parentheses followed by a single statement
+or a group of statements enclosed in braces. This can optionally then be followed by the `else`
+keyword and another single statement or group of statements enclosed in braces.
+
+If the condition is [truthy](#truthiness) then the statement(s) in the body are executed, otherwise
+if an `else` body exists then its statement(s) are executed.
+
+    if (true) 1 else 2
+      1
+
+    if (false) 1 else 2
+      2
+
+### while/next/last statement
+    WhileStatement ::= "while" "(" Statement ")" Statement
+
+The `while` statement expects a condition enclosed in parentheses, followed by a single statement
+or a group of statements enclosed in braces.
+
+As long as the condition is [truthy](#truthiness) the statement(s) in its body will be executed.
+
+The `next` keyword can be used to immediately jump to the next iteration of the loop.
+
+The `last` keyword can be used to immediately exit the loop.
+
 ### String operations
 #### Relational operations
 The relational operators behave as expected. There is no need to compare against `-1`, `0` or `1`.
@@ -337,7 +372,7 @@ When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed
       hello 43 world
 
 #### Concatenation
-To concatenate two strings, use the `.` operator. But consider using [interoplation](#interpolation) instead.
+To concatenate two strings, use the `.` operator. But consider using [interpolation](#interpolation) instead.
 
     > var a = "Plang"; var b = "Rocks!"; a . " " . b
       Plang Rocks!
