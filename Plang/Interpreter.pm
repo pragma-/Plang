@@ -182,22 +182,22 @@ sub handle_parse_errors {
 }
 
 sub interpret {
-    my ($self) = @_;
+    my ($self, %opt) = @_;
     my $errors = $self->handle_parse_errors;
     return $errors if defined $errors;
-    return $self->{interpreter}->run($self->{ast});
+    return $self->{interpreter}->run($self->{ast}, %opt);
 }
 
 sub interpret_stream {
-    my ($self, $stream) = @_;
+    my ($self, $stream, %opt) = @_;
     $self->parse_stream($stream);
-    return $self->interpret;
+    return $self->interpret(%opt);
 }
 
 sub interpret_string {
-    my ($self, $string) = @_;
+    my ($self, $string, %opt) = @_;
     $self->parse_string($string);
-    return $self->interpret;
+    return $self->interpret(%opt);
 }
 
 1;

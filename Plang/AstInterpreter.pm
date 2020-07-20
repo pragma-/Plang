@@ -27,11 +27,13 @@ sub initialize {
 
     $self->{max_iterations} = $conf{max_iterations} // 25000;
     $self->{iterations}     = 0;
+
+    $self->{repl_context}   = undef; # persistent repl context
 }
 
 # runs a new Plang program with a fresh environment
 sub run {
-    my ($self, $ast) = @_;
+    my ($self, $ast, %opt) = @_;
 
     # ast can be supplied via new() or via this run() subroutine
     $ast ||= $self->{ast};
@@ -42,8 +44,15 @@ sub run {
         return;
     }
 
-    # create a fresh empty environment
-    my $context = $self->new_context;
+    # set up the environment
+    my $context;
+
+    if ($opt{repl}) {
+        $self->{repl_context} ||= $self->new_context;
+        $context = $self->{repl_context};
+    } else {
+        $context = $self->new_context;
+    }
 
     # grab our program's statements
     my $program    = $ast->[0];
@@ -783,7 +792,15 @@ sub statement {
 }
 
 sub output_value {
-    my ($self, $value) = @_;
+    my ($self, $value, %opt) = @_;
+
+    if ($opt{repl}) {
+        use Data::Dumper;
+        $Data::Dumper::Indent = 0;
+        $Data::Dumper::Terse  = 1;
+        $Data::Dumper::Useqq  = 1;
+        return Dumper ($value);
+    }
 
     # booleans
     if ($value->[0] eq 'BOOL') {
