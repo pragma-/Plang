@@ -55,7 +55,7 @@ sub initialize {
         ['STAR_EQ',          qr{\G(   \*=                 )}x],
         ['MINUS_EQ',         qr{\G(   -=                  )}x],
         ['PLUS_EQ',          qr{\G(   \+=                 )}x],
-        ['AMP_EQ',           qr{\G(   &=                  )}x],
+        ['DOT_EQ',           qr{\G(   \.=                 )}x],
         ['PLUS_PLUS',        qr{\G(   \+\+                )}x],
         ['STAR_STAR',        qr{\G(   \*\*                )}x],
         ['MINUS_MINUS',      qr{\G(   --                  )}x],

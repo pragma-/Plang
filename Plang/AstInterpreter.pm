@@ -59,6 +59,14 @@ sub run {
     return $self->handle_statement_result($result, 1);
 }
 
+my %pretty_type = (
+    'NIL'    => 'Nil',
+    'NUM'    => 'Number',
+    'STRING' => 'String',
+    'BOOL'   => 'Boolean',
+    'FUNC'   => 'Function',
+);
+
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
@@ -97,6 +105,20 @@ sub get_variable {
 
     # otherwise it's an undefined variable
     return undef;
+}
+
+sub get_lvalue {
+    my ($self, $context, $node) = @_;
+
+    if ($node->[0] eq 'IDENT') {
+        return $self->get_variable($context, $node->[1]);
+    }
+
+    if ($node->[0] eq 'STRING') {
+        return $node;
+    }
+
+    $self->error($context, "Can not assign to type $pretty_type{$node->[0]} (not a modifiable lvalue)");
 }
 
 sub interpret_ast {
@@ -157,14 +179,6 @@ sub handle_statement_result {
     print $self->output_value($result), "\n" if defined $result->[1];
     return;
 }
-
-my %pretty_type = (
-    'NIL'    => 'Nil',
-    'NUM'    => 'Number',
-    'STRING' => 'String',
-    'BOOL'   => 'Boolean',
-    'FUNC'   => 'Function',
-);
 
 my %eval_unary_op_NUM = (
     'NOT' => sub { ['BOOL', int ! $_[0]] },
@@ -516,6 +530,62 @@ sub statement {
         return $self->assignment($context, $data);
     }
 
+    if ($ins eq 'ADD_ASSIGN') {
+        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $right = $self->statement($context, $data->[2]);
+
+        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+            $left->[1] += $right->[1];
+            return $left;
+        }
+
+        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+    }
+
+    if ($ins eq 'SUB_ASSIGN') {
+        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $right = $self->statement($context, $data->[2]);
+
+        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+            $left->[1] -= $right->[1];
+            return $left;
+        }
+
+        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+    }
+
+    if ($ins eq 'MUL_ASSIGN') {
+        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $right = $self->statement($context, $data->[2]);
+
+        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+            $left->[1] *= $right->[1];
+            return $left;
+        }
+
+        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+    }
+
+    if ($ins eq 'DIV_ASSIGN') {
+        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $right = $self->statement($context, $data->[2]);
+
+        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+            $left->[1] /= $right->[1];
+            return $left;
+        }
+
+        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+    }
+
+    if ($ins eq 'CAT_ASSIGN') {
+        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $right = $self->statement($context, $data->[2]);
+
+        $left->[1] .= $right->[1];
+        return $left;
+    }
+
     # variable
     if ($ins eq 'IDENT') {
         my $var = $self->get_variable($context, $value);
@@ -597,7 +667,7 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a & $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a . $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));

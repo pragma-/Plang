@@ -420,7 +420,7 @@ my %infix_token_precedence = (
     MINUS_EQ     => $precedence_table{'ASSIGNMENT'},
     STAR_EQ      => $precedence_table{'ASSIGNMENT'},
     SLASH_EQ     => $precedence_table{'ASSIGNMENT'},
-    AMP_EQ       => $precedence_table{'ASSIGNMENT'},
+    DOT_EQ       => $precedence_table{'ASSIGNMENT'},
     #COMMA        => $precedence_table{'COMMA'},
     NOT          => $precedence_table{'LOW_NOT'},
     AND          => $precedence_table{'LOW_AND'},
@@ -663,7 +663,7 @@ sub Infix {
     return $expr if $expr = BinaryOp($parser, $left, 'MINUS_EQ',    'SUB_ASSIGN', 'ASSIGNMENT',   1);
     return $expr if $expr = BinaryOp($parser, $left, 'STAR_EQ',     'MUL_ASSIGN', 'ASSIGNMENT',   1);
     return $expr if $expr = BinaryOp($parser, $left, 'SLASH_EQ',    'DIV_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'AMP_EQ',      'CAT_ASSIGN', 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT_EQ',      'CAT_ASSIGN', 'ASSIGNMENT',   1);
     return $expr if $expr = BinaryOp($parser, $left, 'AND',         'AND',        'LOW_AND');
     return $expr if $expr = BinaryOp($parser, $left, 'OR',          'OR',         'LOW_OR');
 
