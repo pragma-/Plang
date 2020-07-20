@@ -121,6 +121,10 @@ sub alternate_statement {
 #                        | VariableDeclaration
 #                        | FunctionDefinition
 #                        | ReturnStatement
+#                        | NextStatement
+#                        | LastStatement
+#                        | WhileStatement
+#                        | IfStatement
 #                        | RangeStatement
 #                        | Expression TERM
 #                        | TERM
@@ -147,6 +151,18 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,     'Statement: ReturnStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&NextStatement,       'Statement: NextStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&LastStatement,       'Statement: LastStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&WhileStatement,      'Statement: WhileStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&IfStatement,         'Statement: IfStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
@@ -341,6 +357,120 @@ sub ReturnStatement {
 
             $parser->advance;
             return ['RET', $statement];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: NextStatement ::= KEYWORD_next
+sub NextStatement {
+    my ($parser) = @_;
+
+    $parser->try('NextStatement');
+
+    {
+        if ($parser->consume('KEYWORD_next')) {
+            $parser->advance;
+            return ['NEXT', undef];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: LastStatement ::= KEYWORD_last
+sub LastStatement {
+    my ($parser) = @_;
+
+    $parser->try('LastStatement');
+
+    {
+        if ($parser->consume('KEYWORD_last')) {
+            $parser->advance;
+            return ['LAST', undef];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: WhileStatement ::= KEYWORD_while "(" Expression ")" Statement
+sub WhileStatement {
+    my ($parser) = @_;
+
+    $parser->try('WhileStatement');
+
+    {
+        if ($parser->consume('KEYWORD_while')) {
+            if (not $parser->consume('L_PAREN')) {
+                return expected($parser, "'(' after `while` keyword");
+            }
+
+            my $expr = Expression($parser);
+            return if $parser->errored;
+
+            if (not $expr) {
+                return expected($parser, "expression for `while` condition");
+            }
+
+            if (not $parser->consume('R_PAREN')) {
+                return expected($parser, "')' after `while` condition expression");
+            }
+
+            my $body = Statement($parser);
+            return if $parser->errored;
+
+            if (not $body) {
+                return expected($parser, "statement body for `while` loop");
+            }
+
+            $parser->advance;
+            return ['WHILE', $expr, $body];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: IfStatement ::= KEYWORD_if "(" Expression ")" Statement (KEYWORD_else Statement)?
+sub IfStatement {
+    my ($parser) = @_;
+
+    $parser->try('IfStatement');
+
+    {
+        if ($parser->consume('KEYWORD_if')) {
+            if (not $parser->consume('L_PAREN')) {
+                return expected($parser, "'(' after `if` keyword");
+            }
+
+            my $expr = Expression($parser);
+            return if $parser->errored;
+
+            if (not $expr) {
+                return expected($parser, "expression for `if` condition");
+            }
+
+            if (not $parser->consume('R_PAREN')) {
+                return expected($parser, "')' after `if` condition expression");
+            }
+
+            my $body = Statement($parser);
+            return if $parser->errored;
+
+            if (not $body) {
+                return expected($parser, "statement body for `if` statement");
+            }
+
+            my $else;
+            if ($parser->consume('KEYWORD_else')) {
+                $else = Statement($parser);
+                return if $parser->errored;
+            }
+
+            $parser->advance;
+            return ['IF', $expr, $body, $else];
         }
     }
 

@@ -106,6 +106,7 @@ sub initialize {
     $self->{parser}->define_keywords(
         'var', 'true', 'false', 'nil',
         'fn', 'return',
+        'while', 'next', 'last',
         'if', 'else',
     );
 

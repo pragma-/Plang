@@ -22,8 +22,11 @@ sub initialize {
     $self->{debug}    = $conf{debug}    // 0;
     $self->{embedded} = $conf{embedded} // 0;
 
-    $self->{max_recursion} = $conf{max_recursion} // 10000;
-    $self->{recursions}    = 0;
+    $self->{max_recursion}  = $conf{max_recursion}  // 10000;
+    $self->{recursions}     = 0;
+
+    $self->{max_iterations} = $conf{max_iterations} // 25000;
+    $self->{iterations}     = 0;
 }
 
 # runs a new Plang program with a fresh environment
@@ -152,6 +155,10 @@ sub interpret_ast {
 
     # catch
     if ($@) {
+        if ($@ =~ /^(?:LAST|NEXT)/) {
+            # propagate these to `while`'s eval
+            die $@;
+        }
         return ['ERROR', $@];
     }
 
@@ -521,8 +528,52 @@ sub statement {
         return ['RETURN', $self->statement($context, $value->[1])];
     }
 
+    # next
+    if ($ins eq 'NEXT') {
+        if ($self->{in_loop}) {
+            die 'NEXT';
+        } else {
+            $self->error($context, "`next` cannot be used outside of loop");
+        }
+    }
+
+    # last
+    if ($ins eq 'LAST') {
+        if ($self->{in_loop}) {
+            die 'LAST';
+        } else {
+            $self->error($context, "`last` cannot be used outside of loop");
+        }
+    }
+
+    # while loop
+    if ($ins eq 'WHILE') {
+        $self->{in_loop} = 1;
+        while ($self->is_truthy($context, $data->[1])) {
+            if (++$self->{iterations} > $self->{max_iterations}) {
+                $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
+            }
+
+            eval {
+                $self->statement($context, $data->[2]);
+            };
+
+            if ($@) {
+                next if $@ =~ /^NEXT/;
+                last if $@ =~ /^LAST/;
+            }
+        }
+        $self->{in_loop} = 0;
+        return ['NIL', undef];
+    }
+
     # if/else
     if ($ins eq 'IF') {
+        if ($self->is_truthy($context, $data->[1])) {
+            return $self->statement($context, $data->[2]);
+        } else {
+            return $self->statement($context, $data->[3]);
+        }
     }
 
     # assignment
