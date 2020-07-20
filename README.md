@@ -339,7 +339,8 @@ then be followed by the `else` keyword and another single statement or group of 
 enclosed in braces.
 
 If the condition is [truthy](#truthiness) then the statement(s) in the body are executed, otherwise
-if an `else` body exists then its statement(s) are executed.
+if an `else` body exists then its statement(s) are executed. The value of the `if` statement is the
+value of the final statement of the branch that was executed.
 
     if true then 1 else 2
       1
@@ -354,6 +355,7 @@ The `while` statement expects a condition enclosed in parentheses, followed by a
 or a group of statements enclosed in braces.
 
 As long as the condition is [truthy](#truthiness) the statement(s) in its body will be executed.
+The value of the `while` statement is `nil`.
 
 The `next` keyword can be used to immediately jump to the next iteration of the loop.
 
