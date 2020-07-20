@@ -258,7 +258,7 @@ The `Nil` type signifies that there is no value. All logical comparisons against
 `Nil`.
 
 ### Functions
-    FunctionDefinition ::= "fn" Identifier? IdentifierList? (StatementGroup | Statement)
+    FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
     IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
 A function definition is created by using the `fn` keyword followed by: an identifer (which may
