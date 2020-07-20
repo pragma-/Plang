@@ -107,7 +107,7 @@ sub initialize {
         'var', 'true', 'false', 'nil',
         'fn', 'return',
         'while', 'next', 'last',
-        'if', 'else',
+        'if', 'then', 'else',
     );
 
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});

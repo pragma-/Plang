@@ -437,7 +437,7 @@ sub WhileStatement {
     $parser->backtrack;
 }
 
-# Grammar: IfStatement ::= KEYWORD_if "(" Expression ")" Statement (KEYWORD_else Statement)?
+# Grammar: IfStatement ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
 sub IfStatement {
     my ($parser) = @_;
 
@@ -445,10 +445,6 @@ sub IfStatement {
 
     {
         if ($parser->consume('KEYWORD_if')) {
-            if (not $parser->consume('L_PAREN')) {
-                return expected($parser, "'(' after `if` keyword");
-            }
-
             my $expr = Expression($parser);
             return if $parser->errored;
 
@@ -456,8 +452,8 @@ sub IfStatement {
                 return expected($parser, "expression for `if` condition");
             }
 
-            if (not $parser->consume('R_PAREN')) {
-                return expected($parser, "')' after `if` condition expression");
+            if (not $parser->consume('KEYWORD_then')) {
+                return expected($parser, "`then` after `if` condition expression");
             }
 
             my $body = Statement($parser);
@@ -647,6 +643,10 @@ sub Prefix {
     my $func = FunctionDefinition($parser);
     return if $parser->errored;
     return $func if $func;
+
+    my $if = IfStatement($parser);
+    return if $parser->errored;
+    return $if if $if;
 
     if ($token = $parser->consume('KEYWORD_nil')) {
         return ['NIL', undef];

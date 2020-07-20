@@ -41,7 +41,7 @@ Here's a helpful table of contents:
     * [Lazy evaluation](#lazy-evaluation)
     * [Built-in functions](#built-in-functions)
   * [Scoping](#scoping)
-  * [if/else statement](#ifelse-statement)
+  * [if/then/else statement](#ifthenelse-statement)
   * [while/next/last statement](#whilenextlast-statement)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
@@ -330,20 +330,21 @@ Functions and variables are lexically scoped. A statement group introduces a new
 consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
 `nonlocal` are potential keywords.
 
-### if/else statement
-    IfStatement ::= "if" "(" Statement ")" Statement ("else" Statement)?
+### if/then/else statement
+    IfStatement ::= "if" Statement "then" Statement ("else" Statement)?
 
-The `if` statement expects a condition expression in parentheses followed by a single statement
-or a group of statements enclosed in braces. This can optionally then be followed by the `else`
-keyword and another single statement or group of statements enclosed in braces.
+The `if` statement expects a condition expression followed by the `then` keyword and then
+either a single statement or a group of statements enclosed in braces. This can optionally
+then be followed by the `else` keyword and another single statement or group of statements
+enclosed in braces.
 
 If the condition is [truthy](#truthiness) then the statement(s) in the body are executed, otherwise
 if an `else` body exists then its statement(s) are executed.
 
-    if (true) 1 else 2
+    if true then 1 else 2
       1
 
-    if (false) 1 else 2
+    if false then 1 else 2
       2
 
 ### while/next/last statement
