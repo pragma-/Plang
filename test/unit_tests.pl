@@ -129,6 +129,8 @@ CODE
         ['NUM', 2 ]],
     ['fn force(f)f(); fn a(x){print("a");x}; var lazy = fn 1 + a(2); print("b"); force(lazy)',
         ['NUM', 3], ['STDOUT', "b\na\n"]],
+    ['var i = 0; while (i < 5) print(++i)',
+        ['NIL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
 );
 
 use Data::Dumper;
