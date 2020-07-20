@@ -193,6 +193,7 @@ true | a Boolean with a true value
 false | a Boolean with a false value
 nil | a Nil with a nil value
 if | conditional if statement
+then | then branch of a conditional if statement
 else | else branch of a conditional if statement
 while | loop while a condition is true
 last | break out of the loop
@@ -338,8 +339,8 @@ either a single statement or a group of statements enclosed in braces. This can 
 then be followed by the `else` keyword and another single statement or group of statements
 enclosed in braces.
 
-If the condition is [truthy](#truthiness) then the statement(s) in the body are executed, otherwise
-if an `else` body exists then its statement(s) are executed. The value of the `if` statement is the
+If the condition is [truthy](#truthiness) then the statement(s) in the `then` branch are executed, otherwise
+if an `else` branch exists then its statement(s) are executed. The value of the `if` statement is the
 value of the final statement of the branch that was executed.
 
     if true then 1 else 2
