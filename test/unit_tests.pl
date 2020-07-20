@@ -144,7 +144,7 @@ my $plang = Plang::Interpreter->new(embedded => 1);
 
 # override the Plang builtin `print` function so we can collect
 # the output for testing, instead of printing it
-$plang->{interpreter}->add_function_builtin('print',
+$plang->{interpreter}->add_builtin_function('print',
     # these are the parameters we want: `stmt` and `end`.
     # `stmt` has no default value; `end` has default value [STRING, "\n"]
     [['stmt', undef], ['end', ['STRING', "\n"]]],
@@ -162,13 +162,27 @@ sub print_override {
     return ['NIL', undef];
 }
 
-print "Running ", scalar @tests, " test", @tests == 1 ? '' : 's',  "...\n";
+my @selected_tests;
+
+if (@ARGV) {
+    my $args = "@ARGV";
+    my @wanted = split /\s*,\s*/, $args;
+
+    foreach my $id (@wanted) {
+        push @selected_tests, $tests[$id - 1];
+    }
+} else {
+    @selected_tests = @tests;
+}
+
+
+print "Running ", scalar @selected_tests, " test", @selected_tests == 1 ? '' : 's',  "...\n";
 
 my @pass;
 my @fail;
 
 my $i = 0;
-foreach my $test (@tests) {
+foreach my $test (@selected_tests) {
     $i++;
     $output = "";
     my $result     = $plang->interpret_string($test->[0]);
@@ -187,7 +201,7 @@ foreach my $test (@tests) {
     ++$passed if $stdout eq $exp_stdout;
 
     if ($passed != 2) {
-        push @fail, [$test->[0], $expected, $result, $exp_stdout, $stdout];
+        push @fail, [$i, $test->[0], $expected, $result, $exp_stdout, $stdout];
         print "X";
     } else {
         push @pass, $test;
@@ -198,15 +212,14 @@ foreach my $test (@tests) {
 
 print "\nPass: ", scalar @pass, "; Fail: ", scalar @fail, "\n";
 
-$i = 0;
 foreach my $failure (@fail) {
-    $i++;
     print '-' x 70, "\n";
-    print "FAILURE $i: ", $failure->[0], "\n";
-    print " Expected: ", $failure->[1], "\n";
-    print "      Got: ", $failure->[2], "\n";
-    print "Expected Stdout: ", $failure->[3], "\n";
-    print "     Got Stdout: ", $failure->[4], "\n";
+    print "FAIL (Test #", $failure->[0], ")\n";
+    print "\n$failure->[1]\n";
+    print "       Expected: ", $failure->[2], "\n";
+    print "            Got: ", $failure->[3], "\n";
+    print "Expected Stdout: ", $failure->[4], "\n";
+    print "     Got Stdout: ", $failure->[5], "\n";
 }
 
 exit 1 if @fail;

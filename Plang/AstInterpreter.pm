@@ -34,10 +34,10 @@ sub run {
     my ($self, $ast) = @_;
 
     # ast can be supplied via new() or via this run() subroutine
-    $self->{ast} = $ast if defined $ast;
+    $ast ||= $self->{ast};
 
     # make sure we were given a program
-    if (not $self->{ast}) {
+    if (not $ast) {
         print STDERR "No program to run.\n";
         return;
     }
@@ -46,7 +46,7 @@ sub run {
     my $context = $self->new_context;
 
     # grab our program's statements
-    my $program    = $self->{ast}->[0];
+    my $program    = $ast->[0];
     my $statements = $program->[1];
 
     # interpret the statements
@@ -62,13 +62,20 @@ sub run {
     return $self->handle_statement_result($result, 1);
 }
 
-my %pretty_type = (
+my %pretty_types = (
     'NIL'    => 'Nil',
     'NUM'    => 'Number',
     'STRING' => 'String',
     'BOOL'   => 'Boolean',
     'FUNC'   => 'Function',
 );
+
+sub pretty_type {
+    my ($self, $value) = @_;
+    my $type = $pretty_types{$value->[0]};
+    return $value->[0] if not defined $type;
+    return $type;
+}
 
 sub error {
     my ($self, $context, $err_msg) = @_;
@@ -92,7 +99,7 @@ sub set_variable {
 }
 
 sub get_variable {
-    my ($self, $context, $name) = @_;
+    my ($self, $context, $name, %opt) = @_;
 
     print "get_variable: $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
     # look for variables in current scope
@@ -101,7 +108,7 @@ sub get_variable {
     }
 
     # look for variables in enclosing scopes
-    if (defined $context->{parent}) {
+    if (!$opt{locals_only} and defined $context->{parent}) {
         my $var = $self->get_variable($context->{parent}, $name);
         return $var if defined $var;
     }
@@ -121,70 +128,7 @@ sub get_lvalue {
         return $node;
     }
 
-    $self->error($context, "Can not assign to type $pretty_type{$node->[0]} (not a modifiable lvalue)");
-}
-
-sub interpret_ast {
-    my ($self, $context, $ast) = @_;
-
-    print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
-
-    # try
-    my $last_statement_result = eval {
-        my $result;
-        foreach my $node (@$ast) {
-            my $instruction = $node->[0];
-
-            if ($instruction eq 'STMT') {
-                $result = $self->statement($context, $node->[1]);
-                $result = $self->handle_statement_result($result) if defined $result;
-                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
-            }
-
-            if ($self->{debug} >= 3) {
-                if (defined $result) {
-                    print "Statement result: ", defined $result->[1] ? $result->[1] : 'undef', " ($result->[0])\n";
-                } else {
-                    print "Statement result: none\n";
-                }
-            }
-        }
-
-        return $result;
-    };
-
-    # catch
-    if ($@) {
-        if ($@ =~ /^(?:LAST|NEXT)/) {
-            # propagate these to `while`'s eval
-            die $@;
-        }
-        return ['ERROR', $@];
-    }
-
-    return $last_statement_result;
-}
-
-# handles one statement result
-sub handle_statement_result {
-    my ($self, $result, $print_any) = @_;
-    $print_any ||= 0;
-
-    return if not defined $result;
-
-    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
-    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
-
-    # if Plang is embedded into a larger app return the result
-    # to the larger app so it can handle it itself
-    return $result if $self->{embedded};
-
-    # return result unless we should print any result
-    return $result unless $print_any;
-
-    # print the result if possible and then consume it
-    print $self->output_value($result), "\n" if defined $result->[1];
-    return;
+    $self->error($context, "Can not assign to type " . $self->pretty_type($node) . " (not a modifiable lvalue)");
 }
 
 my %eval_unary_op_NUM = (
@@ -236,7 +180,7 @@ sub unary_op {
             }
         }
 
-        $self->error($context, "Cannot apply unary operator $op to type $pretty_type{$value->[0]}\n");
+        $self->error($context, "Cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
     }
     return;
 }
@@ -268,7 +212,7 @@ sub binary_op {
             }
         }
 
-        $self->error($context, "Cannot apply binary operator $op (have types $pretty_type{$left_value->[0]} and $pretty_type{$right_value->[0]})");
+        $self->error($context, "Cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
     }
     return;
 }
@@ -295,13 +239,17 @@ sub func_builtin_print {
 sub func_builtin_type {
     my ($self, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['STRING', $pretty_type{$expr->[0]}];
+    return ['STRING', $self->pretty_type($expr)];
 }
 
-sub add_function_builtin {
+sub add_builtin_function {
     my ($self, $name, $parameters, $subref) = @_;
-    # TODO warn/error if overwriting?
     $func_builtins{$name} = { params => $parameters, subref => $subref };
+}
+
+sub get_builtin_function {
+    my ($self, $name) = @_;
+    return $func_builtins{$name};
 }
 
 sub call_builtin_function {
@@ -397,15 +345,17 @@ sub func_call {
     }
 
     if ($func->[0] ne 'FUNC') {
-        $self->error($context, "Cannot invoke `" . $self->output_value($func) . "` as a function (have type $pretty_type{$func->[0]})");
+        $self->error($context, "Cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->pretty_type($func) . ")");
     }
 
     my $closure    = $func->[1]->[0];
     my $parameters = $func->[1]->[1];
     my $statements = $func->[1]->[2];
 
+    # wedge closure in between current scope and previous scope
     my $new_context = $self->new_context($closure);
-    $new_context->{locals} = { %{$context->{locals}} };
+    $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
+    $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
 
     my $ret = $self->process_func_call_arguments($new_context, $target->[1], $parameters, $arguments);
 
@@ -510,6 +460,14 @@ sub statement {
             $right_value = ['NIL', undef];
         }
 
+        if ($self->get_variable($context, $value, locals_only => 1)) {
+            $self->error($context, "Cannot redeclare existing local `$value`");
+        }
+
+        if ($self->get_builtin_function($value)) {
+            $self->error($context, "Cannot override builtin function `$value`");
+        }
+
         $self->set_variable($context, $value, $right_value);
         return $right_value;
     }
@@ -590,7 +548,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+        $self->error($context, "Cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'SUB_ASSIGN') {
@@ -602,7 +560,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+        $self->error($context, "Cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'MUL_ASSIGN') {
@@ -614,7 +572,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+        $self->error($context, "Cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'DIV_ASSIGN') {
@@ -626,7 +584,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator ADD (have types $pretty_type{$left->[0]} and $pretty_type{$right->[0]})");
+        $self->error($context, "Cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'CAT_ASSIGN') {
@@ -670,7 +628,7 @@ sub statement {
             return $var;
         }
 
-        $self->error($context, "Cannot apply prefix-increment to type $pretty_type{$var->[0]}");
+        $self->error($context, "Cannot apply prefix-increment to type " . $self->pretty_type($var));
     }
 
     # prefix decrement
@@ -689,7 +647,7 @@ sub statement {
             return $var;
         }
 
-        $self->error($context, "Cannot apply prefix-decrement to type $pretty_type{$var->[0]}");
+        $self->error($context, "Cannot apply prefix-decrement to type " . $self->pretty_type($var));
     }
 
     # short-circuiting logical and
@@ -744,7 +702,7 @@ sub statement {
             return $temp_var;
         }
 
-        $self->error($context, "Cannot apply postfix-increment to type $pretty_type{$var->[0]}");
+        $self->error($context, "Cannot apply postfix-increment to type " . $self->pretty_type($var));
     }
 
     # postfix decrement
@@ -764,7 +722,7 @@ sub statement {
             return $temp_var;
         }
 
-        $self->error($context, "Cannot apply postfix-decrement to type $pretty_type{$var->[0]}");
+        $self->error($context, "Cannot apply postfix-decrement to type " . $self->pretty_type($var));
     }
 
     # range operator
@@ -808,16 +766,16 @@ sub statement {
                 if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
                     return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have $pretty_type{$from->[0]} and $pretty_type{$to->[0]}) inside postfix [] notation");
+                    $self->error($context, "Invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
                 return ['STRING', substr($var->[1], $index, 1) // ""];
             } else {
-                $self->error($context, "Invalid type $pretty_type{$value->[0]} inside postfix [] notation");
+                $self->error($context, "Invalid type " . $self->pretty_type($value) . " inside postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot use postfix [] notation on type $pretty_type{$var->[0]}");
+            $self->error($context, "Cannot use postfix [] notation on type " . $self->pretty_type($var));
         }
     }
 
@@ -891,10 +849,10 @@ sub assignment {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
                         return ['STRING', $var->[1]];
                     } else {
-                        $self->error($context, "Cannot assign from type $pretty_type{$right_value->[0]} to type $pretty_type{$left_value->[0]} with RANGE in postfix [] notation");
+                        $self->error($context, "Cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix [] notation");
                     }
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have $pretty_type{$from->[0]} and $pretty_type{$to->[0]}) inside assignment postfix [] notation");
+                    $self->error($context, "Invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
@@ -905,25 +863,88 @@ sub assignment {
                     substr ($var->[1], $index, 1) = chr $right_value->[1];
                     return ['STRING', $var->[1]];
                 } else {
-                    $self->error($context, "Cannot assign from type $pretty_type{$right_value->[0]} to type $pretty_type{$left_value->[0]} with postfix [] notation");
+                    $self->error($context, "Cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix [] notation");
                 }
             } else {
-                $self->error($context, "Invalid type $pretty_type{$value->[0]} inside assignment postfix [] notation");
+                $self->error($context, "Invalid type " . $self->pretty_type($value) . " inside assignment postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot assign to postfix [] notation on type $pretty_type{$var->[0]}");
+            $self->error($context, "Cannot assign to postfix [] notation on type " . $self->pretty_type($var));
         }
     }
 
     # a statement
     my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "Cannot assign to non-lvalue type $pretty_type{$eval->[0]}");
+    $self->error($context, "Cannot assign to non-lvalue type " . $self->pretty_type($eval));
 }
 
 sub is_arithmetic_type {
     my ($self, $value) = @_;
     return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
     return 0;
+}
+
+sub interpret_ast {
+    my ($self, $context, $ast) = @_;
+
+    print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
+
+    # try
+    my $last_statement_result = eval {
+        my $result;
+        foreach my $node (@$ast) {
+            my $instruction = $node->[0];
+
+            if ($instruction eq 'STMT') {
+                $result = $self->statement($context, $node->[1]);
+                $result = $self->handle_statement_result($result) if defined $result;
+                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
+            }
+
+            if ($self->{debug} >= 3) {
+                if (defined $result) {
+                    print "Statement result: ", defined $result->[1] ? $result->[1] : 'undef', " ($result->[0])\n";
+                } else {
+                    print "Statement result: none\n";
+                }
+            }
+        }
+
+        return $result;
+    };
+
+    # catch
+    if ($@) {
+        if ($@ =~ /^(?:LAST|NEXT)/) {
+            # propagate these to `while`'s eval
+            die $@;
+        }
+        return ['ERROR', $@];
+    }
+
+    return $last_statement_result;
+}
+
+# handles one statement result
+sub handle_statement_result {
+    my ($self, $result, $print_any) = @_;
+    $print_any ||= 0;
+
+    return if not defined $result;
+
+    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
+    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
+
+    # if Plang is embedded into a larger app return the result
+    # to the larger app so it can handle it itself
+    return $result if $self->{embedded};
+
+    # return result unless we should print any result
+    return $result unless $print_any;
+
+    # print the result if possible and then consume it
+    print $self->output_value($result), "\n" if defined $result->[1];
+    return;
 }
 
 1;
