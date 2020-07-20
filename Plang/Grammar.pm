@@ -125,6 +125,7 @@ sub alternate_statement {
 #                        | LastStatement
 #                        | WhileStatement
 #                        | IfStatement
+#                        | ElseWithoutIf
 #                        | RangeStatement
 #                        | Expression TERM
 #                        | TERM
@@ -163,6 +164,9 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&IfStatement,         'Statement: IfStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&ElseWithoutIf,       'Statement: ElseWithoutIf'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
@@ -475,6 +479,17 @@ sub IfStatement {
     }
 
     $parser->backtrack;
+}
+
+# error about an `else` without an `if`
+sub ElseWithoutIf {
+    my ($parser) = @_;
+
+    if ($parser->consume('KEYWORD_else')) {
+        return error($parser, "`else` without matching `if`");
+    }
+
+    return;
 }
 
 # Grammar: RangeStatement ::= Expression ".." Expression
