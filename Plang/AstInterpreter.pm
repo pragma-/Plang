@@ -91,7 +91,7 @@ sub pretty_type {
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
-    die "Fatal error: $err_msg\n";
+    die "Error: $err_msg\n";
 }
 
 sub new_context {
