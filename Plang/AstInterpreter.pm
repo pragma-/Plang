@@ -228,26 +228,26 @@ sub binary_op {
     return;
 }
 
-my %func_builtins = (
+my %function_builtins = (
     'print'   => {
         # [['param1 name', default value], ['param2 name', default value], [...]]
         params => [['statement', undef], ['end', ['STRING', "\n"]]],
-        subref => \&func_builtin_print,
+        subref => \&function_builtin_print,
     },
     'type'   => {
         params => [['expr', undef]],
-        subref => \&func_builtin_type,
+        subref => \&function_builtin_type,
     },
 );
 
-sub func_builtin_print {
+sub function_builtin_print {
     my ($self, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
     return ['NIL', undef];
 }
 
-sub func_builtin_type {
+sub function_builtin_type {
     my ($self, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return ['STRING', $self->pretty_type($expr)];
@@ -255,27 +255,27 @@ sub func_builtin_type {
 
 sub add_builtin_function {
     my ($self, $name, $parameters, $subref) = @_;
-    $func_builtins{$name} = { params => $parameters, subref => $subref };
+    $function_builtins{$name} = { params => $parameters, subref => $subref };
 }
 
 sub get_builtin_function {
     my ($self, $name) = @_;
-    return $func_builtins{$name};
+    return $function_builtins{$name};
 }
 
 sub call_builtin_function {
     my ($self, $context, $data, $name) = @_;
 
-    my $parameters = $func_builtins{$name}->{params};
-    my $func       = $func_builtins{$name}->{subref};
+    my $parameters = $function_builtins{$name}->{params};
+    my $func       = $function_builtins{$name}->{subref};
     my $arguments  = $data->[2];
 
-    my $evaled_args = $self->process_func_call_arguments($context, $name, $parameters, $arguments);
+    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
 
     return $func->($self, $name, $evaled_args);
 }
 
-sub process_func_call_arguments {
+sub process_function_call_arguments {
     my ($self, $context, $name, $parameters, $arguments) = @_;
 
     my $evaluated_arguments;
@@ -305,7 +305,7 @@ sub process_func_call_arguments {
     return $evaluated_arguments;
 }
 
-sub func_definition {
+sub function_definition {
     my ($self, $context, $data) = @_;
 
     my $name       = $data->[1];
@@ -324,11 +324,15 @@ sub func_definition {
         $self->error($context, "cannot define function `$name` with same name as existing local");
     }
 
+    if ($self->get_builtin_function($name)) {
+        $self->error($context, "cannot redefine builtin function `$name`");
+    }
+
     $context->{locals}->{$name} = $func;
     return $func;
 }
 
-sub func_call {
+sub function_call {
     my ($self, $context, $data) = @_;
 
     $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
@@ -346,7 +350,7 @@ sub func_call {
     }
 
     if (not defined $func) {
-        if ($target->[0] eq 'IDENT' and exists $func_builtins{$target->[1]}) {
+        if ($target->[0] eq 'IDENT' and exists $function_builtins{$target->[1]}) {
             # builtin function
             return $self->call_builtin_function($context, $data, $target->[1]);
         } else {
@@ -368,7 +372,7 @@ sub func_call {
     $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
     $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
 
-    my $ret = $self->process_func_call_arguments($new_context, $target->[1], $parameters, $arguments);
+    my $ret = $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
@@ -615,12 +619,12 @@ sub statement {
 
     # function definition
     if ($ins eq 'FUNCDEF') {
-        return $self->func_definition($context, $data);
+        return $self->function_definition($context, $data);
     }
 
     # function call
     if ($ins eq 'CALL') {
-        return $self->func_call($context, $data);
+        return $self->function_call($context, $data);
     }
 
     # prefix increment
