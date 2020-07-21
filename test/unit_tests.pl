@@ -122,7 +122,7 @@ CODE
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
         ['NUM', 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
-        ['ERROR',  "Fatal error: Cannot invoke `7` as a function (have type Number)\n" ]],
+        ['ERROR',  "Fatal error: cannot invoke `7` as a function (have type Number)\n" ]],
     ['var a = fn (x) fn (y) x + y;  a(3)(4)',
         ['NUM', 7 ]],
     ['fn force(f) f(); var lazy = fn 1 + 1; force(lazy)',

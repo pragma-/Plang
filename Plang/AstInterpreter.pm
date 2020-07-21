@@ -191,7 +191,7 @@ sub unary_op {
             }
         }
 
-        $self->error($context, "Cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
+        $self->error($context, "cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
     }
     return;
 }
@@ -223,7 +223,7 @@ sub binary_op {
             }
         }
 
-        $self->error($context, "Cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
+        $self->error($context, "cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
     }
     return;
 }
@@ -321,7 +321,7 @@ sub func_definition {
     }
 
     if (!$self->{repl} and exists $context->{locals}->{$name}) {
-        $self->error($context, "Cannot define function `$name` with same name as existing local");
+        $self->error($context, "cannot define function `$name` with same name as existing local");
     }
 
     $context->{locals}->{$name} = $func;
@@ -356,7 +356,7 @@ sub func_call {
     }
 
     if ($func->[0] ne 'FUNC') {
-        $self->error($context, "Cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->pretty_type($func) . ")");
+        $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->pretty_type($func) . ")");
     }
 
     my $closure    = $func->[1]->[0];
@@ -472,11 +472,11 @@ sub statement {
         }
 
         if (!$self->{repl} and $self->get_variable($context, $value, locals_only => 1)) {
-            $self->error($context, "Cannot redeclare existing local `$value`");
+            $self->error($context, "cannot redeclare existing local `$value`");
         }
 
         if ($self->get_builtin_function($value)) {
-            $self->error($context, "Cannot override builtin function `$value`");
+            $self->error($context, "cannot override builtin function `$value`");
         }
 
         $self->set_variable($context, $value, $right_value);
@@ -559,7 +559,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+        $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'SUB_ASSIGN') {
@@ -571,7 +571,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+        $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'MUL_ASSIGN') {
@@ -583,7 +583,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+        $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'DIV_ASSIGN') {
@@ -595,7 +595,7 @@ sub statement {
             return $left;
         }
 
-        $self->error($context, "Cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+        $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
     }
 
     if ($ins eq 'CAT_ASSIGN') {
@@ -609,7 +609,7 @@ sub statement {
     # variable
     if ($ins eq 'IDENT') {
         my $var = $self->get_variable($context, $value);
-        $self->error($context, "Attempt to use undeclared variable `$value`") if not defined $var;
+        $self->error($context, "undeclared variable `$value`") if not defined $var;
         return $var;
     }
 
@@ -631,7 +631,7 @@ sub statement {
         my $var = $self->get_variable($context, $tok_value);
 
         if (not defined $var) {
-            $self->error($context, "Attempt to prefix-increment undeclared variable `$tok_value`");
+            $self->error($context, "cannot prefix-increment undeclared variable `$tok_value`");
         }
 
         if ($self->is_arithmetic_type($var)) {
@@ -639,7 +639,7 @@ sub statement {
             return $var;
         }
 
-        $self->error($context, "Cannot apply prefix-increment to type " . $self->pretty_type($var));
+        $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
     }
 
     # prefix decrement
@@ -650,7 +650,7 @@ sub statement {
         my $var = $self->get_variable($context, $tok_value);
 
         if (not defined $var) {
-            $self->error($context, "Attempt to prefix-decrement undeclared variable `$tok_value`");
+            $self->error($context, "cannot prefix-decrement undeclared variable `$tok_value`");
         }
 
         if ($self->is_arithmetic_type($var)) {
@@ -658,7 +658,7 @@ sub statement {
             return $var;
         }
 
-        $self->error($context, "Cannot apply prefix-decrement to type " . $self->pretty_type($var));
+        $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
     }
 
     # short-circuiting logical and
@@ -704,7 +704,7 @@ sub statement {
         my $var = $self->get_variable($context, $tok_value);
 
         if (not defined $var) {
-            $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
+            $self->error($context, "cannot postfix-increment undeclared variable `$tok_value`");
         }
 
         if ($self->is_arithmetic_type($var)) {
@@ -713,7 +713,7 @@ sub statement {
             return $temp_var;
         }
 
-        $self->error($context, "Cannot apply postfix-increment to type " . $self->pretty_type($var));
+        $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
     }
 
     # postfix decrement
@@ -724,7 +724,7 @@ sub statement {
         my $var = $self->get_variable($context, $tok_value);
 
         if (not defined $var) {
-            $self->error($context, "Attempt to postfix-increment undeclared variable `$tok_value`");
+            $self->error($context, "cannot postfix-increment undeclared variable `$tok_value`");
         }
 
         if ($self->is_arithmetic_type($var)) {
@@ -733,7 +733,7 @@ sub statement {
             return $temp_var;
         }
 
-        $self->error($context, "Cannot apply postfix-decrement to type " . $self->pretty_type($var));
+        $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
     }
 
     # range operator
@@ -757,11 +757,11 @@ sub statement {
             $var = $self->get_variable($context, $tok_value);
 
             if (not defined $var) {
-                $self->error($context, "Cannot use postfix [] notation on undeclared variable `$tok_value`");
+                $self->error($context, "cannot use postfix [] notation on undeclared variable `$tok_value`");
             }
 
             if (not defined $var->[1]) {
-                $self->error($context, "Cannot use postfix [] notation on undefined variable `$tok_value`");
+                $self->error($context, "cannot use postfix [] notation on undefined variable `$tok_value`");
             }
         } else {
             $var = $token;
@@ -777,16 +777,16 @@ sub statement {
                 if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
                     return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix [] notation");
+                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
                 return ['STRING', substr($var->[1], $index, 1) // ""];
             } else {
-                $self->error($context, "Invalid type " . $self->pretty_type($value) . " inside postfix [] notation");
+                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot use postfix [] notation on type " . $self->pretty_type($var));
+            $self->error($context, "cannot use postfix [] notation on type " . $self->pretty_type($var));
         }
     }
 
@@ -833,7 +833,7 @@ sub assignment {
     # plain variable
     if ($left_value->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $left_value->[1]);
-        $self->error($context, "Attempt to assign to undeclared variable `$left_value->[1]`") if not defined $var;
+        $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
         $self->set_variable($context, $left_value->[1], $right_value);
         return $right_value;
     }
@@ -849,7 +849,7 @@ sub assignment {
             $var = $self->get_variable($context, $tok_value);
 
             if (not defined $var) {
-                $self->error($context, "Cannot assign to postfix [] notation on undeclared variable `$tok_value`");
+                $self->error($context, "cannot assign to postfix [] notation on undeclared variable `$tok_value`");
             }
         } else {
             $var = $token;
@@ -870,10 +870,10 @@ sub assignment {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
                         return ['STRING', $var->[1]];
                     } else {
-                        $self->error($context, "Cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix [] notation");
+                        $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix [] notation");
                     }
                 } else {
-                    $self->error($context, "Invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix [] notation");
+                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix [] notation");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
@@ -884,19 +884,19 @@ sub assignment {
                     substr ($var->[1], $index, 1) = chr $right_value->[1];
                     return ['STRING', $var->[1]];
                 } else {
-                    $self->error($context, "Cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix [] notation");
+                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix [] notation");
                 }
             } else {
-                $self->error($context, "Invalid type " . $self->pretty_type($value) . " inside assignment postfix [] notation");
+                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix [] notation");
             }
         } else {
-            $self->error($context, "Cannot assign to postfix [] notation on type " . $self->pretty_type($var));
+            $self->error($context, "cannot assign to postfix [] notation on type " . $self->pretty_type($var));
         }
     }
 
     # a statement
     my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "Cannot assign to non-lvalue type " . $self->pretty_type($eval));
+    $self->error($context, "cannot assign to non-lvalue type " . $self->pretty_type($eval));
 }
 
 sub is_arithmetic_type {
