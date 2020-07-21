@@ -184,7 +184,7 @@ sub handle_parse_errors {
 sub interpret {
     my ($self, %opt) = @_;
     my $errors = $self->handle_parse_errors;
-    return $errors if defined $errors;
+    return ['ERROR', $errors] if defined $errors;
     return $self->{interpreter}->run($self->{ast}, %opt);
 }
 
