@@ -191,7 +191,7 @@ sub binary_op {
 my %function_builtins = (
     'print'   => {
         # [['param1 name', default value], ['param2 name', default value], [...]]
-        params => [['statement', undef], ['end', ['STRING', "\n"]]],
+        params => [['expr', undef], ['end', ['STRING', "\n"]]],
         subref => \&function_builtin_print,
     },
     'type'   => {
@@ -199,27 +199,27 @@ my %function_builtins = (
         subref => \&function_builtin_type,
     },
     'Number' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_Number,
     },
     'String' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_String,
     },
     'Boolean' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_Boolean,
     },
     'Nil' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_Nil,
     },
     'Function' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_CannotConvert,
     },
     'Builtin' => {
-        params => [['statement', undef]],
+        params => [['expr', undef]],
         subref => \&function_builtin_CannotConvert,
     },
 );
