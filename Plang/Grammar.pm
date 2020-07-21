@@ -128,6 +128,7 @@ sub alternate_statement {
 #                        | ElseWithoutIf
 #                        | RangeStatement
 #                        | Expression TERM
+#                        | UnexpectedKeyword
 #                        | TERM
 sub Statement {
     my ($parser) = @_;
@@ -173,6 +174,9 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&UnexpectedKeyword,   'Statement: Expression'));
     return if $parser->errored;
 
     $parser->alternate('Statement: TERM');
@@ -510,6 +514,19 @@ sub RangeStatement {
     }
 
     $parser->backtrack;
+}
+
+# error about unexpected keywords
+sub UnexpectedKeyword {
+    my ($parser) = @_;
+
+    my $token = $parser->next_token('peek');
+
+    if ($token->[0] =~ m/^KEYWORD_(.*)$/) {
+        return error($parser, "unexpected keyword `$1`");
+    }
+
+    return;
 }
 
 my %precedence_table = (
