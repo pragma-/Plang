@@ -176,7 +176,7 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&UnexpectedKeyword,   'Statement: Expression'));
+    return $result if defined ($result = alternate_statement($parser, \&UnexpectedKeyword,   'Statement: UnexpectedKeyword'));
     return if $parser->errored;
 
     $parser->alternate('Statement: TERM');
