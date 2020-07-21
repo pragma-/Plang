@@ -145,9 +145,9 @@ my $plang = Plang::Interpreter->new(embedded => 1);
 # override the Plang builtin `print` function so we can collect
 # the output for testing, instead of printing it
 $plang->{interpreter}->add_builtin_function('print',
-    # these are the parameters we want: `stmt` and `end`.
-    # `stmt` has no default value; `end` has default value [STRING, "\n"]
-    [['stmt', undef], ['end', ['STRING', "\n"]]],
+    # these are the parameters we want: `expr` and `end`.
+    # `expr` has no default value; `end` has default value [STRING, "\n"]
+    [['expr', undef], ['end', ['STRING', "\n"]]],
     # subref to our function that will override the `print` function
     \&print_override);
 
@@ -157,8 +157,8 @@ my $output;
 # our overridden `print` function
 sub print_override {
     my ($plang, $context, $name, $arguments) = @_;
-    my ($stmt, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
-    $output .= "$stmt$end"; # append the print output to our $output
+    my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    $output .= "$expr$end"; # append the print output to our $output
     return ['NIL', undef];
 }
 
