@@ -187,6 +187,7 @@ sub binary_op {
     return;
 }
 
+# builtin functions
 my %function_builtins = (
     'print'   => {
         # [['param1 name', default value], ['param2 name', default value], [...]]
@@ -197,19 +198,123 @@ my %function_builtins = (
         params => [['expr', undef]],
         subref => \&function_builtin_type,
     },
+    'Number' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_Number,
+    },
+    'String' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_String,
+    },
+    'Boolean' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_Boolean,
+    },
+    'Nil' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_Nil,
+    },
+    'Function' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_CannotConvert,
+    },
+    'Builtin' => {
+        params => [['statement', undef]],
+        subref => \&function_builtin_CannotConvert,
+    },
 );
 
+# builtin print
 sub function_builtin_print {
-    my ($self, $name, $arguments) = @_;
+    my ($self, $context, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
     return ['NIL', undef];
 }
 
+# builtin type
 sub function_builtin_type {
-    my ($self, $name, $arguments) = @_;
+    my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return ['STRING', $self->pretty_type($expr)];
+}
+
+# cast functions
+sub function_builtin_Number {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'NUM') {
+        return $expr;
+    }
+
+    if ($expr->[0] eq 'STRING') {
+        return ['NUM', $expr->[1] + 0];
+    }
+
+    if ($expr->[0] eq 'BOOL') {
+        return ['NUM', !!$expr->[1]];
+    }
+
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+}
+
+sub function_builtin_String {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'NUM') {
+        return ['STRING', $expr->[1]];
+    }
+
+    if ($expr->[0] eq 'STRING') {
+        return $expr;
+    }
+
+    if ($expr->[0] eq 'BOOL') {
+        return ['STRING', $self->output_value($expr)];
+    }
+
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+}
+
+sub function_builtin_Boolean {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'NUM') {
+        if ($self->is_truthy($context, $expr)) {
+            return ['BOOL', 1];
+        } else {
+            return ['BOOL', 0];
+        }
+    }
+
+    if ($expr->[0] eq 'STRING') {
+        if (not $self->is_truthy($context, $expr)) {
+            return ['BOOL', 0];
+        } else {
+            return ['BOOL', 1];
+        }
+    }
+
+    if ($expr->[0] eq 'BOOL') {
+        return $expr;
+    }
+
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+}
+
+sub function_builtin_Nil {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+    return ['NIL', undef];
+}
+
+sub function_builtin_CannotConvert {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to $name");
 }
 
 sub add_builtin_function {
@@ -231,7 +336,7 @@ sub call_builtin_function {
 
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
 
-    return $func->($self, $name, $evaled_args);
+    return $func->($self, $context, $name, $evaled_args);
 }
 
 sub process_function_call_arguments {

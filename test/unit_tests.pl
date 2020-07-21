@@ -156,7 +156,7 @@ my $output;
 
 # our overridden `print` function
 sub print_override {
-    my ($plang, $name, $arguments) = @_;
+    my ($plang, $context, $name, $arguments) = @_;
     my ($stmt, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
     $output .= "$stmt$end"; # append the print output to our $output
     return ['NIL', undef];
