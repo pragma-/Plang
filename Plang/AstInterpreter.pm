@@ -31,54 +31,13 @@ sub initialize {
     $self->{repl_context}   = undef; # persistent repl context
 }
 
-# runs a new Plang program with a fresh environment
-sub run {
-    my ($self, $ast, %opt) = @_;
-
-    # ast can be supplied via new() or via this run() subroutine
-    $ast ||= $self->{ast};
-
-    # make sure we were given a program
-    if (not $ast) {
-        print STDERR "No program to run.\n";
-        return;
-    }
-
-    # set up the environment
-    my $context;
-
-    if ($opt{repl}) {
-        $self->{repl_context} ||= $self->new_context;
-        $context = $self->{repl_context};
-        $self->{repl} = 1;
-    } else {
-        $context = $self->new_context;
-        $self->{repl} = 0;
-    }
-
-    # grab our program's statements
-    my $program    = $ast->[0];
-    my $statements = $program->[1];
-
-    # interpret the statements
-    my $result = $self->interpret_ast($context, $statements);
-
-    # return result to parent program if we're embedded
-    return $result if $self->{embedded};
-
-    # return success if there's no result to print
-    return if not defined $result;
-
-    # handle final statement (print last value of program if not Nil)
-    return $self->handle_statement_result($result, 1);
-}
-
 my %pretty_types = (
-    'NIL'    => 'Nil',
-    'NUM'    => 'Number',
-    'STRING' => 'String',
-    'BOOL'   => 'Boolean',
-    'FUNC'   => 'Function',
+    'NIL'     => 'Nil',
+    'NUM'     => 'Number',
+    'STRING'  => 'String',
+    'BOOL'    => 'Boolean',
+    'FUNC'    => 'Function',
+    'BUILTIN' => 'Builtin',
 );
 
 sub pretty_type {
@@ -320,7 +279,7 @@ sub function_definition {
         $name =~ s/\)$//;
     }
 
-    if (!$self->{repl} and exists $context->{locals}->{$name}) {
+    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0] ne 'BUILTIN') {
         $self->error($context, "cannot define function `$name` with same name as existing local");
     }
 
@@ -344,6 +303,7 @@ sub function_call {
     if ($target->[0] eq 'IDENT') {
         print "Calling function `$target->[1]` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
         $func = $self->get_variable($context, $target->[1]);
+        $func = undef if $func->[0] eq 'BUILTIN';
     } else {
         print "Calling anonymous function with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
         $func = $self->statement($context, $target);
@@ -475,8 +435,10 @@ sub statement {
             $right_value = ['NIL', undef];
         }
 
-        if (!$self->{repl} and $self->get_variable($context, $value, locals_only => 1)) {
-            $self->error($context, "cannot redeclare existing local `$value`");
+        if (!$self->{repl} and (my $var = $self->get_variable($context, $value, locals_only => 1))) {
+            if ($var->[0] ne 'BUILTIN') {
+                $self->error($context, "cannot redeclare existing local `$value`");
+            }
         }
 
         if ($self->get_builtin_function($value)) {
@@ -907,6 +869,53 @@ sub is_arithmetic_type {
     my ($self, $value) = @_;
     return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
     return 0;
+}
+
+# runs a new Plang program with a fresh environment
+sub run {
+    my ($self, $ast, %opt) = @_;
+
+    # ast can be supplied via new() or via this run() subroutine
+    $ast ||= $self->{ast};
+
+    # make sure we were given a program
+    if (not $ast) {
+        print STDERR "No program to run.\n";
+        return;
+    }
+
+    # set up the global environment
+    my $context;
+
+    if ($opt{repl}) {
+        $self->{repl_context} ||= $self->new_context;
+        $context = $self->{repl_context};
+        $self->{repl} = 1;
+    } else {
+        $context = $self->new_context;
+        $self->{repl} = 0;
+    }
+
+    # add built-in functions to global enviornment
+    foreach my $builtin (keys %function_builtins) {
+        $self->set_variable($context, $builtin, ['BUILTIN', $builtin]);
+    }
+
+    # grab our program's statements
+    my $program    = $ast->[0];
+    my $statements = $program->[1];
+
+    # interpret the statements
+    my $result = $self->interpret_ast($context, $statements);
+
+    # return result to parent program if we're embedded
+    return $result if $self->{embedded};
+
+    # return success if there's no result to print
+    return if not defined $result;
+
+    # handle final statement (print last value of program if not Nil)
+    return $self->handle_statement_result($result, 1);
 }
 
 sub interpret_ast {
