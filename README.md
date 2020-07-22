@@ -32,6 +32,7 @@ Here's a helpful table of contents:
       * [String](#string)
       * [Boolean](#boolean)
       * [Nil](#nil)
+    * [Casting](#casting)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
     * [Default arguments](#default-arguments)
@@ -226,10 +227,11 @@ Variables that have not yet been assigned a value will produce an error.
       Error: `b` not defined.
 
 #### Types
-At this stage, there are seven types planned: reference, array, table, string, number, boolean and nil.
+At this stage, these are planned types: nil, boolean, number, string, array, map, and reference.
 
 Types of variables are inferred from the type of their value. All variables are simply declared with `var`
-and no type specifier.
+and no type specifier. However, there is no implicit conversion between types. You must [cast](#casting) a
+value to explicitly convert it to a desired type.
 
 Currently implemented are:
 
@@ -257,6 +259,23 @@ A `Boolean` is either true or false.
 
 The `Nil` type signifies that there is no value. All logical comparisons against `Nil` produce
 `Nil`.
+
+#### Casting
+Plang does not allow implicit conversion between types. You must cast a value to explicitly
+convert it to a desired type.
+
+To convert a value to a different type, pass the value as an argument to the function named
+after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
+
+Wrong:
+
+    > var a = "45"; a + 1
+      Error: cannot apply binary operator ADD (have types String and Number)
+
+Right:
+
+    > var a = "45"; Number(a) + 1
+      46
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
