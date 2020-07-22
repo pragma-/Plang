@@ -274,8 +274,8 @@ Creating a map and accessing a key:
 
 Creating an empty map and then assigning a value to a key:
 
-    > var map = {}; map["color"] = "blue"; print(map["color"])
-     blue
+    > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
+     The color is blue!
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
