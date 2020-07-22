@@ -246,7 +246,7 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-# Grammar: MapInitializer ::= "{" ((String | IDENT) ":" Expression ","?)+ "}"
+# Grammar: MapInitializer ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
 #          String ::= DQUOTE_STRING | SQUOTE_STRING
 sub MapInitializer {
     my ($parser) = @_;
@@ -260,30 +260,31 @@ sub MapInitializer {
                 my $key = $parser->consume('DQUOTE_STRING')
                                || $parser->consume('SQUOTE_STRING')
                                || $parser->consume('IDENT');
-                return expected($parser, 'String or Identifier for map key') if not $key;
 
-                if ($key->[0] eq 'DQUOTE_STRING') {
-                    $key->[1] =~ s/^\"|\"$//g;
-                    $key->[0] = 'STRING';
-                } elsif ($key->[0] eq 'SQUOTE_STRING') {
-                    $key->[1] =~ s/^\"|\"$//g;
-                    $key->[0] = 'STRING';
+                if ($key) {
+                    if ($key->[0] eq 'DQUOTE_STRING') {
+                        $key->[1] =~ s/^\"|\"$//g;
+                        $key->[0] = 'STRING';
+                    } elsif ($key->[0] eq 'SQUOTE_STRING') {
+                        $key->[1] =~ s/^\'|\'$//g;
+                        $key->[0] = 'STRING';
+                    }
+
+                    if (not $parser->consume('COLON')) {
+                        return expected($parser, '":" after map key');
+                    }
+
+                    my $expr = Expression($parser);
+                    return if $parser->errored;
+
+                    if (not $expr) {
+                        return expected($parser, "expression for map value");
+                    }
+
+                    $parser->consume('COMMA');
+
+                    push @map, [$key, $expr];
                 }
-
-                if (not $parser->consume('COLON')) {
-                    return expected($parser, '":" after map key');
-                }
-
-                my $expr = Expression($parser);
-                return if $parser->errored;
-
-                if (not $expr) {
-                    return expected($parser, "expression for map value");
-                }
-
-                $parser->consume('COMMA');
-
-                push @map, [$key, $expr];
 
                 last if $parser->consume('R_BRACE');
             }
@@ -906,24 +907,7 @@ sub Postfix {
         return ['CALL', $left, $arguments];
     }
 
-    # map index
-    if ($parser->consume('L_BRACE')) {
-        my $expr = Expression($parser);
-        return if $parser->errored;
-
-        if (not $expr or not defined $expr->[1]) {
-            return expected($parser, 'expression in postfix {} braces');
-        }
-
-        if (not $parser->consume('R_BRACE')) {
-            return expected($parser, 'closing } brace');
-        }
-
-        return ['MAP_INDEX', $left, $expr];
-    }
-
-
-    # array index
+    # array/map index
     if ($parser->consume('L_BRACKET')) {
         my $stmt = Statement($parser);
         return if $parser->errored;
