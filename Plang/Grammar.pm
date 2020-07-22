@@ -246,7 +246,57 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-#Grammar: Initializer ::= ASSIGN Statement
+# Grammar: MapInitializer ::= "{" ((String | IDENT) ":" Expression ","?)+ "}"
+#          String ::= DQUOTE_STRING | SQUOTE_STRING
+sub MapInitializer {
+    my ($parser) = @_;
+
+    $parser->try('MapInitializer');
+
+    {
+        if ($parser->consume('L_BRACE')) {
+            my @map;
+            while (1) {
+                my $key = $parser->consume('DQUOTE_STRING')
+                               || $parser->consume('SQUOTE_STRING')
+                               || $parser->consume('IDENT');
+                return expected($parser, 'String or Identifier for map key') if not $key;
+
+                if ($key->[0] eq 'DQUOTE_STRING') {
+                    $key->[1] =~ s/^\"|\"$//g;
+                    $key->[0] = 'STRING';
+                } elsif ($key->[0] eq 'SQUOTE_STRING') {
+                    $key->[1] =~ s/^\"|\"$//g;
+                    $key->[0] = 'STRING';
+                }
+
+                if (not $parser->consume('COLON')) {
+                    return expected($parser, '":" after map key');
+                }
+
+                my $expr = Expression($parser);
+                return if $parser->errored;
+
+                if (not $expr) {
+                    return expected($parser, "expression for map value");
+                }
+
+                $parser->consume('COMMA');
+
+                push @map, [$key, $expr];
+
+                last if $parser->consume('R_BRACE');
+            }
+
+            $parser->advance;
+            return ['MAPINIT', \@map];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: Initializer ::= ASSIGN (MapInitializer | Expression)
 sub Initializer {
     my ($parser) = @_;
 
@@ -254,7 +304,17 @@ sub Initializer {
 
     {
         if ($parser->consume('ASSIGN')) {
-            my $expr = Statement($parser);
+            # try a map initializer
+            my $map = MapInitializer($parser);
+            return if $parser->errored;
+
+            if ($map) {
+                $parser->advance;
+                return $map;
+            }
+
+            # try an expression
+            my $expr = Expression($parser);
             return if $parser->errored;
 
             if ($expr) {
@@ -686,7 +746,9 @@ sub Prefix {
     }
 
     if ($token = $parser->consume('IDENT')) {
-        return ['IDENT', $token->[1]];
+        my $postfix = Postfix($parser, ['IDENT', $token->[1]]);
+        return if $parser->errored;
+        return $postfix;
     }
 
     if ($token = $parser->consume('SQUOTE_STRING_I')) {
@@ -751,35 +813,6 @@ sub Infix {
     my ($parser, $left, $precedence) = @_;
     my $expr;
 
-    # function call
-    if ($parser->consume('L_PAREN')) {
-        my $arguments = [];
-        while (1) {
-            my $arg;
-
-            # try a function definition
-            $arg = FunctionDefinition($parser);
-            return if $parser->errored;
-
-            # otherwise try an expression
-            if (not defined $arg) {
-                $arg = Expression($parser);
-                return if $parser->errored;
-            }
-
-            if ($arg) {
-                push @{$arguments}, $arg;
-                $parser->consume('COMMA');
-                next;
-            }
-
-            last if $parser->consume('R_PAREN');
-            return expected($parser, 'Expression or closing ")" for function call argument list');
-        }
-
-        return ['CALL', $left, $arguments];
-    }
-
     # ternary conditional operator
     if ($parser->consume('QUESTION')) {
         my $then = Statement($parser);
@@ -835,6 +868,7 @@ sub Infix {
 sub Postfix {
     my ($parser, $left, $precedence) = @_;
 
+    # post-increment
     if ($parser->consume('PLUS_PLUS')) {
         if ($left->[0] eq 'IDENT') {
             return ['POSTFIX_ADD', $left];
@@ -843,6 +877,7 @@ sub Postfix {
         }
     }
 
+    # post-decrement
     if ($parser->consume('MINUS_MINUS')) {
         if ($left->[0] eq 'IDENT') {
             return ['POSTFIX_SUB', $left];
@@ -851,21 +886,60 @@ sub Postfix {
         }
     }
 
-    if ($parser->consume('L_BRACKET')) {
-        my $statement = Statement($parser);
+    # function call
+    if ($parser->consume('L_PAREN')) {
+        my $arguments = [];
+        while (1) {
+            my $expr = Expression($parser);
+            return if $parser->errored;
+
+            if ($expr) {
+                push @{$arguments}, $expr;
+                $parser->consume('COMMA');
+                next;
+            }
+
+            last if $parser->consume('R_PAREN');
+            return expected($parser, 'Expression or closing ")" for function call argument list');
+        }
+
+        return ['CALL', $left, $arguments];
+    }
+
+    # map index
+    if ($parser->consume('L_BRACE')) {
+        my $expr = Expression($parser);
         return if $parser->errored;
 
-        if (not $statement or not defined $statement->[1]) {
-            return expected($parser, 'statement in [] brackets');
+        if (not $expr or not defined $expr->[1]) {
+            return expected($parser, 'expression in postfix {} braces');
+        }
+
+        if (not $parser->consume('R_BRACE')) {
+            return expected($parser, 'closing } brace');
+        }
+
+        return ['MAP_INDEX', $left, $expr];
+    }
+
+
+    # array index
+    if ($parser->consume('L_BRACKET')) {
+        my $stmt = Statement($parser);
+        return if $parser->errored;
+
+        if (not $stmt or not defined $stmt->[1]) {
+            return expected($parser, 'statement in postfix [] brackets');
         }
 
         if (not $parser->consume('R_BRACKET')) {
             return expected($parser, 'closing ] bracket');
         }
 
-        return ['POSTFIX_ARRAY', $left, $statement];
+        return ['ARRAY_INDEX', $left, $stmt];
     }
 
+    # no postfix
     return $left;
 }
 

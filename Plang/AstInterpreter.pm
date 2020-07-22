@@ -52,6 +52,7 @@ my %pretty_types = (
     'BOOL'    => 'Boolean',
     'FUNC'    => 'Function',
     'BUILTIN' => 'Builtin',
+    'MAP'     => 'Map',
 );
 
 sub pretty_type {
@@ -291,7 +292,7 @@ sub function_builtin_String {
         return ['STRING', $self->output_value($expr)];
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to String");
 }
 
 sub function_builtin_Boolean {
@@ -318,7 +319,7 @@ sub function_builtin_Boolean {
         return $expr;
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Boolean");
 }
 
 sub function_builtin_Nil {
@@ -568,6 +569,35 @@ sub statement {
 
         $self->set_variable($context, $value, $right_value);
         return $right_value;
+    }
+
+    # map initializer
+    if ($ins eq 'MAPINIT') {
+        my $map = $data->[1];
+        my $hashref = {};
+
+        foreach my $entry (@$map) {
+            if ($entry->[0]->[0] eq 'IDENT') {
+                my $var = $self->get_variable($context, $entry->[0]->[1]);
+                return $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
+
+                if ($var->[0] eq 'STRING') {
+                    $hashref->{$var->[1]} = $entry->[1];
+                    next;
+                }
+
+                $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
+            }
+
+            if ($entry->[0]->[0] eq 'STRING') {
+                $hashref->{$entry->[0]->[1]} = $entry->[1];
+                next;
+            }
+
+            $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
+        }
+
+        return ['MAP', $hashref];
     }
 
     # ternary ?: conditional operator
@@ -821,22 +851,39 @@ sub statement {
         return ['RANGE', $to, $from];
     }
 
-    # array notation
-    if ($ins eq 'POSTFIX_ARRAY') {
-        my $token = $data->[1];
-        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
+    # rvalue map index
+    if ($ins eq 'MAP_INDEX') {
+        my $var = $self->statement($context, $data->[1]);
 
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $data->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                my $val = $var->[1]->{$key->[1]};
+                return ['NIL', undef] if not defined $val;
+                return $val;
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "cannot use postfix {} on type " . $self->pretty_type($var));
+    }
+
+    # rvalue array index
+    if ($ins eq 'ARRAY_INDEX') {
+        my $token = $data->[1];
         my $var;
 
-        if ($tok_type eq 'IDENT') {
-            $var = $self->get_variable($context, $tok_value);
+        if ($token->[0] eq 'IDENT') {
+            $var = $self->get_variable($context, $token->[1]);
 
             if (not defined $var) {
-                $self->error($context, "cannot use postfix [] notation on undeclared variable `$tok_value`");
+                $self->error($context, "cannot use postfix [] on undeclared variable `$token->[1]`");
             }
 
             if (not defined $var->[1]) {
-                $self->error($context, "cannot use postfix [] notation on undefined variable `$tok_value`");
+                $self->error($context, "cannot use postfix [] on undefined variable `$token->[1]`");
             }
         } else {
             $var = $token;
@@ -852,16 +899,16 @@ sub statement {
                 if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
                     return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
                 } else {
-                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix [] notation");
+                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix []");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
                 return ['STRING', substr($var->[1], $index, 1) // ""];
             } else {
-                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix [] notation");
+                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix []");
             }
         } else {
-            $self->error($context, "cannot use postfix [] notation on type " . $self->pretty_type($var));
+            $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
         }
     }
 
@@ -899,13 +946,14 @@ sub output_value {
     return $result;
 }
 
+# lvalue assignment
 sub assignment {
     my ($self, $context, $data) = @_;
 
     my $left_value  = $data->[1];
     my $right_value = $self->statement($context, $data->[2]);
 
-    # plain variable
+    # lvalue variable
     if ($left_value->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $left_value->[1]);
         $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
@@ -913,8 +961,27 @@ sub assignment {
         return $right_value;
     }
 
-    # postfix-array notation
-    if ($left_value->[0] eq 'POSTFIX_ARRAY') {
+    # lvalue map index
+    if ($left_value->[0] eq 'MAP_INDEX') {
+        my $var = $self->statement($context, $left_value->[1]);
+
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $left_value->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                my $val = $self->statement($context, $right_value);
+                $var->[1]->{$key->[1]} = $val;
+                return $val;
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "cannot use postfix {} on type " . $self->pretty_type($var));
+    }
+
+    # lvalue array index
+    if ($left_value->[0] eq 'ARRAY_INDEX') {
         my $token = $left_value->[1];
         my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
 
@@ -924,7 +991,7 @@ sub assignment {
             $var = $self->get_variable($context, $tok_value);
 
             if (not defined $var) {
-                $self->error($context, "cannot assign to postfix [] notation on undeclared variable `$tok_value`");
+                $self->error($context, "cannot assign to postfix [] on undeclared variable `$tok_value`");
             }
         } else {
             $var = $token;
@@ -945,10 +1012,10 @@ sub assignment {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
                         return ['STRING', $var->[1]];
                     } else {
-                        $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix [] notation");
+                        $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix []");
                     }
                 } else {
-                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix [] notation");
+                    $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix []");
                 }
             } elsif ($value->[0] eq 'NUM') {
                 my $index = $value->[1];
@@ -959,13 +1026,13 @@ sub assignment {
                     substr ($var->[1], $index, 1) = chr $right_value->[1];
                     return ['STRING', $var->[1]];
                 } else {
-                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix [] notation");
+                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix []");
                 }
             } else {
-                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix [] notation");
+                $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix []");
             }
         } else {
-            $self->error($context, "cannot assign to postfix [] notation on type " . $self->pretty_type($var));
+            $self->error($context, "cannot assign to postfix [] on type " . $self->pretty_type($var));
         }
     }
 

@@ -93,7 +93,7 @@ sub advance {
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
-        $self->{dprint}->('PARSER', "<- Advanced $rule\n");
+        $self->{dprint}->('PARSER', "<- Advanced $rule\n") if defined $rule; # TODO: this is a band-aid; fix this properly
     }
 }
 
