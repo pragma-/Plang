@@ -28,10 +28,11 @@ Here's a helpful table of contents:
     * [Keywords](#keywords)
   * [Variables](#variables)
     * [Types](#types)
+      * [Nil](#nil)
+      * [Boolean](#boolean)
       * [Number](#number)
       * [String](#string)
-      * [Boolean](#boolean)
-      * [Nil](#nil)
+      * [Map](#map)
     * [Casting](#casting)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
@@ -213,29 +214,37 @@ variables will default to `nil`, which has type `Nil`.
 The `var` statement returns the value of the variable.
 
     > var a = 5
-      5
+     5
 
     > var a = "hello"
-      hello
+     hello
 
 Attempting to use a variable that has not been declared will produce an error.
 
     > var a = 5; a + b
-      Error: `b` not declared.
+     Error: `b` not declared.
 
 Variables that have not yet been assigned a value will produce an error.
 
     > var a = 5; var b; a + b
-      Error: `b` not defined.
+     Error: `b` not defined.
 
 #### Types
-At this stage, these are planned types: nil, boolean, number, string, array, map, and reference.
-
 Types of variables are inferred from the type of their value. All variables are simply declared with `var`
 and no type specifier. However, there is no implicit conversion between types. You must [cast](#casting) a
 value to explicitly convert it to a desired type.
 
-Currently implemented are:
+Currently implemented types are:
+
+##### Nil
+     Nil ::= "nil"
+
+The `Nil` type signifies that there is no value.
+
+##### Boolean
+    Boolean ::= "true" | "false"
+
+A `Boolean` is either true or false.
 
 ##### Number
     Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
@@ -251,15 +260,22 @@ In Plang, the `Number` type is equivalent to a double-precision type.
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no difference between the quotes.
 
-##### Boolean
-    Boolean ::= "true" | "false"
+##### Map
+    MapInitializer ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
-A `Boolean` is either true or false.
+A `Map` is a collection of key/value pairs. To create a map, it must be assigned
+to a variable; anonymous maps are not permitted. Map keys must be of type `String`.
+Map values can be any type.
 
-##### Nil
-     Nil ::= "nil"
+Creating a map and accessing a key:
 
-The `Nil` type signifies that there is no value.
+    > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
+     75
+
+Creating an empty map and then assigning a value to a key:
+
+    > var map = {}; map["color"] = "blue"; print(map["color"])
+     blue
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
@@ -271,12 +287,12 @@ after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
 Wrong:
 
     > var a = "45"; a + 1
-      Error: cannot apply binary operator ADD (have types String and Number)
+     Error: cannot apply binary operator ADD (have types String and Number)
 
 Right:
 
     > var a = "45"; Number(a) + 1
-      46
+     46
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
@@ -301,24 +317,24 @@ The `fn` statement returns a reference to the newly defined function.
 
 #### Trivial examples
     > fn square(x) x * x; square(2 + 2)
-      16
+     16
 <!-- -->
     > fn add(a, b) a + b; add(2, 3)
-      5
+     5
 
 #### Default arguments
     > fn add(a, b = 10) a + b; add(5);
-      15
+     15
 
 #### Anonymous functions
     > var adder = fn (a, b) a + b; adder(10, 20)
       30
 <!-- -->
     > (fn (a, b) a + b)(1, 2)
-      3
+     3
 <!-- -->
     > (fn 42)()
-      42
+     42
 
 #### Closures
 The following snippet:
@@ -334,11 +350,11 @@ produces the output:
 
 #### Currying
     > var a = fn (x) fn (y) x + y;  a(3)(4)
-      7
+     7
 
 #### Lazy evaluation
     > fn force(f) f(); var lazy = fn 1 + 1; force(lazy)
-      2
+     2
 
 #### Built-in functions
 Function | Parameters | Description
@@ -363,11 +379,11 @@ If the condition is [truthy](#truthiness) then the statement(s) in the `then` br
 if an `else` branch exists then its statement(s) are executed. The value of the `if` statement is the
 value of the final statement of the branch that was executed.
 
-    if true then 1 else 2
-      1
+    > if true then 1 else 2
+     1
 
-    if false then 1 else 2
-      2
+    > if false then 1 else 2
+     2
 
 ### while/next/last statement
     WhileStatement ::= "while" "(" Statement ")" Statement
@@ -387,53 +403,53 @@ The `last` keyword can be used to immediately exit the loop.
 The relational operators behave as expected. There is no need to compare against `-1`, `0` or `1`.
 
     > "blue" < "red"
-      true
+     true
 
 #### Interpolation
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
 
-      > var a = 42; $"hello {a + 1} world"
-      hello 43 world
+    > var a = 42; $"hello {a + 1} world"
+     hello 43 world
 
 #### Concatenation
 To concatenate two strings, use the `.` operator. But consider using [interpolation](#interpolation) instead.
 
     > var a = "Plang"; var b = "Rocks!"; a . " " . b
-      Plang Rocks!
+     Plang Rocks!
 
 #### Substring search
 To find the index of a substring within a string, use the `~` operator.
 
     > "Hello world!" ~ "world"
-      6
+     6
 
 #### Indexing
 To get a positional character from a string, you can use postfix `[]` array notation.
 
     > "Hello!"[0]
-      H
+     H
 
 You can use negative numbers to start from the end.
 
     > "Hello!"[-2]
-      o
+     o
 
 You can assign to the above notation to replace the character instead.
 
     > "Hello!"[0] = "Jee"
-      Jeeello!
+     Jeeello!
 
 #### Substring
 To extract a substring from a string, you can use the `..` range operator inside
 postfix `[]` array notation.
 
     > "Hello!"[1..4]
-      ello
+     ello
 
 You can assign to the above notation to replace the substring instead.
 
     > "Good-bye!"[5..7] = "night"
-      Good-night!
+     Good-night!
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
