@@ -18,16 +18,21 @@ sub initialize {
 
     $self->{token_iter} = $conf{token_iter};
 
-    $self->{debug} = $ENV{DEBUG} // 0;
+    $self->{debug} = $conf{debug} // $ENV{DEBUG} // 0;
 
     # set up internal debugging subroutines
     if ($self->{debug}) {
+        my @tags = split /,/, $self->{debug};
+        $self->{debug} = \@tags;
         $self->{clean} = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub { my $level = shift; print "|  " x $self->{indent}, @_ if $level <= $self->{debug} };
+        $self->{dprint} = sub {
+            my $tag = shift;
+            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        };
         $self->{indent} = 0;
     } else {
         $self->{dprint} = sub {};
-        $self->{clean} = sub {};
+        $self->{clean} = sub {''};
     }
 
     $self->{rules}    = [];
@@ -46,16 +51,15 @@ sub try {
     push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
-        $self->{dprint}->(1, "+-> Trying $dbg_msg\n");
+        $self->{dprint}->('PARSER', "+-> Trying $dbg_msg\n");
         push @{$self->{current_rule}}, $dbg_msg;
         $self->{indent}++;
 
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(5, "[$count] saving posiition $self->{current_token}: ");
+        $self->{dprint}->('BACKTRACK', "[$count] saving posiition $self->{current_token}: ");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
-        print "\n" if not defined $token and $self->{debug} >= 5;
+        $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
     }
 }
 
@@ -66,15 +70,14 @@ sub backtrack {
 
     if ($self->{debug}) {
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(5, "[$count] backtracking to position $self->{current_token}: ");
+        $self->{dprint}->('BACKTRACK', "[$count] backtracking to position $self->{current_token}: ");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        print "[$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
-        print "\n" if not defined $token and $self->{debug} >= 5;
+        $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
-        $self->{dprint}->(1, "<- Backtracked $rule\n");
+        $self->{dprint}->('PARSER', "<- Backtracked $rule\n");
     }
     return;
 }
@@ -86,11 +89,11 @@ sub advance {
 
     if ($self->{debug}) {
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->(5, "[$count] popped a backtrack\n");
+        $self->{dprint}->('BACKTRACK', "[$count] popped a backtrack\n");
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
-        $self->{dprint}->(1, "<- Advanced $rule\n");
+        $self->{dprint}->('PARSER', "<- Advanced $rule\n");
     }
 }
 
@@ -108,8 +111,8 @@ sub next_token {
 
     $opt ||= '';
 
-    $self->{dprint}->(5, "Fetching next token: ");
-    print "(peeking) " if $opt eq 'peek' and $self->{debug} >= 5;
+    $self->{dprint}->('TOKEN', "Fetching next token:\n");
+    $self->{dprint}->('TOKEN', "(peeking)\n") if $opt eq 'peek';
 
     my $token;
 
@@ -117,7 +120,7 @@ sub next_token {
         if ($opt eq 'peek') {
             # return token if we've already peeked a token
             $token = $self->{read_tokens}->[$self->{current_token}];
-            print "peeked existing: [$token->[0], ", $self->{clean}->($token->[1]), "]\n" if defined $token and $self->{debug} >= 5;
+            $self->{dprint}->('TOKEN', "peeked existing: [$token->[0], " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
             return $token if defined $token;
         }
 
@@ -149,7 +152,7 @@ sub next_token {
     # consume token unless we're just peeking
     $self->consume unless $opt eq 'peek';
 
-    print "[$token->[0], ", $self->{clean}->($token->[1]), "], position: $self->{current_token}\n" if $self->{debug} >= 5;
+    $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "], position: $self->{current_token}\n");
 
     return $token;
 }
@@ -190,15 +193,15 @@ sub consume {
         return $token;
     }
 
-    $self->{dprint}->(1, "Looking for $wanted... ");
+    $self->{dprint}->('PARSER', "Looking for $wanted...\n");
 
     if ($token->[0] eq $wanted) {
-        print "got it (", $self->{clean}->($token->[1]), ") <--\n" if $self->{debug};
+        $self->{dprint}->('PARSER', "got it (" . $self->{clean}->($token->[1]) . ") <--\n");
         $self->{current_token}++;
         return $token;
     }
 
-    print "got $token->[0] instead\n" if $self->{debug};
+    $self->{dprint}->('PARSER', "got $token->[0] instead\n");
     return;
 }
 
@@ -207,19 +210,19 @@ sub consume {
 sub consume_to {
     my ($self, $target) = @_;
 
-    $self->{dprint}->(1, "Consuming until $target\n");
+    $self->{dprint}->('PARSER', "Consuming until $target\n");
 
     while (1) {
         my $token = $self->next_token('peek');
 
-        $self->{dprint}->(1, "Peeked EOF\n") if not defined $token;
+        $self->{dprint}->('PARSER', "Peeked EOF\n") if not defined $token;
         return if not defined $token;
 
-        $self->{dprint}->(1, "Consumed $token->[0] at position $self->{current_token}\n");
+        $self->{dprint}->('PARSER', "Consumed $token->[0] at position $self->{current_token}\n");
         $self->consume;
 
         if ($token->[0] eq $target) {
-            $self->{dprint}->(1, "Got target.\n");
+            $self->{dprint}->('PARSER', "Got target.\n");
             return;
         }
     }
@@ -239,7 +242,7 @@ sub add_error {
     my ($self, $text) = @_;
     push @{$self->{errors}}, $text;
     $self->set_error;
-    $self->{dprint}->(1, "Added error: $text\n");
+    $self->{dprint}->('PARSER', "Added error: $text\n");
 }
 
 # was there an error in the last parse?
@@ -247,7 +250,7 @@ sub errored {
     my ($self) = @_;
 
     if ($self->{got_error}) {
-        $self->{dprint}->(1, "Got error.\n");
+        $self->{dprint}->('PARSER', "Got error.\n");
         $self->advance;
         return 1;
     }
@@ -258,14 +261,14 @@ sub errored {
 # set the error flag
 sub set_error {
     my ($self) = @_;
-    $self->{dprint}->(3, "Error set.\n");
+    $self->{dprint}->('PARSER', "Error set.\n");
     $self->{got_error} = 1;
 }
 
 # clear the error flag
 sub clear_error {
     my ($self) = @_;
-    $self->{dprint}->(3, "Error cleared.\n");
+    $self->{dprint}->('PARSER', "Error cleared.\n");
     $self->{got_error} = 0;
 }
 

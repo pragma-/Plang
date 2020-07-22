@@ -31,6 +31,7 @@ sub plang {
 
 # example using slightly more control over the lex/parse/interpret stages
 my $debug = $ENV{DEBUG} // 0;
+my @debug_tags = split /,/, $debug;
 
 # Grammar rule: DumpToken --> *
 sub DumpToken {
@@ -64,7 +65,7 @@ sub plang_dbg {
     $plang->handle_parse_errors;
 
     # dump the $result data structure
-    if ($dumptokens or $debug >= 2) {
+    if ($dumptokens or grep { $_ eq 'AST' } @debug_tags) {
         $Data::Dumper::Terse = 1;
         $Data::Dumper::Indent = 1;
         $Data::Dumper::Useqq = 1;

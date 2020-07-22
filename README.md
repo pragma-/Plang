@@ -81,11 +81,13 @@ of all the tokens as they are encountered.
 ### DEBUG environment variable
 You can set the `DEBUG` environment variable to enable debugging output.
 
-The value is an integer representing verbosity, where higher values are more verbose.
+The value is a comma-separated list of tags, or `ALL` for everything.
 
-    $ DEBUG=1 ./plang <<< '1 + 2'  # minimal (though still a quite a bit) output
+Currently available DEBUG tags are: TOKEN, PARSER, BACKTRACK, AST, STMT, RESULT, OPERS, VARS, FUNCS.
+
+    $ DEBUG=VARS,FUNCS ./plang <<< '1 + 2'  # debug messages only for tags `VARS` and `FUNCS`
 <!-- -->
-    $ DEBUG=10 ./plang <<< '1 + 2'  # most verbose debugging output
+    $ DEBUG=ALL ./plang <<< '1 + 2'         # all debug messages
 
 ## Embedding Plang
 Plang is designed to be embedded into larger Perl applications. Here's how you can

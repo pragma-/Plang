@@ -21,17 +21,21 @@ sub new {
 sub initialize {
     my ($self, %conf) = @_;
 
-    $self->{debug} = $conf{debug};
-
     $self->{embedded} = $conf{embedded};
+    $self->{debug}    = $conf{debug};
 
     if ($self->{debug}) {
+        my @tags = split /,/, $self->{debug};
+        $self->{debug}  = \@tags;
         $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub { my $level = shift; print "|  " x $self->{indent}, @_ if $level <= $self->{debug} };
+        $self->{dprint} = sub {
+            my $tag = shift;
+            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        };
         $self->{indent} = 0;
     } else {
         $self->{dprint} = sub {};
-        $self->{clean}  = sub {};
+        $self->{clean}  = sub {''};
     }
 
     $self->{lexer} = Plang::Lexer->new(debug => $conf{debug});

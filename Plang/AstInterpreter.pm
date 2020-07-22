@@ -19,8 +19,22 @@ sub initialize {
     my ($self, %conf) = @_;
 
     $self->{ast}      = $conf{ast};
-    $self->{debug}    = $conf{debug}    // 0;
     $self->{embedded} = $conf{embedded} // 0;
+    $self->{debug}    = $conf{debug}    // 0;
+
+    if ($self->{debug}) {
+        my @tags = split /,/, $self->{debug};
+        $self->{debug}  = \@tags;
+        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
+        $self->{dprint} = sub {
+            my $tag = shift;
+            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        };
+        $self->{indent} = 0;
+    } else {
+        $self->{dprint} = sub {};
+        $self->{clean}  = sub {''};
+    }
 
     $self->{max_recursion}  = $conf{max_recursion}  // 10000;
     $self->{recursions}     = 0;
@@ -65,13 +79,14 @@ sub new_context {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{locals}->{$name} = $value;
-    print "set_variable $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
+    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context->{locals}) . "\n");
 }
 
 sub get_variable {
     my ($self, $context, $name, %opt) = @_;
 
-    print "get_variable: $name\n", Dumper($context->{locals}), "\n" if $self->{debug} >= 6;
+    $self->{dprint}->('VARS', "get_variable: $name\n" . Dumper($context->{locals}) . "\n");
+
     # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
         return $context->{locals}->{$name};
@@ -139,9 +154,9 @@ sub unary_op {
     if ($data->[0] eq $op) {
         my $value  = $self->statement($context, $data->[1]);
 
-        if ($debug_msg and $self->{debug} >= 3) {
+        if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
-            print $debug_msg, "\n";
+            $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
         if ($self->is_arithmetic_type($value)) {
@@ -162,10 +177,10 @@ sub binary_op {
         my $left_value  = $self->statement($context, $data->[1]);
         my $right_value = $self->statement($context, $data->[2]);
 
-        if ($debug_msg and $self->{debug} >= 3) {
+        if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
             $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
-            print $debug_msg, "\n";
+            $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
         if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
@@ -399,18 +414,18 @@ sub function_definition {
 sub function_call {
     my ($self, $context, $data) = @_;
 
-    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
+    $Data::Dumper::Indent = 0;
 
     my $target    = $data->[1];
     my $arguments = $data->[2];
     my $func;
 
     if ($target->[0] eq 'IDENT') {
-        print "Calling function `$target->[1]` with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
+        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n");
         $func = $self->get_variable($context, $target->[1]);
         $func = undef if $func->[0] eq 'BUILTIN';
     } else {
-        print "Calling anonymous function with arguments: ", Dumper($arguments), "\n" if $self->{debug} >= 3;
+        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n");
         $func = $self->statement($context, $target);
     }
 
@@ -505,7 +520,8 @@ sub statement {
     my $ins   = $data->[0];
     my $value = $data->[1];
 
-    print "stmt ins: $ins (value: ", Dumper($value), ")\n" if $self->{debug} >= 4;
+    $Data::Dumper::Indent = 0;
+    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($value) . ")\n");
 
     if ($ins eq 'STMT') {
         return $self->statement($context, $data->[1]);
@@ -1026,7 +1042,7 @@ sub run {
 sub interpret_ast {
     my ($self, $context, $ast) = @_;
 
-    print "interpet ast: ", Dumper ($ast), "\n" if $self->{debug} >= 5;
+    $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n");
 
     # try
     my $last_statement_result = eval {
@@ -1037,15 +1053,14 @@ sub interpret_ast {
             if ($instruction eq 'STMT') {
                 $result = $self->statement($context, $node->[1]);
                 $result = $self->handle_statement_result($result) if defined $result;
-                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
-            }
 
-            if ($self->{debug} >= 3) {
                 if (defined $result) {
-                    print "Statement result: ", defined $result->[1] ? $result->[1] : 'undef', " ($result->[0])\n";
+                    $self->{dprint}->('AST', "Statement result: " . (defined $result->[1] ? $result->[1] : 'undef') . " ($result->[0])\n");
                 } else {
-                    print "Statement result: none\n";
+                    $self->{dprint}->('AST', "Statement result: none\n");
                 }
+
+                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
             }
         }
 
@@ -1071,8 +1086,7 @@ sub handle_statement_result {
 
     return if not defined $result;
 
-    $Data::Dumper::Indent = 0 if $self->{debug} >= 3;
-    print "handle result: ", Dumper($result), "\n" if $self->{debug} >= 3;
+    $self->{dprint}->('RESULT', "handle result: " . Dumper($result) . "\n");
 
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself
