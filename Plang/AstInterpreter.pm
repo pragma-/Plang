@@ -64,6 +64,7 @@ sub pretty_type {
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
+    $self->{dprint}->('ERRORS', "Got error: $err_msg\n");
     die "Error: $err_msg\n";
 }
 
@@ -530,8 +531,7 @@ sub statement {
     # statement group
     if ($ins eq 'STMT_GROUP') {
         my $new_context = $self->new_context($context);
-        my $result = $self->interpret_ast($new_context, $value);
-        return $result;
+        return $self->interpret_ast($new_context, $value);
     }
 
     # literals
@@ -586,40 +586,28 @@ sub statement {
 
     # next
     if ($ins eq 'NEXT') {
-        if ($self->{in_loop}) {
-            die 'NEXT';
-        } else {
-            $self->error($context, "`next` cannot be used outside of loop");
-        }
+        return ['NEXT', undef];
     }
 
     # last
     if ($ins eq 'LAST') {
-        if ($self->{in_loop}) {
-            die 'LAST';
-        } else {
-            $self->error($context, "`last` cannot be used outside of loop");
-        }
+        return ['LAST', undef];
     }
 
     # while loop
     if ($ins eq 'WHILE') {
-        $self->{in_loop} = 1;
         while ($self->is_truthy($context, $data->[1])) {
             if (++$self->{iterations} > $self->{max_iterations}) {
                 $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
             }
 
-            eval {
-                $self->statement($context, $data->[2]);
-            };
+            my $result = $self->statement($context, $data->[2]);
 
-            if ($@) {
-                next if $@ =~ /^NEXT/;
-                last if $@ =~ /^LAST/;
-            }
+            next if $result->[0] eq 'NEXT';
+            last if $result->[0] eq 'LAST';
+            return $result if $result->[0] eq 'ERROR';
         }
-        $self->{in_loop} = 0;
+
         return ['NIL', undef];
     }
 
@@ -1056,11 +1044,12 @@ sub interpret_ast {
 
                 if (defined $result) {
                     $self->{dprint}->('AST', "Statement result: " . (defined $result->[1] ? $result->[1] : 'undef') . " ($result->[0])\n");
+                    return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
+                    return $result->[1] if $result->[0] eq 'RETURN';
+                    return $result if $result->[0] eq 'ERROR';
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n");
                 }
-
-                return $result->[1] if defined $result and $result->[0] eq 'RETURN';
             }
         }
 
@@ -1069,10 +1058,6 @@ sub interpret_ast {
 
     # catch
     if ($@) {
-        if ($@ =~ /^(?:LAST|NEXT)/) {
-            # propagate these to `while`'s eval
-            die $@;
-        }
         return ['ERROR', $@];
     }
 
