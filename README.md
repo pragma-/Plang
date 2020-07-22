@@ -257,8 +257,7 @@ A `Boolean` is either true or false.
 ##### Nil
      Nil ::= "Nil"
 
-The `Nil` type signifies that there is no value. All logical comparisons against `Nil` produce
-`Nil`.
+The `Nil` type signifies that there is no value.
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
