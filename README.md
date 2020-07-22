@@ -255,7 +255,7 @@ no difference between the quotes.
 A `Boolean` is either true or false.
 
 ##### Nil
-     Nil ::= "Nil"
+     Nil ::= "nil"
 
 The `Nil` type signifies that there is no value.
 
