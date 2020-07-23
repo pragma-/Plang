@@ -882,7 +882,16 @@ sub map_to_string {
     my @entries;
     while (my ($key, $value) = each %$hash) {
         my $entry = "$key: ";
-        $entry .= $self->output_value($value);
+
+        if ($value->[0] eq 'STRING') {
+            $Data::Dumper::Indent = 0;
+            $Data::Dumper::Terse  = 1;
+            $Data::Dumper::Useqq  = 1;
+            my $dump = Dumper ($value->[1]);
+            $entry .= $dump;
+        } else {
+            $entry .= $self->output_value($value);
+        }
         push @entries, $entry;
     }
 
