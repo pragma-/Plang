@@ -30,7 +30,7 @@ sub error {
 
 my %pretty_tokens = (
     'TERM'  => 'statement terminator',
-    'IDENT' => 'Identifier',
+    'IDENT' => 'identifier',
 );
 
 sub pretty_token {
@@ -231,7 +231,7 @@ sub VariableDeclaration {
     {
         if ($parser->consume('KEYWORD_var')) {
             my $token = $parser->consume('IDENT');
-            return expected($parser, 'Identifier for variable name') if not $token;
+            return expected($parser, 'identifier for variable name') if not $token;
 
             my $name = $token->[1];
 
@@ -259,6 +259,7 @@ sub MapInitializer {
             while (1) {
                 my $key = $parser->consume('DQUOTE_STRING')
                                || $parser->consume('SQUOTE_STRING')
+                               || $parser->consume('STRING')
                                || $parser->consume('IDENT');
 
                 if ($key) {
@@ -726,6 +727,10 @@ sub Prefix {
     return if $parser->errored;
     return $if if $if;
 
+    my $map = MapInitializer($parser);
+    return if $parser->errored;
+    return $map if $map;
+
     if ($token = $parser->consume('KEYWORD_nil')) {
         return ['NIL', undef];
     }
@@ -777,23 +782,13 @@ sub Prefix {
     if ($parser->consume('MINUS_MINUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
         return expected($parser, 'Expression') if not defined $expr;
-
-        if ($expr->[0] eq 'IDENT') {
-            return ['PREFIX_SUB', $expr];
-        } else {
-            return error($parser, "Prefix decrement must be used on Identifiers (got " . pretty_token($expr->[0]) . ")");
-        }
+        return ['PREFIX_SUB', $expr];
     }
 
     if ($parser->consume('PLUS_PLUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
         return expected($parser, 'Expression') if not defined $expr;
-
-        if ($expr->[0] eq 'IDENT') {
-            return ['PREFIX_ADD', $expr];
-        } else {
-            return error($parser, "Prefix increment must be used on Identifiers (got " . pretty_token($expr->[0]) . ")");
-        }
+        return ['PREFIX_ADD', $expr];
     }
 
     return $expr if $expr = UnaryOp($parser, 'BANG',   'NOT');
@@ -871,20 +866,12 @@ sub Postfix {
 
     # post-increment
     if ($parser->consume('PLUS_PLUS')) {
-        if ($left->[0] eq 'IDENT') {
-            return ['POSTFIX_ADD', $left];
-        } else {
-            return error($parser, "Postfix increment must be used on Identifiers (got " . pretty_token($left->[0]) . ")");
-        }
+        return ['POSTFIX_ADD', $left];
     }
 
     # post-decrement
     if ($parser->consume('MINUS_MINUS')) {
-        if ($left->[0] eq 'IDENT') {
-            return ['POSTFIX_SUB', $left];
-        } else {
-            return error($parser, "Postfix decrement must be used on Identifiers (got " . pretty_token($left->[0]) . ")");
-        }
+        return ['POSTFIX_SUB', $left];
     }
 
     # function call

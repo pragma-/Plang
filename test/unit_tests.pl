@@ -135,6 +135,12 @@ CODE
         ['NUM', 75]],
     ['var map = {}; map["color"] = "blue"; $"The color is {map[\\"color\\"]}!"',
         ['STRING', 'The color is blue!']],
+    ['var a = {"x": 42}; ++a["x"]; a["x"] += 5; a["x"] + 1',
+        ['NUM', 49]],
+    ['var a = {"x": {"y": 42}}; a["x"]["y"] # nested Maps',
+        ['NUM', 42]],
+    ['var a = {}; a["x"] = {"y": 42}; a["x"]["y"] # assign anonymous Map to another Map key',
+        ['NUM', 42]],
 );
 
 use Data::Dumper;

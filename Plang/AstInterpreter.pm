@@ -104,20 +104,6 @@ sub get_variable {
     return undef;
 }
 
-sub get_lvalue {
-    my ($self, $context, $node) = @_;
-
-    if ($node->[0] eq 'IDENT') {
-        return $self->get_variable($context, $node->[1]);
-    }
-
-    if ($node->[0] eq 'STRING') {
-        return $node;
-    }
-
-    $self->error($context, "Can not assign to type " . $self->pretty_type($node) . " (not a modifiable lvalue)");
-}
-
 my %eval_unary_op_NUM = (
     'NOT' => sub { ['BOOL', int ! $_[0]] },
     'NEG' => sub { ['NUM',      - $_[0]] },
@@ -598,7 +584,7 @@ sub statement {
                 return $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
 
                 if ($var->[0] eq 'STRING') {
-                    $hashref->{$var->[1]} = $entry->[1];
+                    $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
                     next;
                 }
 
@@ -606,7 +592,7 @@ sub statement {
             }
 
             if ($entry->[0]->[0] eq 'STRING') {
-                $hashref->{$entry->[0]->[1]} = $entry->[1];
+                $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
                 next;
             }
 
@@ -672,7 +658,7 @@ sub statement {
     }
 
     if ($ins eq 'ADD_ASSIGN') {
-        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $left  = $self->statement($context, $data->[1]);
         my $right = $self->statement($context, $data->[2]);
 
         if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
@@ -684,7 +670,7 @@ sub statement {
     }
 
     if ($ins eq 'SUB_ASSIGN') {
-        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $left  = $self->statement($context, $data->[1]);
         my $right = $self->statement($context, $data->[2]);
 
         if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
@@ -696,7 +682,7 @@ sub statement {
     }
 
     if ($ins eq 'MUL_ASSIGN') {
-        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $left  = $self->statement($context, $data->[1]);
         my $right = $self->statement($context, $data->[2]);
 
         if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
@@ -708,7 +694,7 @@ sub statement {
     }
 
     if ($ins eq 'DIV_ASSIGN') {
-        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $left  = $self->statement($context, $data->[1]);
         my $right = $self->statement($context, $data->[2]);
 
         if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
@@ -720,7 +706,7 @@ sub statement {
     }
 
     if ($ins eq 'CAT_ASSIGN') {
-        my $left  = $self->get_lvalue($context, $data->[1]);
+        my $left  = $self->statement($context, $data->[1]);
         my $right = $self->statement($context, $data->[2]);
 
         $left->[1] .= $right->[1];
@@ -746,14 +732,7 @@ sub statement {
 
     # prefix increment
     if ($ins eq 'PREFIX_ADD') {
-        my $token = $value;
-        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
-
-        my $var = $self->get_variable($context, $tok_value);
-
-        if (not defined $var) {
-            $self->error($context, "cannot prefix-increment undeclared variable `$tok_value`");
-        }
+        my $var = $self->statement($context, $value);
 
         if ($self->is_arithmetic_type($var)) {
             $var->[1]++;
@@ -765,14 +744,7 @@ sub statement {
 
     # prefix decrement
     if ($ins eq 'PREFIX_SUB') {
-        my $token = $value;
-        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
-
-        my $var = $self->get_variable($context, $tok_value);
-
-        if (not defined $var) {
-            $self->error($context, "cannot prefix-decrement undeclared variable `$tok_value`");
-        }
+        my $var = $self->statement($context, $value);
 
         if ($self->is_arithmetic_type($var)) {
             $var->[1]--;
@@ -819,14 +791,7 @@ sub statement {
 
     # postfix increment
     if ($ins eq 'POSTFIX_ADD') {
-        my $token = $data->[1];
-        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
-
-        my $var = $self->get_variable($context, $tok_value);
-
-        if (not defined $var) {
-            $self->error($context, "cannot postfix-increment undeclared variable `$tok_value`");
-        }
+        my $var = $self->statement($context, $data->[1]);
 
         if ($self->is_arithmetic_type($var)) {
             my $temp_var = [$var->[0], $var->[1]];
@@ -839,14 +804,7 @@ sub statement {
 
     # postfix decrement
     if ($ins eq 'POSTFIX_SUB') {
-        my $token = $data->[1];
-        my ($tok_type, $tok_value) = ($token->[0], $token->[1]);
-
-        my $var = $self->get_variable($context, $tok_value);
-
-        if (not defined $var) {
-            $self->error($context, "cannot postfix-increment undeclared variable `$tok_value`");
-        }
+        my $var = $self->statement($context, $data->[1]);
 
         if ($self->is_arithmetic_type($var)) {
             my $temp_var = [$var->[0], $var->[1]];
