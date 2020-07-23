@@ -131,6 +131,10 @@ CODE
         ['NUM', 3], ['STDOUT', "b\na\n"]],
     ['var i = 0; while (i < 5) print(++i)',
         ['NIL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
+    ['var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]',
+        ['NUM', 75]],
+    ['var map = {}; map["color"] = "blue"; $"The color is {map[\\"color\\"]}!"',
+        ['STRING', 'The color is blue!']],
 );
 
 use Data::Dumper;
