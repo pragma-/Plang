@@ -263,9 +263,8 @@ no difference between the quotes.
 ##### Map
     MapInitializer ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
-A `Map` is a collection of key/value pairs. To create a map, it must be assigned
-to a variable; anonymous maps are not permitted. Map keys must be of type `String`.
-Map values can be any type.
+A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
+values can be any type.
 
 Creating a map and accessing a key:
 
@@ -276,6 +275,14 @@ Creating an empty map and then assigning a value to a key:
 
     > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
      The color is blue!
+
+Nested maps:
+
+    > var a = {"x": {"y": 42}}; a["x"]["y"]
+     42
+
+    > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
+     42
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
