@@ -871,6 +871,23 @@ sub statement {
     return $data;
 }
 
+# converts a map to a string
+# note: trusts $var to be a MAP
+sub map_to_string {
+    my ($self, $var) = @_;
+
+    my $hash = $var->[1];
+    my $string = '{ ';
+
+    while (my ($key, $value) = each %$hash) {
+        $string .= "$key: ";
+        $string .= $self->output_value($value);
+    }
+
+    $string .= ' }';
+    return $string;
+}
+
 sub output_value {
     my ($self, $value) = @_;
 
@@ -892,6 +909,11 @@ sub output_value {
     # functions
     elsif ($value->[0] eq 'FUNC') {
         $result .= 'Function';
+    }
+
+    # maps
+    elsif ($value->[0] eq 'MAP') {
+        $result .= $self->map_to_string($value);
     }
 
     # STRING and NUM returned as-is
