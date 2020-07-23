@@ -290,16 +290,18 @@ Nested maps:
 
 ###### Exists
 To check for existence of a map key, use the `exists` keyword. If the key exists then
-the `exists` evaluates to `true`, otherwise `false`.
+`true` is yielded, otherwise `false`. Note that setting a map key to `nil` does not
+delete the key. See the [`delete`](#delete) keyword.
 
     > var map = { "a": 1, "b": 2 }; exists map["a"]
      true
 
 ###### Delete
-To delete keys from a map, use the `delete` keyword.
+To delete keys from a map, use the `delete` keyword. Setting a key to `nil` does not
+delete the key.
 
 When used on a Map key, the `delete` keyword deletes the key and returns its value, or
-`nil` if no such key existed.
+`nil` if no such key exists.
 
 When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
 the empty map.
