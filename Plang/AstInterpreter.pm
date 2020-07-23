@@ -879,11 +879,14 @@ sub map_to_string {
     my $hash = $var->[1];
     my $string = '{ ';
 
+    my @entries;
     while (my ($key, $value) = each %$hash) {
-        $string .= "$key: ";
-        $string .= $self->output_value($value);
+        my $entry = "$key: ";
+        $entry .= $self->output_value($value);
+        push @entries, $entry;
     }
 
+    $string .= join(', ', @entries);
     $string .= ' }';
     return $string;
 }
