@@ -602,6 +602,70 @@ sub statement {
         return ['MAP', $hashref];
     }
 
+    # exists keyword
+    if ($ins eq 'EXISTS') {
+        # check for key in map
+        if ($value->[0] eq 'ARRAY_INDEX') {
+            my $var = $self->statement($context, $value->[1]);
+
+            # map index
+            if ($var->[0] eq 'MAP') {
+                my $key = $self->statement($context, $value->[2]);
+
+                if ($key->[0] eq 'STRING') {
+                    if (exists $var->[1]->{$key->[1]}) {
+                        return ['BOOL', 1];
+                    } else {
+                        return ['BOOL', 0];
+                    }
+                }
+
+                $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            }
+
+            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($value) . ")");
+    }
+
+    # delete keyword
+    if ($ins eq 'DELETE') {
+        # delete one key in map
+        if ($value->[0] eq 'ARRAY_INDEX') {
+            my $var = $self->statement($context, $value->[1]);
+
+            # map index
+            if ($var->[0] eq 'MAP') {
+                my $key = $self->statement($context, $value->[2]);
+
+                if ($key->[0] eq 'STRING') {
+                    my $val = delete $var->[1]->{$key->[1]};
+                    return ['NIL', undef] if not defined $val;
+                    return $val;
+                }
+
+                $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            }
+
+            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        }
+
+        # delete all keys in map
+        if ($value->[0] eq 'IDENT') {
+            my $var = $self->get_variable($context, $value->[1]);
+
+            if ($var->[0] eq 'MAP') {
+                $var->[1] = {};
+                return $var;
+            }
+
+            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($value) . ")");
+    }
+
     # ternary ?: conditional operator
     if ($ins eq 'COND') {
         if ($self->is_truthy($context, $data->[1])) {

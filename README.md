@@ -33,6 +33,9 @@ Here's a helpful table of contents:
       * [Number](#number)
       * [String](#string)
       * [Map](#map)
+        * [Creating and accessing](#creating-and-accessing)
+        * [Exists](#exists)
+        * [Delete](#delete)
     * [Casting](#casting)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
@@ -266,6 +269,7 @@ no difference between the quotes.
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type.
 
+###### Creating and accessing
 Creating a map and accessing a key:
 
     > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
@@ -283,6 +287,25 @@ Nested maps:
 
     > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
      42
+
+###### Exists
+To check for existence of a map key, use the `exists` keyword. If the key exists then
+the `exists` evaluates to `true`, otherwise `false`.
+
+    > var map = { "a": 1, "b": 2 }; exists map["a"]
+     true
+
+###### Delete
+To delete keys from a map, use the `delete` keyword.
+
+When used on a Map key, the `delete` keyword deletes the key and returns its value, or
+`nil` if no such key existed.
+
+When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
+the empty map.
+
+    > var map = { "a": 1, "b": 2 }; delete map["b"]; map;
+     { "a": 1 }
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly

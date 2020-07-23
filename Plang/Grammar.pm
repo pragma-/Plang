@@ -35,7 +35,7 @@ my %pretty_tokens = (
 
 sub pretty_token {
     my ($token) = @_;
-    return 'Keyword' if $token =~ /^KEYWORD_/;
+    return 'keyword' if $token =~ /^KEYWORD_/;
     return $pretty_tokens{$token} // $token;
 }
 
@@ -126,6 +126,8 @@ sub alternate_statement {
 #                        | WhileStatement
 #                        | IfStatement
 #                        | ElseWithoutIf
+#                        | ExistsStatement
+#                        | DeleteStatement
 #                        | RangeStatement
 #                        | Expression TERM
 #                        | UnexpectedKeyword
@@ -168,6 +170,12 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&ElseWithoutIf,       'Statement: ElseWithoutIf'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&ExistsStatement,     'Statement: ExistsStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&DeleteStatement,     'Statement: DeleteStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
@@ -552,6 +560,52 @@ sub ElseWithoutIf {
     }
 
     return;
+}
+
+# Grammar: ExistsStatement ::= KEYWORD_exists Statement
+sub ExistsStatement {
+    my ($parser) = @_;
+
+    $parser->try('ExistsStatement');
+
+    {
+        if ($parser->consume('KEYWORD_exists')) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+
+            if (not $statement or not defined $statement->[1]) {
+                return expected($parser, "statement after exists keyword");
+            }
+
+            $parser->advance;
+            return ['EXISTS', $statement->[1]];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: DeleteStatement ::= KEYWORD_return Statement
+sub DeleteStatement {
+    my ($parser) = @_;
+
+    $parser->try('DeleteStatement');
+
+    {
+        if ($parser->consume('KEYWORD_delete')) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+
+            if (not $statement or not defined $statement->[1]) {
+                return expected($parser, "statement after delete keyword");
+            }
+
+            $parser->advance;
+            return ['DELETE', $statement->[1]];
+        }
+    }
+
+    $parser->backtrack;
 }
 
 # Grammar: RangeStatement ::= Expression ".." Expression

@@ -112,6 +112,7 @@ sub initialize {
         'fn', 'return',
         'while', 'next', 'last',
         'if', 'then', 'else',
+        'exists', 'delete',
     );
 
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});
