@@ -239,6 +239,10 @@ my %function_builtins = (
         params => [['expr', undef]],
         subref => \&function_builtin_CannotConvert,
     },
+    'Map' => {
+        params => [['expr', undef]],
+        subref => \&function_builtin_CannotConvert,
+    },
 );
 
 # builtin print
@@ -261,6 +265,10 @@ sub function_builtin_Number {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
+    if ($expr->[0] eq 'NIL') {
+        return ['NUM', 0];
+    }
+
     if ($expr->[0] eq 'NUM') {
         return $expr;
     }
@@ -280,6 +288,10 @@ sub function_builtin_String {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
+    if ($expr->[0] eq 'NIL') {
+        return ['STRING', ''];
+    }
+
     if ($expr->[0] eq 'NUM') {
         return ['STRING', $expr->[1]];
     }
@@ -298,6 +310,10 @@ sub function_builtin_String {
 sub function_builtin_Boolean {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'NIL') {
+        return ['BOOL', 0];
+    }
 
     if ($expr->[0] eq 'NUM') {
         if ($self->is_truthy($context, $expr)) {
