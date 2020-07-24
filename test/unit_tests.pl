@@ -75,8 +75,8 @@ CODE
         ['STRING', 'String'   ]],
     ['type(42)',
         ['STRING', 'Number'   ]],
-    ['type(nil)',
-        ['STRING', 'Nil',     ]],
+    ['type(null)',
+        ['STRING', 'Null',    ]],
     ['"Hello!"[1..4]',
         ['STRING', 'ello',    ]],
     ['"Good-bye!"[5..7] = "night"',
@@ -86,7 +86,7 @@ CODE
     ['"Hello!"[0]',
         ['STRING', 'H'        ]],
     ['var a',
-        ['NIL',    undef      ]],
+        ['NULL',    undef      ]],
     ['1e2 + 1e3',
         ['NUM',    1100       ]],
     ['1e-4',
@@ -118,7 +118,7 @@ fn outer {
 outer();
 CODE
         ,
-        ['NIL', undef], ['STDOUT', "outer\n" ]],
+        ['NULL', undef], ['STDOUT', "outer\n" ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
         ['NUM', 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
@@ -130,7 +130,7 @@ CODE
     ['fn force(f)f(); fn a(x){print("a");x}; var lazy = fn 1 + a(2); print("b"); force(lazy)',
         ['NUM', 3], ['STDOUT', "b\na\n"]],
     ['var i = 0; while (i < 5) print(++i)',
-        ['NIL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
+        ['NULL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
     ['var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]',
         ['NUM', 75]],
     ['var map = {}; map["color"] = "blue"; $"The color is {map[\\"color\\"]}!"',
@@ -183,7 +183,7 @@ sub print_override {
     my ($plang, $context, $name, $arguments) = @_;
     my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
     $output .= "$expr$end"; # append the print output to our $output
-    return ['NIL', undef];
+    return ['NULL', undef];
 }
 
 my @selected_tests;

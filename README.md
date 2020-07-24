@@ -28,7 +28,7 @@ Here's a helpful table of contents:
     * [Keywords](#keywords)
   * [Variables](#variables)
     * [Types](#types)
-      * [Nil](#nil)
+      * [Null](#null)
       * [Boolean](#boolean)
       * [Number](#number)
       * [String](#string)
@@ -77,7 +77,7 @@ To interpret a string of Plang code:
       Hello world!
 
 Plang automatically prints the value of the last statement of the program. To prevent this,
-use the `nil` keyword (or construct any statement that doesn't yield a value) as the last statement.
+use the `null` keyword (or construct any statement that doesn't yield a value) as the last statement.
 
 You can pass `--dumptokens` as a command-line argument to display a flat-list
 of all the tokens as they are encountered.
@@ -163,7 +163,7 @@ Type | Truthiness
 Number | false when value is `0`;true otherwise.
 String | false when value is empty string; true otherwise.
 Boolean | false when value is `false`; true otherwise.
-Nil | Attempting to use a Nil type is always an error.
+Null | Attempting to use a Null type is always an error.
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
@@ -200,7 +200,7 @@ fn | function definition
 return | return value from function
 true | a Boolean with a true value
 false | a Boolean with a false value
-nil | a Nil with a nil value
+null | a Null with a null value
 if | conditional if statement
 then | then branch of a conditional if statement
 else | else branch of a conditional if statement
@@ -214,7 +214,7 @@ next | jump to the next iteration of the loop
 
 Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
 may optionally have an initializer that assigns a default value. Without an initializer, the value of
-variables will default to `nil`, which has type `Nil`.
+variables will default to `null`, which has type `Null`.
 
 The `var` statement returns the value of the variable.
 
@@ -241,10 +241,10 @@ value to explicitly convert it to a desired type.
 
 Currently implemented types are:
 
-##### Nil
-     Nil ::= "nil"
+##### Null
+     Null ::= "null"
 
-The `Nil` type signifies that there is no value.
+The `Null` type signifies that there is no value.
 
 ##### Boolean
     Boolean ::= "true" | "false"
@@ -292,18 +292,18 @@ Nested maps:
 
 ###### Exists
 To check for existence of a map key, use the `exists` keyword. If the key exists then
-`true` is yielded, otherwise `false`. Note that setting a map key to `nil` does not
+`true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
 delete the key. See the [`delete`](#delete) keyword.
 
     > var map = { "a": 1, "b": 2 }; exists map["a"]
      true
 
 ###### Delete
-To delete keys from a map, use the `delete` keyword. Setting a key to `nil` does not
+To delete keys from a map, use the `delete` keyword. Setting a key to `null` does not
 delete the key.
 
 When used on a Map key, the `delete` keyword deletes the key and returns its value, or
-`nil` if no such key exists.
+`null` if no such key exists.
 
 When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
 the empty map.
@@ -437,7 +437,7 @@ The `while` statement expects a condition enclosed in parentheses, followed by a
 or a group of statements enclosed in braces.
 
 As long as the condition is [truthy](#truthiness) the statement(s) in its body will be executed.
-The value of the `while` statement is `nil`.
+The value of the `while` statement is `null`.
 
 The `next` keyword can be used to immediately jump to the next iteration of the loop.
 

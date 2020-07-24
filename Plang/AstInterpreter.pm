@@ -46,7 +46,7 @@ sub initialize {
 }
 
 my %pretty_types = (
-    'NIL'     => 'Nil',
+    'NULL'    => 'Null',
     'NUM'     => 'Number',
     'STRING'  => 'String',
     'BOOL'    => 'Boolean',
@@ -214,9 +214,9 @@ my %function_builtins = (
         params => [['expr', undef]],
         subref => \&function_builtin_Boolean,
     },
-    'Nil' => {
+    'Null' => {
         params => [['expr', undef]],
-        subref => \&function_builtin_Nil,
+        subref => \&function_builtin_Null,
     },
     'Function' => {
         params => [['expr', undef]],
@@ -241,7 +241,7 @@ sub function_builtin_print {
     my ($self, $context, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
-    return ['NIL', undef];
+    return ['NULL', undef];
 }
 
 # builtin type
@@ -256,7 +256,7 @@ sub function_builtin_Number {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NIL') {
+    if ($expr->[0] eq 'NULL') {
         return ['NUM', 0];
     }
 
@@ -279,7 +279,7 @@ sub function_builtin_String {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NIL') {
+    if ($expr->[0] eq 'NULL') {
         return ['STRING', ''];
     }
 
@@ -310,7 +310,7 @@ sub function_builtin_Boolean {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NIL') {
+    if ($expr->[0] eq 'NULL') {
         return ['BOOL', 0];
     }
 
@@ -337,10 +337,10 @@ sub function_builtin_Boolean {
     $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Boolean");
 }
 
-sub function_builtin_Nil {
+sub function_builtin_Null {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['NIL', undef];
+    return ['NULL', undef];
 }
 
 sub function_builtin_Map {
@@ -603,7 +603,7 @@ sub statement {
         if ($initializer) {
             $right_value = $self->statement($context, $initializer);
         } else {
-            $right_value = ['NIL', undef];
+            $right_value = ['NULL', undef];
         }
 
         if (!$self->{repl} and (my $var = $self->get_variable($context, $value, locals_only => 1))) {
@@ -700,7 +700,7 @@ sub statement {
 
                 if ($key->[0] eq 'STRING') {
                     my $val = delete $var->[1]->{$key->[1]};
-                    return ['NIL', undef] if not defined $val;
+                    return ['NULL', undef] if not defined $val;
                     return $val;
                 }
 
@@ -763,7 +763,7 @@ sub statement {
             return $result if $result->[0] eq 'ERROR';
         }
 
-        return ['NIL', undef];
+        return ['NULL', undef];
     }
 
     # if/else
@@ -958,7 +958,7 @@ sub statement {
 
             if ($key->[0] eq 'STRING') {
                 my $val = $var->[1]->{$key->[1]};
-                return ['NIL', undef] if not defined $val;
+                return ['NULL', undef] if not defined $val;
                 return $val;
             }
 
@@ -972,7 +972,7 @@ sub statement {
             # number index
             if ($index->[0] eq 'NUM') {
                 my $val = $var->[1]->[$index->[1]];
-                return ['NIL', undef] if not defined $val;
+                return ['NULL', undef] if not defined $val;
                 return $val;
             }
 
@@ -1034,8 +1034,8 @@ sub map_to_string {
             my $dump = Dumper ($value->[1]);
             $dump =~ s/$dump_to_string/$1/g;
             $entry .= $dump;
-        } elsif ($value->[0] eq 'NIL') {
-            $entry .= 'nil';
+        } elsif ($value->[0] eq 'NULL') {
+            $entry .= 'null';
         } else {
             $entry .= $self->output_value($value);
         }
@@ -1065,8 +1065,8 @@ sub array_to_string {
             my $dump = Dumper ($entry->[1]);
             $dump =~ s/$dump_to_string/$1/g;
             push @entries, $dump;
-        } elsif ($entry->[0] eq 'NIL') {
-            push @entries, 'nil';
+        } elsif ($entry->[0] eq 'NULL') {
+            push @entries, 'null';
         } else {
             push @entries, $self->output_value($entry);
         }
@@ -1260,7 +1260,7 @@ sub run {
     # return success if there's no result to print
     return if not defined $result;
 
-    # handle final statement (print last value of program if not Nil)
+    # handle final statement (print last value of program if not Null)
     return $self->handle_statement_result($result, 1);
 }
 

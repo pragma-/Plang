@@ -815,8 +815,8 @@ sub Prefix {
     return if $parser->errored;
     return $array if $array;
 
-    if ($token = $parser->consume('KEYWORD_nil')) {
-        return ['NIL', undef];
+    if ($token = $parser->consume('KEYWORD_null')) {
+        return ['NULL', undef];
     }
 
     if ($token = $parser->consume('KEYWORD_true')) {
