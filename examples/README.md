@@ -6,10 +6,3 @@ It's not much. Yet. There are some more examples in [the unit test script.](../t
 You can run each script from the parent directory with:
 
     $ ./plang < examples/<script.pl>
-
-## examples.pl
-A brief introduction to syntax that is somewhat unique to Plang.
-
-## fibonacci.pl
-Prints the first 15 fibonacci numbers.
-

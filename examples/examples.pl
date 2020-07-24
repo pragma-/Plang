@@ -1,4 +1,5 @@
 /* This is a Plang script that demonstrates some examples
+ * of Plang syntax.
  *
  * You can run it via ./plang < examples/examples.pl
  *
@@ -17,7 +18,7 @@ fn square(x)    x * x
 var foo = 4
 print($"square of {foo}: {square(foo)}")  # prints "square of 4: 16"
 
-# you can make an aonymous function that takes no parameters by omitting the
+# you can make an anonymous function that takes no parameters by omitting the
 # function name and the parameter identifier list
 var a = fn { var x = 1 + 2;  $"x = {x}" }
 print(a()) # prints x = 3
@@ -39,6 +40,5 @@ fn test
   var a = x
   a + y
 }
+
 test(2 3)  # prints 5
-
-
