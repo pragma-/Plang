@@ -141,6 +141,20 @@ CODE
         ['NUM', 42]],
     ['var a = {}; a["x"] = {"y": 42}; a["x"]["y"] # assign anonymous Map to another Map key',
         ['NUM', 42]],
+    ['var a = ["red", "blue", 3, 4]; a[1]',
+        ['STRING', 'blue']],
+    ['var a = [[1,2], [3, 4], [5,6]]; a[2][1] # nested arrays',
+        ['NUM', 6]],
+    ['var a = [fn "hi", fn "bye"]; a[1]() # functions as array element',
+        ['STRING', 'bye']],
+    ['var a = {"say_hi": fn "hi", "say_bye": fn "bye"};  a["say_bye"]() # functions as map value',
+        ['STRING', 'bye']],
+    ['var a = [1, 2, 3, 4]; a[-1] # index backwards',
+        ['NUM', 4]],
+    ['var a = ["hi", "bye", {"foo": 42}];  a[2]["foo"] # map as array element',
+        ['NUM', 42]],
+    ['var a = {"hi": [1, "bye"]}; a["hi"][1] # array as map element',
+        ['STRING', 'bye']],
 );
 
 use Data::Dumper;
