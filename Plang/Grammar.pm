@@ -217,9 +217,11 @@ sub StatementGroup {
 
             if ($statement and $statement->[0] ne 'NOP') {
                 push @statements, $statement;
+                next;
             }
 
             last if $parser->consume('R_BRACE');
+            goto STATEMENT_GROUP_FAIL;
         }
 
         $parser->advance;
@@ -347,24 +349,6 @@ sub Initializer {
 
     {
         if ($parser->consume('ASSIGN')) {
-            # try a map initializer
-            my $map = MapInitializer($parser);
-            return if $parser->errored;
-
-            if ($map) {
-                $parser->advance;
-                return $map;
-            }
-
-            # try an array initializer
-            my $array = ArrayInitializer($parser);
-            return if $parser->errored;
-
-            if ($array) {
-                $parser->advance;
-                return $array;
-            }
-
             # try an expression
             my $expr = Expression($parser);
             return if $parser->errored;

@@ -228,11 +228,11 @@ my %function_builtins = (
     },
     'Map' => {
         params => [['expr', undef]],
-        subref => \&function_builtin_CannotConvert,
+        subref => \&function_builtin_Map,
     },
     'Array' => {
         params => [['expr', undef]],
-        subref => \&function_builtin_CannotConvert,
+        subref => \&function_builtin_Array,
     },
 );
 
@@ -295,6 +295,14 @@ sub function_builtin_String {
         return ['STRING', $self->output_value($expr)];
     }
 
+    if ($expr->[0] eq 'MAP') {
+        return ['STRING', $self->map_to_string($expr)];
+    }
+
+    if ($expr->[0] eq 'ARRAY') {
+        return ['STRING', $self->array_to_string($expr)];
+    }
+
     $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to String");
 }
 
@@ -333,6 +341,40 @@ sub function_builtin_Nil {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return ['NIL', undef];
+}
+
+sub function_builtin_Map {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'STRING') {
+        my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
+
+        if ($mapinit->[0] ne 'MAPINIT') {
+            $self->error($context, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
+        }
+
+        return $self->statement($context, $mapinit);
+    }
+
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Map");
+}
+
+sub function_builtin_Array {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($expr->[0] eq 'STRING') {
+        my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
+
+        if ($mapinit->[0] ne 'ARRAYINIT') {
+            $self->error($context, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
+        }
+
+        return $self->statement($context, $mapinit);
+    }
+
+    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Array");
 }
 
 sub function_builtin_CannotConvert {
@@ -968,24 +1010,32 @@ sub statement {
     return $data;
 }
 
+my $dump_to_string = qr/\\([\@\$\%])/;
+
 # converts a map to a string
 # note: trusts $var to be MAP type
 sub map_to_string {
     my ($self, $var) = @_;
 
+    $Data::Dumper::Indent = 0;
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Useqq  = 1;
+
     my $hash = $var->[1];
-    my $string = '{ ';
+    my $string = '{';
 
     my @entries;
     while (my ($key, $value) = each %$hash) {
+        $key = Dumper ($key);
+        $key =~ s/$dump_to_string/$1/g;
         my $entry = "$key: ";
 
         if ($value->[0] eq 'STRING') {
-            $Data::Dumper::Indent = 0;
-            $Data::Dumper::Terse  = 1;
-            $Data::Dumper::Useqq  = 1;
             my $dump = Dumper ($value->[1]);
+            $dump =~ s/$dump_to_string/$1/g;
             $entry .= $dump;
+        } elsif ($value->[0] eq 'NIL') {
+            $entry .= 'nil';
         } else {
             $entry .= $self->output_value($value);
         }
@@ -993,7 +1043,7 @@ sub map_to_string {
     }
 
     $string .= join(', ', @entries);
-    $string .= ' }';
+    $string .= '}';
     return $string;
 }
 
@@ -1002,24 +1052,28 @@ sub map_to_string {
 sub array_to_string {
     my ($self, $var) = @_;
 
+    $Data::Dumper::Indent = 0;
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Useqq  = 1;
+
     my $array = $var->[1];
-    my $string = '[ ';
+    my $string = '[';
 
     my @entries;
     foreach my $entry (@$array) {
         if ($entry->[0] eq 'STRING') {
-            $Data::Dumper::Indent = 0;
-            $Data::Dumper::Terse  = 1;
-            $Data::Dumper::Useqq  = 1;
             my $dump = Dumper ($entry->[1]);
+            $dump =~ s/$dump_to_string/$1/g;
             push @entries, $dump;
+        } elsif ($entry->[0] eq 'NIL') {
+            push @entries, 'nil';
         } else {
             push @entries, $self->output_value($entry);
         }
     }
 
-    $string .= join(', ', @entries);
-    $string .= ' ]';
+    $string .= join(',', @entries);
+    $string .= ']';
     return $string;
 }
 
