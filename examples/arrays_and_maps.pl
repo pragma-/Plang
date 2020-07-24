@@ -85,3 +85,23 @@ print(maps['wizard']['iq'])  # prints 200
 maps['dragon'] = { 'health': 500, 'iq': 150 }
 
 print(maps)  # should print caveman, wizard, human and dragon as expected
+
+# Map of Functions
+
+fn exit_function print("exit function called")
+
+# the braces aren't necessary here, but this is what it would look like
+fn move(direction) {
+    print($"moving {direction}")
+}
+
+var functions = {
+    'exit'  : exit_function,
+    'help'  : fn { print("help function called") },
+    'north' : fn { move('north') }
+    'south' : fn { move('south') }
+}
+
+functions['exit']()   # prints exit function called
+functions['help']()   # prints help function called
+functions['north']()  # prints moving north
