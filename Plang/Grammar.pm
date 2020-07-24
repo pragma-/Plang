@@ -287,15 +287,17 @@ sub MapInitializer {
                     return if $parser->errored;
 
                     if (not $expr) {
-                        return expected($parser, "expression for map value");
+                        return expected($parser, 'expression for map value');
                     }
 
                     $parser->consume('COMMA');
 
                     push @map, [$key, $expr];
+                    next;
                 }
 
                 last if $parser->consume('R_BRACE');
+                return expected($parser, 'map entry or `}` in map initializer');
             }
 
             $parser->advance;
@@ -306,7 +308,38 @@ sub MapInitializer {
     $parser->backtrack;
 }
 
-# Grammar: Initializer ::= ASSIGN (MapInitializer | Expression)
+# Grammar: ArrayInitializer ::= "[" (Expression ","?)* "]"
+sub ArrayInitializer {
+    my ($parser) = @_;
+
+    $parser->try('ArrayInitializer');
+
+    {
+        if ($parser->consume('L_BRACKET')) {
+            my @array;
+            while (1) {
+                my $expr = Expression($parser);
+                return if $parser->errored;
+
+                if ($expr) {
+                    $parser->consume('COMMA');
+                    push @array, $expr;
+                    next;
+                }
+
+                last if $parser->consume('R_BRACKET');
+                return expected($parser, 'expression or `]` in array initializer');
+            }
+
+            $parser->advance;
+            return ['ARRAYINIT', \@array];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: Initializer ::= ASSIGN (MapInitializer | ArrayInitializer | Expression)
 sub Initializer {
     my ($parser) = @_;
 
@@ -321,6 +354,15 @@ sub Initializer {
             if ($map) {
                 $parser->advance;
                 return $map;
+            }
+
+            # try an array initializer
+            my $array = ArrayInitializer($parser);
+            return if $parser->errored;
+
+            if ($array) {
+                $parser->advance;
+                return $array;
             }
 
             # try an expression
@@ -585,7 +627,7 @@ sub ExistsStatement {
     $parser->backtrack;
 }
 
-# Grammar: DeleteStatement ::= KEYWORD_return Statement
+# Grammar: DeleteStatement ::= KEYWORD_delete Statement
 sub DeleteStatement {
     my ($parser) = @_;
 
@@ -784,6 +826,10 @@ sub Prefix {
     my $map = MapInitializer($parser);
     return if $parser->errored;
     return $map if $map;
+
+    my $array = ArrayInitializer($parser);
+    return if $parser->errored;
+    return $array if $array;
 
     if ($token = $parser->consume('KEYWORD_nil')) {
         return ['NIL', undef];

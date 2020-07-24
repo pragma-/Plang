@@ -53,6 +53,7 @@ my %pretty_types = (
     'FUNC'    => 'Function',
     'BUILTIN' => 'Builtin',
     'MAP'     => 'Map',
+    'ARRAY'   => 'Array',
 );
 
 sub pretty_type {
@@ -226,6 +227,10 @@ my %function_builtins = (
         subref => \&function_builtin_CannotConvert,
     },
     'Map' => {
+        params => [['expr', undef]],
+        subref => \&function_builtin_CannotConvert,
+    },
+    'Array' => {
         params => [['expr', undef]],
         subref => \&function_builtin_CannotConvert,
     },
@@ -575,7 +580,7 @@ sub statement {
 
     # map initializer
     if ($ins eq 'MAPINIT') {
-        my $map = $data->[1];
+        my $map     = $data->[1];
         my $hashref = {};
 
         foreach my $entry (@$map) {
@@ -600,6 +605,18 @@ sub statement {
         }
 
         return ['MAP', $hashref];
+    }
+
+    # array initializer
+    if ($ins eq 'ARRAYINIT') {
+        my $array    = $data->[1];
+        my $arrayref = [];
+
+        foreach my $entry (@$array) {
+            push @$arrayref, $self->statement($context, $entry);
+        }
+
+        return ['ARRAY', $arrayref];
     }
 
     # exists keyword
@@ -906,6 +923,22 @@ sub statement {
             $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
         }
 
+        # array index
+        if ($var->[0] eq 'ARRAY') {
+            my $index = $self->statement($context, $data->[2]);
+
+            # number index
+            if ($index->[0] eq 'NUM') {
+                my $val = $var->[1]->[$index->[1]];
+                return ['NIL', undef] if not defined $val;
+                return $val;
+            }
+
+            # TODO support RANGE and x:y splices and negative indexing
+
+            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+        }
+
         # string index
         if ($var->[0] eq 'STRING') {
             my $value = $self->statement($context, $data->[2]->[1]);
@@ -936,7 +969,7 @@ sub statement {
 }
 
 # converts a map to a string
-# note: trusts $var to be a MAP
+# note: trusts $var to be MAP type
 sub map_to_string {
     my ($self, $var) = @_;
 
@@ -961,6 +994,32 @@ sub map_to_string {
 
     $string .= join(', ', @entries);
     $string .= ' }';
+    return $string;
+}
+
+# converts an array to a string
+# note: trusts $var to be ARRAY type
+sub array_to_string {
+    my ($self, $var) = @_;
+
+    my $array = $var->[1];
+    my $string = '[ ';
+
+    my @entries;
+    foreach my $entry (@$array) {
+        if ($entry->[0] eq 'STRING') {
+            $Data::Dumper::Indent = 0;
+            $Data::Dumper::Terse  = 1;
+            $Data::Dumper::Useqq  = 1;
+            my $dump = Dumper ($entry->[1]);
+            push @entries, $dump;
+        } else {
+            push @entries, $self->output_value($entry);
+        }
+    }
+
+    $string .= join(', ', @entries);
+    $string .= ' ]';
     return $string;
 }
 
@@ -990,6 +1049,11 @@ sub output_value {
     # maps
     elsif ($value->[0] eq 'MAP') {
         $result .= $self->map_to_string($value);
+    }
+
+    # arrays
+    elsif ($value->[0] eq 'ARRAY') {
+        $result .= $self->array_to_string($value);
     }
 
     # STRING and NUM returned as-is
@@ -1029,6 +1093,18 @@ sub assignment {
             }
 
             $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        if ($var->[0] eq 'ARRAY') {
+            my $index = $self->statement($context, $left_value->[2]);
+
+            if ($index->[0] eq 'NUM') {
+                my $val = $self->statement($context, $right_value);
+                $var->[1]->[$index->[1]] = $val;
+                return $val;
+            }
+
+            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
         }
 
         if ($var->[0] eq 'STRING') {

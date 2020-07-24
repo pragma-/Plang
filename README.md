@@ -33,9 +33,11 @@ Here's a helpful table of contents:
       * [Number](#number)
       * [String](#string)
       * [Map](#map)
-        * [Creating and accessing](#creating-and-accessing)
+        * [Creating and accessing maps](#creating-and-accessing-maps)
         * [Exists](#exists)
         * [Delete](#delete)
+      * [Array](#array)
+        * [Creating and accessing arrays](#creating-and-accessing-arrays)
     * [Casting](#casting)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
@@ -269,7 +271,7 @@ no difference between the quotes.
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type.
 
-###### Creating and accessing
+###### Creating and accessing maps
 Creating a map and accessing a key:
 
     > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
@@ -308,6 +310,17 @@ the empty map.
 
     > var map = { "a": 1, "b": 2 }; delete map["b"]; map;
      { "a": 1 }
+
+##### Array
+    ArrayInitializer ::= "[" (Expression ","?)* "]"
+
+An `Array` is a list of values. Plang array elements may be of any type.
+
+###### Creating and accessing arrays
+Creating an array and accessing an element:
+
+    > var array = ["red", "blue", 3, 4]; array[1]
+     blue
 
 #### Casting
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
