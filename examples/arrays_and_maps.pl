@@ -4,9 +4,9 @@
 # Basic Array
 var array = ["red", "green", 1, 2]
 
-print(array[1])    # prints green
-print(array)       # prints [ "red", "green", 1, 2 ]
 print(type(array)) # prints Array
+print(array[1])    # prints green
+print(array)       # prints ["red","green",1,2]
 
 # Basic Map
 var map = {
@@ -15,16 +15,17 @@ var map = {
     'iq'     : 75
 }
 
+print(type(map))     # prints Map
 print(map['name'])   # prints Grok
-print(map)           # prints { "name": "Grok", "health": 200, "iq": 75 }
+print(map)           # prints {"name": "Grok", "health": 200, "iq": 75}
 
 # Array of anonymous Arrays
-var arrays = [[1, 2], [3, 4], [5, 6]]
+var arrays = [[1,2], [3,4], [5,6]]
 
 print(arrays[2][1]) # prints 6
+print(arrays)       # prints [[1,2],[3,4],[5,6]]
 
 # Map of anonymous Arrays:
-
 var map_arrays = {
     'colors': [ "red", "green", "blue" ],
     'shapes': [ "triangle", "square", "circle" ],
@@ -34,13 +35,11 @@ var map_arrays = {
 print(map_arrays['colors'][1])  # prints green
 
 # To add another anonymous Array to the Map:
-
 map_arrays['pets'] = [ "cat", "dog", "hamster" ];
 
 print(map_arrays) # this should print the map as expected
 
 # Array of anonymous Maps
-
 var array_maps = [
     {
         'name'   : "Grok the Caveman",
@@ -62,7 +61,6 @@ var array_maps = [
 print(array_maps[1]['name'])  # prints Merlin the Wizard
 
 # Map of anonymous Maps
-
 var maps = {
     'caveman': {
         'health': 200,
@@ -81,14 +79,12 @@ var maps = {
 print(maps['wizard']['iq'])  # prints 200
 
 # To add another anonymous Map to the Map:
-
 maps['dragon'] = { 'health': 500, 'iq': 150 }
 
 print(maps)  # should print caveman, wizard, human and dragon as expected
 
 # Map of Functions
-
-fn exit_function print("exit function called")
+fn exit_function print("exit called")
 
 # the braces aren't necessary here, but this is what it would look like
 fn move(direction) {
@@ -97,11 +93,12 @@ fn move(direction) {
 
 var functions = {
     'exit'  : exit_function,
-    'help'  : fn { print("help function called") },
+    'help'  : fn { print("help called") },
     'north' : fn { move('north') }
     'south' : fn { move('south') }
 }
 
-functions['exit']()   # prints exit function called
-functions['help']()   # prints help function called
+functions['exit']()   # prints exit called
+functions['help']()   # prints help called
 functions['north']()  # prints moving north
+functions['south']()  # prints moving south
