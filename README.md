@@ -350,6 +350,7 @@ to perform the conversion.
 
 ##### Null()
 From Type | With Value | Resulting Null Value
+--- | --- | ---
 Null | any value | `null`
 Boolean | any value | `null`
 Number | any value | `null`
