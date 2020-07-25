@@ -682,10 +682,10 @@ sub statement {
                 $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
             }
 
-            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+            $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
         }
 
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($value) . ")");
+        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($value) . ")");
     }
 
     # delete keyword
@@ -1010,30 +1010,21 @@ sub statement {
     return $data;
 }
 
-my $dump_to_string = qr/\\([\@\$\%])/;
-
 # converts a map to a string
 # note: trusts $var to be MAP type
 sub map_to_string {
     my ($self, $var) = @_;
-
-    $Data::Dumper::Indent = 0;
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Useqq  = 1;
 
     my $hash = $var->[1];
     my $string = '{';
 
     my @entries;
     while (my ($key, $value) = each %$hash) {
-        $key = Dumper ($key);
-        $key =~ s/$dump_to_string/$1/g;
+        $key = $self->output_string_literal($key);
         my $entry = "$key: ";
 
         if ($value->[0] eq 'STRING') {
-            my $dump = Dumper ($value->[1]);
-            $dump =~ s/$dump_to_string/$1/g;
-            $entry .= $dump;
+            $entry .= $self->output_string_literal($value->[1]);
         } elsif ($value->[0] eq 'NULL') {
             $entry .= 'null';
         } else {
@@ -1052,19 +1043,13 @@ sub map_to_string {
 sub array_to_string {
     my ($self, $var) = @_;
 
-    $Data::Dumper::Indent = 0;
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Useqq  = 1;
-
     my $array = $var->[1];
     my $string = '[';
 
     my @entries;
     foreach my $entry (@$array) {
         if ($entry->[0] eq 'STRING') {
-            my $dump = Dumper ($entry->[1]);
-            $dump =~ s/$dump_to_string/$1/g;
-            push @entries, $dump;
+            push @entries, $self->output_string_literal($entry->[1]);
         } elsif ($entry->[0] eq 'NULL') {
             push @entries, 'null';
         } else {
@@ -1075,6 +1060,17 @@ sub array_to_string {
     $string .= join(',', @entries);
     $string .= ']';
     return $string;
+}
+
+sub output_string_literal {
+    my ($self, $text) = @_;
+    $Data::Dumper::Indent = 0;
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Useqq  = 1;
+
+    $text = Dumper ($text);
+    $text =~ s/\\([\@\$\%])/$1/g;
+    return $text;
 }
 
 sub output_value {
@@ -1318,7 +1314,14 @@ sub handle_statement_result {
     return $result unless $print_any;
 
     # print the result if possible and then consume it
-    print $self->output_value($result), "\n" if defined $result->[1];
+    if (defined $result->[1]) {
+        if ($result->[0] eq 'STRING') {
+            print $self->output_string_literal($result->[1]), "\n";;
+        } else {
+            print $self->output_value($result), "\n";
+        }
+    }
+
     return;
 }
 
