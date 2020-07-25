@@ -22,8 +22,6 @@ Here's a helpful table of contents:
 * [The Plang Language (so far)](#the-plang-language-so-far)
   * [Expressions](#expressions)
     * [Operators](#operators)
-    * [Truthiness](#truthiness)
-  * [Statements and StatementGroups](#statements-and-statementgroups)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
   * [Variables](#variables)
@@ -42,13 +40,15 @@ Here's a helpful table of contents:
         * [Delete](#delete)
     * [Type conversion](#type-conversion)
       * [Null()](#null-1)
-      * [Booleaan()](#booleaan)
+      * [Boolean()](#boolean-1)
       * [Number()](#number-1)
       * [String()](#string-1)
       * [Array()](#array-1)
       * [Map()](#map-1)
       * [Function()](#function-1)
       * [Builtin()](#builtin-1)
+    * [Truthiness](#truthiness)
+  * [Scoping](#scoping)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
     * [Default arguments](#default-arguments)
@@ -57,9 +57,9 @@ Here's a helpful table of contents:
     * [Currying](#currying)
     * [Lazy evaluation](#lazy-evaluation)
     * [Built-in functions](#built-in-functions)
-  * [Scoping](#scoping)
-  * [if/then/else statement](#ifthenelse-statement)
-  * [while/next/last statement](#whilenextlast-statement)
+  * [Statements and StatementGroups](#statements-and-statementgroups)
+    * [if/then/else](#ifthenelse)
+    * [while/next/last](#whilenextlast)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
     * [Interpolation](#interpolation)
@@ -164,34 +164,6 @@ P | Operator | Description | Type
 `not`, `and`, and `or` have low precedence such that they are useful for flow control between
 what are essentially different expressions.
 
-#### Truthiness
-For the logical operators (==, ||, &&, etc), this is how truthiness
-is evaluated for each type.
-
-Type | Truthiness
---- | ---
-Number | false when value is `0`;true otherwise.
-String | false when value is empty string; true otherwise.
-Boolean | false when value is `false`; true otherwise.
-Null | Attempting to use a Null type is always an error.
-
-### Statements and StatementGroups
-    Statement      ::=  StatementGroup
-                      | VariableDeclaration
-                      | FunctionDefinition
-                      | Expression Terminator
-                      | Terminator
-    StatementGroup ::=  "{" Statement+ "}"
-    Terminator     ::=  ";"
-
-A statement is a single instruction. Statements must be terminated by a semi-colon.
-
-A statement group is multiple statements enclosed in curly-braces.
-
-In Plang, statements have values. The value of a statement is the value of its expression.
-
-The value of a statement group is the value of the final statement in the group.
-
 ### Identifiers
     Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
     Letter     ::=  "a" - "z" | "A" - "Z"
@@ -217,6 +189,8 @@ else | else branch of a conditional if statement
 while | loop while a condition is true
 last | break out of the loop
 next | jump to the next iteration of the loop
+exists | test if a key exists in a Map
+delete | deletes a key from a Map
 
 ### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
@@ -246,7 +220,7 @@ Variables that have not yet been assigned a value will produce an error.
 
 #### Types
 Types of variables are inferred from the type of their value. All variables are simply declared with `var`
-and no type specifier. However, there is no implicit conversion between types. You must [cast](#casting) a
+and no type specifier. However, there is no implicit conversion between types. You must [convert](#type-conversion) a
 value to explicitly convert it to a desired type.
 
 Currently implemented types are:
@@ -343,8 +317,8 @@ the empty map.
      { "a": 1 }
 
 #### Type conversion
-Plang does not allow implicit conversion between types. You must cast a value to explicitly
-convert it to a desired type.
+Plang does not allow implicit conversion between types. You must convert a value explicitly
+to a desired type.
 
 To convert a value to a different type, pass the value as an argument to the function named
 after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
@@ -366,17 +340,17 @@ to perform the conversion.
 ##### Null()
 Converting to `Null` always produces a `Null` type with value `null`.
 
-Converting from `Null` to type T produces a T with value X:
+Converting from `Null` to type T produces a T with the following values:
 
-Type T | Value of T
+Type T | Value
 --- | ---
 Null | null
 Boolean | false
 Number | 0
 String | ""
 
-##### Booleaan()
-Converting to `Boolean` from type T with value X produces a `Boolean` with value B:
+##### Boolean()
+Converting to `Boolean` from type T with value X produces a `Boolean` with the following values:
 
 From Type T | With Value X | Value of Boolean
 --- | --- | ---
@@ -388,7 +362,7 @@ Number | not 0 | true
 String | "" | false
 String | not "" | true
 
-Converting from `Boolean` with value B to type T produces a T with value X:
+Converting from `Boolean` with value B to type T produces a T with the following values:
 
 Value of Boolean | To Type T | Value of T
 --- | --- | ---
@@ -402,7 +376,7 @@ false | String | "false"
 true | String | "true"
 
 ##### Number()
-Converting to `Number` from type T with value X produces a `Number` with value N:
+Converting to `Number` from type T with value N produces a `Number` with the following values:
 
 From Type T | With Value X | Value of Number
 --- | --- | ---
@@ -413,7 +387,7 @@ Number | any value | that value
 String | "" | 0
 String | "X" | if "X" begins with a Number then its value otherwise 0
 
-Converting from `Number` with value N to type T produces a T with value X:
+Converting from `Number` with value N to type T produces a T with the following values:
 
 Value of Number | To Type T | Value of T
 --- | --- | ---
@@ -424,7 +398,7 @@ any value | Number | that value
 any value | String | that value as a String
 
 ##### String()
-Converting to `String` from type T with value X produces a `String` with value S:
+Converting to `String` from type T with value S produces a `String` with the following values:
 
 From Type T | With Value X | Value of String
 --- | --- | ---
@@ -436,7 +410,7 @@ String | any value | that value
 Array | any value | A String containing a construction of that Array
 Map | any value | A String containing a construction of that Map
 
-Converting from `String` with value S to type T produces a T with value X:
+Converting from `String` with value S to type T produces a T with the following values:
 
 Value of String | To Type T | Value of T
 --- | --- | ---
@@ -450,14 +424,14 @@ A String containing a Array construction | Array | An Array containing elements 
 A String containing a Map construction | Map | A Map with keys and values of the Map construction
 
 ##### Array()
-Converting to `Array` from type T with value X produces an `Array` with value A:
+Converting to `Array` from type T with value X produces an `Array` with the following values:
 
 From Type T | With Value X | Value of Array
 --- | --- | ---
 String | A String containing an Array constructor | An Array containing elements of the Array constructor
 Array | any value | that value
 
-Converting from `Array` with value A to type T produces a T with value X:
+Converting from `Array` with value A to type T produces a T with the following values:
 
 Value of Array | To Type T | Value of T
 --- | --- | ---
@@ -465,14 +439,14 @@ any value | Null | null
 any value | String | A String containing an Array constructor
 
 ##### Map()
-Converting to `Map` from type T with value X produces an `Map` with value M:
+Converting to `Map` from type T with value X produces an `Map` with the following values:
 
 From Type T | With Value X | Value of Map
 --- | --- | ---
 String | A String containing an Map constructor | An Map containing elements of the Map constructor
 Map | any value | that value
 
-Converting from `Map` with value M to type T produces a T with value X:
+Converting from `Map` with value M to type T produces a T with the following values:
 
 Value of Map | To Type T | Value of T
 --- | --- | ---
@@ -484,6 +458,24 @@ It is an error to convert anything to or from `Function`.
 
 ##### Builtin()
 It is an error to convert anything to or from `Builtin`.
+
+#### Truthiness
+For the logical operators (==, ||, &&, etc), this is how truthiness
+is evaluated for each type.
+
+Type | Truthiness
+--- | ---
+Null | Attempting to use a Null type is always an error.
+Boolean | false when value is `false`; true otherwise.
+Number | false when value is `0`;true otherwise.
+String | false when value is empty string; true otherwise.
+Array | It is an error to use Arrays in truthy expressions.
+Map | It is an error to use Maps in truthy expressions.
+
+### Scoping
+Functions and variables are lexically scoped. A statement group introduces a new lexical scope. There is some
+consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
+`nonlocal` are potential keywords.
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
@@ -553,12 +545,21 @@ Function | Parameters | Description
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 type | `expr` | Returns the type of an expression, as a string.
 
-### Scoping
-Functions and variables are lexically scoped. A statement group introduces a new lexical scope. There is some
-consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
-`nonlocal` are potential keywords.
+### Statements and StatementGroups
+    Statement      ::=  StatementGroup
+                      | VariableDeclaration
+                      | FunctionDefinition
+                      | Expression Terminator
+                      | Terminator
+    StatementGroup ::=  "{" Statement+ "}"
+    Terminator     ::=  ";"
 
-### if/then/else statement
+A statement is a single instruction. A statement group is multiple statements enclosed in curly-braces.
+
+In Plang, statements and statement groups have values. The value of a statement is the value of its expression.
+The value of a statement group is the value of the final statement in the group.
+
+#### if/then/else
     IfStatement ::= "if" Statement "then" Statement ("else" Statement)?
 
 The `if` statement expects a condition expression followed by the `then` keyword and then
@@ -576,7 +577,7 @@ value of the final statement of the branch that was executed.
     > if false then 1 else 2
      2
 
-### while/next/last statement
+#### while/next/last
     WhileStatement ::= "while" "(" Statement ")" Statement
 
 The `while` statement expects a condition enclosed in parentheses, followed by a single statement
