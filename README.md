@@ -380,7 +380,7 @@ String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise 0
 
 ##### String()
-From Type | With Value | Value of String
+From Type | With Value | Resulting String Value
 --- | --- | ---
 Null | null | `0`
 Boolean | `true` | `"true"`
@@ -391,13 +391,13 @@ Array | any value | A String containing a constructor of that Array
 Map | any value | A String containing a constructor of that Map
 
 ##### Array()
-From Type | With Value | Value of Array
+From Type | With Value | Resulting Array Value
 --- | --- | ---
 String | A String containing an [Array constructor](#array) | the constructed Array
 Array | any value | that value
 
 ##### Map()
-From Type | With Value | Value of Map
+From Type | With Value | Resulting Map Value
 --- | --- | ---
 String | A String containing a [Map constructor](#map) | the constructed Map
 Map | any value | that value
