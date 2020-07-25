@@ -32,13 +32,23 @@ Here's a helpful table of contents:
       * [Boolean](#boolean)
       * [Number](#number)
       * [String](#string)
+      * [Array](#array)
+        * [Creating and accessing arrays](#creating-and-accessing-arrays)
       * [Map](#map)
+      * [Function](#function)
+      * [Builtin](#builtin)
         * [Creating and accessing maps](#creating-and-accessing-maps)
         * [Exists](#exists)
         * [Delete](#delete)
-      * [Array](#array)
-        * [Creating and accessing arrays](#creating-and-accessing-arrays)
-    * [Casting](#casting)
+    * [Type conversion](#type-conversion)
+      * [Null()](#null-1)
+      * [Booleaan()](#booleaan)
+      * [Number()](#number-1)
+      * [String()](#string-1)
+      * [Array()](#array-1)
+      * [Map()](#map-1)
+      * [Function()](#function-1)
+      * [Builtin()](#builtin-1)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
     * [Default arguments](#default-arguments)
@@ -74,7 +84,7 @@ To interpret a Plang file:
 To interpret a string of Plang code:
 
     $ ./plang <<< '"Hello world!"'
-      Hello world!
+      "Hello world!"
 
 Plang automatically prints the value of the last statement of the program. To prevent this,
 use the `null` keyword (or construct any statement that doesn't yield a value) as the last statement.
@@ -222,7 +232,7 @@ The `var` statement returns the value of the variable.
      5
 
     > var a = "hello"
-     hello
+     "hello"
 
 Attempting to use a variable that has not been declared will produce an error.
 
@@ -265,11 +275,32 @@ In Plang, the `Number` type is equivalent to a double-precision type.
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no difference between the quotes.
 
+##### Array
+    ArrayConstructor ::= "[" (Expression ","?)* "]"
+
+An `Array` is a collection of values. Array elements can be any type.
+
+See the [arrays and maps examples](examples/arrays_and_maps.pl) for more information.
+
+###### Creating and accessing arrays
+Creating an array and accessing an element:
+
+    > var array = ["red, "green", 3, 4]; array[1]
+     "green"
+
 ##### Map
-    MapInitializer ::= "{" ( (IDENT | String) ":" Expression )* "}"
+    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type.
+
+See the [arrays and maps examples](examples/arrays_and_maps.pl) for more information.
+
+##### Function
+The `Function` type identifies a Plang function. See [functions](#functions) for more information.
+
+##### Builtin
+The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
 
 ###### Creating and accessing maps
 Creating a map and accessing a key:
@@ -280,7 +311,7 @@ Creating a map and accessing a key:
 Creating an empty map and then assigning a value to a key:
 
     > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
-     The color is blue!
+     "The color is blue!"
 
 Nested maps:
 
@@ -308,21 +339,10 @@ When used on a Map key, the `delete` keyword deletes the key and returns its val
 When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
 the empty map.
 
-    > var map = { "a": 1, "b": 2 }; delete map["b"]; map;
+    > var map = { "a": 1, "b": 2 }; delete map["b"]; map
      { "a": 1 }
 
-##### Array
-    ArrayInitializer ::= "[" (Expression ","?)* "]"
-
-An `Array` is a list of values. Plang array elements may be of any type.
-
-###### Creating and accessing arrays
-Creating an array and accessing an element:
-
-    > var array = ["red", "blue", 3, 4]; array[1]
-     blue
-
-#### Casting
+#### Type conversion
 Plang does not allow implicit conversion between types. You must cast a value to explicitly
 convert it to a desired type.
 
@@ -338,6 +358,132 @@ Right:
 
     > var a = "45"; Number(a) + 1
      46
+
+The following type conversion functions may be used to convert to and from the types
+listed in their respective tables. If a type is not listed in a table, it is an error
+to perform the conversion.
+
+##### Null()
+Converting to `Null` always produces a `Null` type with value `null`.
+
+Converting from `Null` to type T produces a T with value X:
+
+Type T | Value of T
+--- | ---
+Null | null
+Boolean | false
+Number | 0
+String | ""
+
+##### Booleaan()
+Converting to `Boolean` from type T with value X produces a `Boolean` with value B:
+
+From Type T | With Value X | Value of Boolean
+--- | --- | ---
+Null | null | false
+Boolean | true | true
+Boolean | false | false
+Number | 0 | false
+Number | not 0 | true
+String | "" | false
+String | not "" | true
+
+Converting from `Boolean` with value B to type T produces a T with value X:
+
+Value of Boolean | To Type T | Value of T
+--- | --- | ---
+any value | Null | null
+true | Null | null
+false | Boolean | false
+true | Boolean | true
+false | Number | 0
+true | Number | 1
+false | String | "false"
+true | String | "true"
+
+##### Number()
+Converting to `Number` from type T with value X produces a `Number` with value N:
+
+From Type T | With Value X | Value of Number
+--- | --- | ---
+Null | null | 0
+Boolean | true | 1
+Boolean | false | 0
+Number | any value | that value
+String | "" | 0
+String | "X" | if "X" begins with a Number then its value otherwise 0
+
+Converting from `Number` with value N to type T produces a T with value X:
+
+Value of Number | To Type T | Value of T
+--- | --- | ---
+any value | Null | null
+0 | Boolean | false
+not 0 | Boolean | true
+any value | Number | that value
+any value | String | that value as a String
+
+##### String()
+Converting to `String` from type T with value X produces a `String` with value S:
+
+From Type T | With Value X | Value of String
+--- | --- | ---
+Null | null | 0
+Boolean | true | "true"
+Boolean | false | "false"
+Number | any value | that value as a String
+String | any value | that value
+Array | any value | A String containing a construction of that Array
+Map | any value | A String containing a construction of that Map
+
+Converting from `String` with value S to type T produces a T with value X:
+
+Value of String | To Type T | Value of T
+--- | --- | ---
+any value | Null | null
+"" | Boolean | false
+not "" | Boolean | true
+"" | Number | 0
+String beginning with a Number | Number | the value of the Number at the beginning of the String
+Any other String | Number | 0
+A String containing a Array construction | Array | An Array containing elements of the Array construction
+A String containing a Map construction | Map | A Map with keys and values of the Map construction
+
+##### Array()
+Converting to `Array` from type T with value X produces an `Array` with value A:
+
+From Type T | With Value X | Value of Array
+--- | --- | ---
+String | A String containing an Array constructor | An Array containing elements of the Array constructor
+Array | any value | that value
+
+Converting from `Array` with value A to type T produces a T with value X:
+
+Value of Array | To Type T | Value of T
+--- | --- | ---
+any value | Null | null
+any value | String | A String containing an Array constructor
+
+##### Map()
+Converting to `Map` from type T with value X produces an `Map` with value M:
+
+From Type T | With Value X | Value of Map
+--- | --- | ---
+String | A String containing an Map constructor | An Map containing elements of the Map constructor
+Map | any value | that value
+
+Converting from `Map` with value M to type T produces a T with value X:
+
+Value of Map | To Type T | Value of T
+--- | --- | ---
+any value | Null | null
+any value | String | A String containing an Map constructor
+
+##### Function()
+It is an error to convert anything to or from `Function`.
+
+##### Builtin()
+It is an error to convert anything to or from `Builtin`.
 
 ### Functions
     FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
@@ -454,13 +600,13 @@ The relational operators behave as expected. There is no need to compare against
 When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed Plang code.
 
     > var a = 42; $"hello {a + 1} world"
-     hello 43 world
+     "hello 43 world"
 
 #### Concatenation
 To concatenate two strings, use the `.` operator. But consider using [interpolation](#interpolation) instead.
 
     > var a = "Plang"; var b = "Rocks!"; a . " " . b
-     Plang Rocks!
+     "Plang Rocks!"
 
 #### Substring search
 To find the index of a substring within a string, use the `~` operator.
@@ -472,29 +618,29 @@ To find the index of a substring within a string, use the `~` operator.
 To get a positional character from a string, you can use postfix `[]` array notation.
 
     > "Hello!"[0]
-     H
+     "H"
 
 You can use negative numbers to start from the end.
 
     > "Hello!"[-2]
-     o
+     "o"
 
 You can assign to the above notation to replace the character instead.
 
     > "Hello!"[0] = "Jee"
-     Jeeello!
+     "Jeeello!"
 
 #### Substring
 To extract a substring from a string, you can use the `..` range operator inside
 postfix `[]` array notation.
 
     > "Hello!"[1..4]
-     ello
+     "ello"
 
 You can assign to the above notation to replace the substring instead.
 
     > "Good-bye!"[5..7] = "night"
-     Good-night!
+     "Good-night!"
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
