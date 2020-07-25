@@ -599,8 +599,7 @@ for external storage or transmission.
 The Array() and Map() type conversion functions can be used to convert a String containing
 an Array constructor or a Map constructor back to an Array or a Map object.
 
-See [examples/json.pl](examples/json.pl) for more details. See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
-first if you haven't yet.
+See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/json.pl](examples/json.pl) for more details.
 
 ## Example Plang scripts
 [Check out some examples!](examples/)
