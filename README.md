@@ -483,10 +483,11 @@ type | `expr` | Returns the type of an expression, as a string.
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
-                      | VariableDeclaration
-                      | FunctionDefinition
-                      | Expression Terminator
-                      | Terminator
+                      | IfStatement
+                      | WhileStatement
+                      | [ et cetera ]
+                      | Expression Terminator?
+                      | Terminator?
     StatementGroup ::=  "{" Statement+ "}"
     Terminator     ::=  ";"
 
@@ -588,6 +589,7 @@ something like `{'name': Bob, 'age': 32}`. These are 100% compatible with JSON.
 
 You can use the Array() and Map() type conversion functions to convert a String
 containing an Array constructor or a Map constructor to an Array or a Map object.
+
 Inversely, you can use the String() type conversion function to convert Arrays and
 Maps to Strings.
 
