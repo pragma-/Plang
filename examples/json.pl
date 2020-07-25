@@ -9,7 +9,7 @@
 var array = ['green', 2, 3.1459, null]
 
 print(type(array))   # prints Array
-print(array[1])      # prints green
+print(array[0])      # prints green
 print(array)         # prints ["green",2,3.1459,null]
 
 # Maps
@@ -41,11 +41,13 @@ var array2 = Array("[1,2,'blue','green']")
 
 print(type(array2))  # prints Array
 print(array2[2])     # prints blue
+print(array2)        # prints [1,2,"blue","green"]
 
 var map2 = Map("{'a': 1, 'b': 2}")
 
 print(type(map2))    # prints Map
 print(map2['b'])     # prints 2
+print(map2)          # prints {"a": 1, "b": 2}
 
 # As seen in `arrays_and_maps.pl`, you can mix-and-match and
 # nest Maps and Arrays to construct useful data structures.
