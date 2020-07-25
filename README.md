@@ -324,9 +324,9 @@ to use that type in a truthy expression.
 
 Type | Truthiness
 --- | ---
-Boolean | false when value is `false`; true otherwise.
-Number | false when value is `0`;true otherwise.
-String | false when value is empty string; true otherwise.
+Boolean | `false` when value is `false`; `true` otherwise.
+Number | `false` when value is `0`; `true` otherwise.
+String | `false` when value is empty string; `true` otherwise.
 
 #### Type conversion
 Plang does not allow implicit conversion between types. You must convert a value explicitly
@@ -377,7 +377,7 @@ Boolean | `true` | `1`
 Boolean | `false` | `0`
 Number | any value | that value
 String | `""` | `0`
-String | `"X"` | if `"X"` begins with a Number then its value, otherwise 0
+String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
 
 ##### String()
 From Type | With Value | Resulting String Value
