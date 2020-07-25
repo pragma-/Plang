@@ -28,7 +28,7 @@ print(map)           # prints {"name": "Grok", "health": 200}
 var string1 = String(array)
 
 print(type(string1)) # prints String
-print(string1)       # prints ["red","green",1,2]
+print(string1)       # prints ["green",2,3.1459,null]
 
 # Likewise for Maps:
 var string2 = String(map)
