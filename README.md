@@ -68,6 +68,7 @@ Here's a helpful table of contents:
     * [Indexing](#indexing)
     * [Substring](#substring)
     * [Regular expressions](#regular-expressions)
+* [JSON compatibility](#json-compatibility)
 * [Example Plang scripts](#example-plang-scripts)
 <!-- md-toc-end -->
 
@@ -254,7 +255,7 @@ no difference between the quotes.
 
 An `Array` is a collection of values. Array elements can be any type.
 
-See the [arrays and maps examples](examples/arrays_and_maps.pl) for more information.
+See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
 
 ###### Creating and accessing arrays
 Creating an array and accessing an element:
@@ -268,7 +269,7 @@ Creating an array and accessing an element:
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type.
 
-See the [arrays and maps examples](examples/arrays_and_maps.pl) for more information.
+See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
 
 ###### Creating and accessing maps
 Creating a map and accessing a key:
@@ -627,6 +628,18 @@ You can assign to the above notation to replace the substring instead.
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
+
+## JSON compatibility
+An Array constructor is something like `[1,2,"red","green"]`. A Map constructor is
+something like `{'name': Bob, 'age': 32}`. These are 100% compatible with JSON.
+
+You can use the Array() and Map() type conversion functions to convert a String
+containing an Array constructor or a Map constructor to an Array or a Map object.
+
+Inversely, you can use the String() type conversion function to convert Arrays and Maps to
+Strings.
+
+See [examples/json.pl](examples/json.pl) for more details.
 
 ## Example Plang scripts
 [Check out some examples!](examples/)
