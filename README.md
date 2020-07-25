@@ -382,7 +382,7 @@ String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
 ##### String()
 From Type | With Value | Resulting String Value
 --- | --- | ---
-Null | null | `0`
+Null | null | `""`
 Boolean | `true` | `"true"`
 Boolean | `false` | `"false"`
 Number | any value | that value as a String
