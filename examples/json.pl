@@ -33,8 +33,7 @@ var string2 = String(map)
 print(type(string2)) # prints String
 print(string2)       # prints {"name": "Grok", "health": 200}
 
-# Now here's where things get fun. You can convert from a String to an Array
-# or a Map.
+# You can also convert from a String to an Array or a Map.
 var array2 = Array("[1,2,'blue','green']")
 
 print(type(array2))  # prints Array
@@ -45,4 +44,13 @@ var map2 = Map("{'a': 1, 'b': 2}")
 print(type(map2))    # prints Map
 print(map2['b'])     # prints 2
 
-# Absolutely brilliant, isn't it?
+# As seen in `arrays_and_maps.pl`, you can mix-and-match and
+# nest Maps and Arrays to construct useful data structures.
+
+# You can then use the String() type conversion function to
+# convert them to strings for external storage or transmission.
+
+# You can also use the Array() and Map() type conversion
+# functions to convert a String.
+
+# These Strings are 100% compatible with JSON! Absolutely brilliant.
