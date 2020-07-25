@@ -38,6 +38,7 @@ Here's a helpful table of contents:
         * [Delete](#delete)
       * [Function](#function)
       * [Builtin](#builtin)
+    * [Truthiness](#truthiness)
     * [Type conversion](#type-conversion)
       * [Null()](#null-1)
       * [Boolean()](#boolean-1)
@@ -47,7 +48,6 @@ Here's a helpful table of contents:
       * [Map()](#map-1)
       * [Function()](#function-1)
       * [Builtin()](#builtin-1)
-    * [Truthiness](#truthiness)
   * [Scoping](#scoping)
   * [Functions](#functions)
     * [Trivial examples](#trivial-examples)
@@ -310,12 +310,22 @@ the empty map.
     > var map = { "a": 1, "b": 2 }; delete map["b"]; map
      { "a": 1 }
 
-
 ##### Function
 The `Function` type identifies a Plang function. See [functions](#functions) for more information.
 
 ##### Builtin
 The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
+
+#### Truthiness
+For the logical operators (==, ||, &&, etc), this is how truthiness
+is evaluated for each type. If a type is omitted from the table, it is an error
+to use that type in a truthy expression.
+
+Type | Truthiness
+--- | ---
+Boolean | false when value is `false`; true otherwise.
+Number | false when value is `0`;true otherwise.
+String | false when value is empty string; true otherwise.
 
 #### Type conversion
 Plang does not allow implicit conversion between types. You must convert a value explicitly
@@ -341,9 +351,7 @@ to perform the conversion.
 ##### Null()
 Converting to `Null` always produces a `Null` type with value `null`.
 
-Converting from `Null` to type T produces a T with the following values:
-
-Type T | Value
+From Null to Type | Resulting Value
 --- | ---
 Null | null
 Boolean | false
@@ -351,9 +359,7 @@ Number | 0
 String | ""
 
 ##### Boolean()
-Converting to `Boolean` from type T with value X produces a `Boolean` with the following values:
-
-From Type T | With Value X | Value of Boolean
+From Type | With Value | Resulting Boolean Value
 --- | --- | ---
 Null | null | false
 Boolean | true | true
@@ -363,9 +369,7 @@ Number | not 0 | true
 String | "" | false
 String | not "" | true
 
-Converting from `Boolean` with value B to type T produces a T with the following values:
-
-Value of Boolean | To Type T | Value of T
+From Boolean Value | To Type | Resulting Type Value
 --- | --- | ---
 any value | Null | null
 true | Null | null
@@ -377,20 +381,16 @@ false | String | "false"
 true | String | "true"
 
 ##### Number()
-Converting to `Number` from type T with value N produces a `Number` with the following values:
-
-From Type T | With Value X | Value of Number
+From Type | With Value | Resulting Number Value
 --- | --- | ---
 Null | null | 0
-Boolean | true | 1
-Boolean | false | 0
+Boolean | `true` | 1
+Boolean | `false` | 0
 Number | any value | that value
-String | "" | 0
-String | "X" | if "X" begins with a Number then its value, otherwise 0
+String | `""` | `0`
+String | `"X"` | if `"X"` begins with a Number then its value, otherwise 0
 
-Converting from `Number` with value N to type T produces a T with the following values:
-
-Value of Number | To Type T | Value of T
+From Number Value | To Type | Resulting Type Value
 --- | --- | ---
 any value | Null | null
 0 | Boolean | false
@@ -399,9 +399,7 @@ any value | Number | that value
 any value | String | that value as a String
 
 ##### String()
-Converting to `String` from type T with value S produces a `String` with the following values:
-
-From Type T | With Value X | Value of String
+From Type | With Value | Value of String
 --- | --- | ---
 Null | null | 0
 Boolean | true | "true"
@@ -411,9 +409,7 @@ String | any value | that value
 Array | any value | A String containing a construction of that Array
 Map | any value | A String containing a construction of that Map
 
-Converting from `String` with value S to type T produces a T with the following values:
-
-Value of String | To Type T | Value of T
+From String Value | To Type | Resulting Type Value
 --- | --- | ---
 any value | Null | null
 "" | Boolean | false
@@ -421,35 +417,27 @@ not "" | Boolean | true
 "" | Number | 0
 String beginning with a Number | Number | the value of the Number at the beginning of the String
 Any other String | Number | 0
-A String containing a Array construction | Array | An Array containing elements of the Array construction
-A String containing a Map construction | Map | A Map with keys and values of the Map construction
+A String containing a [Array constructor](#array) | Array | the constructed Array
+A String containing a [Map constructor](#map) | Map | the constructed Map
 
 ##### Array()
-Converting to `Array` from type T with value X produces an `Array` with the following values:
-
-From Type T | With Value X | Value of Array
+From Type | With Value | Value of Array
 --- | --- | ---
-String | A String containing an Array constructor | An Array containing elements of the Array constructor
+String | A String containing an [Array constructor](#array) | the constructed Array
 Array | any value | that value
 
-Converting from `Array` with value A to type T produces a T with the following values:
-
-Value of Array | To Type T | Value of T
+From Array Value | To Type | Resulting Type Value
 --- | --- | ---
 any value | Null | null
 any value | String | A String containing an Array constructor
 
 ##### Map()
-Converting to `Map` from type T with value X produces an `Map` with the following values:
-
-From Type T | With Value X | Value of Map
+From Type | With Value | Value of Map
 --- | --- | ---
-String | A String containing an Map constructor | An Map containing elements of the Map constructor
+String | A String containing an [Map constructor](#map) | the constructed Map
 Map | any value | that value
 
-Converting from `Map` with value M to type T produces a T with the following values:
-
-Value of Map | To Type T | Value of T
+From Map Value | To Type | Resulting Type Value
 --- | --- | ---
 any value | Null | null
 any value | String | A String containing an Map constructor
@@ -459,19 +447,6 @@ It is an error to convert anything to or from `Function`.
 
 ##### Builtin()
 It is an error to convert anything to or from `Builtin`.
-
-#### Truthiness
-For the logical operators (==, ||, &&, etc), this is how truthiness
-is evaluated for each type.
-
-Type | Truthiness
---- | ---
-Null | Attempting to use a Null type is always an error.
-Boolean | false when value is `false`; true otherwise.
-Number | false when value is `0`;true otherwise.
-String | false when value is empty string; true otherwise.
-Array | It is an error to use Arrays in truthy expressions.
-Map | It is an error to use Maps in truthy expressions.
 
 ### Scoping
 Functions and variables are lexically scoped. A statement group introduces a new lexical scope. There is some
