@@ -33,11 +33,11 @@ Here's a helpful table of contents:
       * [Array](#array)
         * [Creating and accessing arrays](#creating-and-accessing-arrays)
       * [Map](#map)
-      * [Function](#function)
-      * [Builtin](#builtin)
         * [Creating and accessing maps](#creating-and-accessing-maps)
         * [Exists](#exists)
         * [Delete](#delete)
+      * [Function](#function)
+      * [Builtin](#builtin)
     * [Type conversion](#type-conversion)
       * [Null()](#null-1)
       * [Boolean()](#boolean-1)
@@ -220,8 +220,8 @@ Variables that have not yet been assigned a value will produce an error.
 
 #### Types
 Types of variables are inferred from the type of their value. All variables are simply declared with `var`
-and no type specifier. However, there is no implicit conversion between types. You must [convert](#type-conversion) a
-value to explicitly convert it to a desired type.
+and no type specifier. However, there is no implicit conversion between types. You must [explicitly convert](#type-conversion) a
+value to change its type.
 
 Currently implemented types are:
 
@@ -238,7 +238,7 @@ A `Boolean` is either true or false.
 ##### Number
     Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
 
-`Number`s are things like `-100`, `+4.20`, `2001`, etc. We all know what numbers are!
+`Number`s are things like `-100`, `+4.20`, `2001`, `1e1`, `0x4a`, etc.
 
 In Plang, the `Number` type is equivalent to a double-precision type.
 
@@ -269,12 +269,6 @@ A `Map` is a collection of key/value pairs. Map keys must be of type `String`. M
 values can be any type.
 
 See the [arrays and maps examples](examples/arrays_and_maps.pl) for more information.
-
-##### Function
-The `Function` type identifies a Plang function. See [functions](#functions) for more information.
-
-##### Builtin
-The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
 
 ###### Creating and accessing maps
 Creating a map and accessing a key:
@@ -315,6 +309,13 @@ the empty map.
 
     > var map = { "a": 1, "b": 2 }; delete map["b"]; map
      { "a": 1 }
+
+
+##### Function
+The `Function` type identifies a Plang function. See [functions](#functions) for more information.
+
+##### Builtin
+The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
 
 #### Type conversion
 Plang does not allow implicit conversion between types. You must convert a value explicitly
@@ -385,7 +386,7 @@ Boolean | true | 1
 Boolean | false | 0
 Number | any value | that value
 String | "" | 0
-String | "X" | if "X" begins with a Number then its value otherwise 0
+String | "X" | if "X" begins with a Number then its value, otherwise 0
 
 Converting from `Number` with value N to type T produces a T with the following values:
 
