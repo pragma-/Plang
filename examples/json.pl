@@ -2,15 +2,17 @@
 
 # Recall the syntax for Arrays and Maps? If not, check out
 # the `arrays_and_maps.pl` Plang script in this directory.
-#
+
 # Here's a quick refresher:
 
+# Arrays
 var array = ["red", "green", 1, 2]
 
 print(type(array))   # prints Array
 print(array[1])      # prints green
 print(array)         # prints ["red","green",1,2]
 
+# Maps
 var map = { 'name': 'Grok', 'health': 200 }
 
 print(type(map))     # prints Map
@@ -31,10 +33,11 @@ var string2 = String(map)
 print(type(string2)) # prints String
 print(string2)       # prints {"name": "Grok", "health": 200}
 
+# As seen in `arrays_and_maps.pl`, you can mix-and-match and
+# nest Maps and Arrays to construct useful data structures.
 
-# As seen in `arrays_and_maps.pl`, you can mix-and-match
-# and nest Maps and Arrays to construct useful data structures. You can then
-# use the String() type conversion function to convert them to JSON for
-# external storage or transmission.
+# You can then use the String() type conversion function to
+# convert them to strings, which are 100% compatible with JSON,
+# for external storage or transmission.
 
 # Absolutely brilliant, isn't it?
