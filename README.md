@@ -435,6 +435,9 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Trivial examples
+    > fn say_hello print("Hello, world!"); say_hello()
+     Hello, world!
+<!-- -->
     > fn square(x) x * x; square(2 + 2)
      16
 <!-- -->
@@ -446,8 +449,11 @@ The `fn` statement returns a reference to the newly defined function.
      15
 
 #### Anonymous functions
+    > var greeter = fn { print("Hello!" }; greeter()
+     Hello!
+<!-- -->
     > var adder = fn (a, b) a + b; adder(10, 20)
-      30
+     30
 <!-- -->
     > (fn (a, b) a + b)(1, 2)
      3
