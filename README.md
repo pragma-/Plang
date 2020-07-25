@@ -349,74 +349,79 @@ listed in their respective tables. If a type is not listed in a table, it is an 
 to perform the conversion.
 
 ##### Null()
-Converting to `Null` always produces a `Null` type with value `null`.
+From Type | With Value | Resulting Null Value
+Null | any value | `null`
+Boolean | any value | `null`
+Number | any value | `null`
+String | any value | `null`
+Array | any value | `null`
+Map | any value | `null`
 
-From Null to Type | Resulting Value
---- | ---
-Null | null
-Boolean | false
-Number | 0
-String | ""
+From Null Value | To Type | Resulting Value
+--- | --- | ---
+`null` | Null | `null`
+`null` | Boolean | `false`
+`null` | Number | `0`
+`null` | String | `""`
 
 ##### Boolean()
 From Type | With Value | Resulting Boolean Value
 --- | --- | ---
-Null | null | false
-Boolean | true | true
-Boolean | false | false
-Number | 0 | false
-Number | not 0 | true
-String | "" | false
-String | not "" | true
+Null | `null` | `false`
+Boolean | `true` | `true`
+Boolean | `false` | `false`
+Number | `0` | `false`
+Number | not `0` | `true`
+String | `""` | `false`
+String | not `""` | `true`
 
 From Boolean Value | To Type | Resulting Type Value
 --- | --- | ---
-any value | Null | null
-true | Null | null
-false | Boolean | false
-true | Boolean | true
-false | Number | 0
-true | Number | 1
-false | String | "false"
-true | String | "true"
+any value | Null | `null`
+`false` | Boolean | `false`
+`true` | Boolean | `true`
+`false` | Number | `0`
+`true` | Number | `1`
+`false` | String | `"false"`
+`true` | String | `"true"`
 
 ##### Number()
 From Type | With Value | Resulting Number Value
 --- | --- | ---
-Null | null | 0
-Boolean | `true` | 1
-Boolean | `false` | 0
+Null | `null` | `0`
+Boolean | `true` | `1`
+Boolean | `false` | `0`
 Number | any value | that value
 String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise 0
 
 From Number Value | To Type | Resulting Type Value
 --- | --- | ---
-any value | Null | null
-0 | Boolean | false
-not 0 | Boolean | true
+any value | Null | `null`
+`0` | Boolean | `false`
+not `0` | Boolean | `true`
 any value | Number | that value
 any value | String | that value as a String
 
 ##### String()
 From Type | With Value | Value of String
 --- | --- | ---
-Null | null | 0
-Boolean | true | "true"
-Boolean | false | "false"
+Null | null | `0`
+Boolean | `true` | `"true"`
+Boolean | `false` | `"false"`
 Number | any value | that value as a String
 String | any value | that value
-Array | any value | A String containing a construction of that Array
-Map | any value | A String containing a construction of that Map
+Array | any value | A String containing a constructor of that Array
+Map | any value | A String containing a constructor of that Map
 
 From String Value | To Type | Resulting Type Value
 --- | --- | ---
-any value | Null | null
-"" | Boolean | false
-not "" | Boolean | true
-"" | Number | 0
+any value | Null | `null`
+`""` | Boolean | `false`
+not `""` | Boolean | `true`
+`""` | Number | `0`
 String beginning with a Number | Number | the value of the Number at the beginning of the String
-Any other String | Number | 0
+Any other String | Number | `0`
 A String containing a [Array constructor](#array) | Array | the constructed Array
 A String containing a [Map constructor](#map) | Map | the constructed Map
 
@@ -428,19 +433,19 @@ Array | any value | that value
 
 From Array Value | To Type | Resulting Type Value
 --- | --- | ---
-any value | Null | null
+any value | Null | `null`
 any value | String | A String containing an Array constructor
 
 ##### Map()
 From Type | With Value | Value of Map
 --- | --- | ---
-String | A String containing an [Map constructor](#map) | the constructed Map
+String | A String containing a [Map constructor](#map) | the constructed Map
 Map | any value | that value
 
 From Map Value | To Type | Resulting Type Value
 --- | --- | ---
-any value | Null | null
-any value | String | A String containing an Map constructor
+any value | Null | `null`
+any value | String | A String containing a [Map constructor](#map)
 
 ##### Function()
 It is an error to convert anything to or from `Function`.
