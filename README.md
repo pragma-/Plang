@@ -352,40 +352,22 @@ to perform the conversion.
 ##### Null()
 From Type | With Value | Resulting Null Value
 --- | --- | ---
-Null | any value | `null`
+Null | `null` | `null`
 Boolean | any value | `null`
 Number | any value | `null`
 String | any value | `null`
 Array | any value | `null`
 Map | any value | `null`
 
-From Null Value | To Type | Resulting Value
---- | --- | ---
-`null` | Null | `null`
-`null` | Boolean | `false`
-`null` | Number | `0`
-`null` | String | `""`
-
 ##### Boolean()
 From Type | With Value | Resulting Boolean Value
 --- | --- | ---
 Null | `null` | `false`
-Boolean | `true` | `true`
-Boolean | `false` | `false`
+Boolean | any value | that value
 Number | `0` | `false`
 Number | not `0` | `true`
 String | `""` | `false`
 String | not `""` | `true`
-
-From Boolean Value | To Type | Resulting Type Value
---- | --- | ---
-any value | Null | `null`
-`false` | Boolean | `false`
-`true` | Boolean | `true`
-`false` | Number | `0`
-`true` | Number | `1`
-`false` | String | `"false"`
-`true` | String | `"true"`
 
 ##### Number()
 From Type | With Value | Resulting Number Value
@@ -396,14 +378,6 @@ Boolean | `false` | `0`
 Number | any value | that value
 String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise 0
-
-From Number Value | To Type | Resulting Type Value
---- | --- | ---
-any value | Null | `null`
-`0` | Boolean | `false`
-not `0` | Boolean | `true`
-any value | Number | that value
-any value | String | that value as a String
 
 ##### String()
 From Type | With Value | Value of String
@@ -416,38 +390,17 @@ String | any value | that value
 Array | any value | A String containing a constructor of that Array
 Map | any value | A String containing a constructor of that Map
 
-From String Value | To Type | Resulting Type Value
---- | --- | ---
-any value | Null | `null`
-`""` | Boolean | `false`
-not `""` | Boolean | `true`
-`""` | Number | `0`
-String beginning with a Number | Number | the value of the Number at the beginning of the String
-Any other String | Number | `0`
-A String containing a [Array constructor](#array) | Array | the constructed Array
-A String containing a [Map constructor](#map) | Map | the constructed Map
-
 ##### Array()
 From Type | With Value | Value of Array
 --- | --- | ---
 String | A String containing an [Array constructor](#array) | the constructed Array
 Array | any value | that value
 
-From Array Value | To Type | Resulting Type Value
---- | --- | ---
-any value | Null | `null`
-any value | String | A String containing an Array constructor
-
 ##### Map()
 From Type | With Value | Value of Map
 --- | --- | ---
 String | A String containing a [Map constructor](#map) | the constructed Map
 Map | any value | that value
-
-From Map Value | To Type | Resulting Type Value
---- | --- | ---
-any value | Null | `null`
-any value | String | A String containing a [Map constructor](#map)
 
 ##### Function()
 It is an error to convert anything to or from `Function`.
@@ -635,9 +588,8 @@ something like `{'name': Bob, 'age': 32}`. These are 100% compatible with JSON.
 
 You can use the Array() and Map() type conversion functions to convert a String
 containing an Array constructor or a Map constructor to an Array or a Map object.
-
-Inversely, you can use the String() type conversion function to convert Arrays and Maps to
-Strings.
+Inversely, you can use the String() type conversion function to convert Arrays and
+Maps to Strings.
 
 See [examples/json.pl](examples/json.pl) for more details.
 
