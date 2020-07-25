@@ -11,7 +11,8 @@ fn counter() {
 var count1 = counter()
 var count2 = counter()
 
-# these should increment their own `i` that was in scope at the time `fn ++i` was returned by counter()
+# each invocation of count1() and count2() increment their copy of `i`
+# that was in scope at the time `fn ++i` was returned by counter()
 $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}";
 
 # outputs: 1 2 3 1 4 2
