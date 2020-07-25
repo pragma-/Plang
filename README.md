@@ -449,7 +449,7 @@ The `fn` statement returns a reference to the newly defined function.
      15
 
 #### Anonymous functions
-    > var greeter = fn { print("Hello!" }; greeter()
+    > var greeter = fn { print("Hello!") }; greeter()
      Hello!
 <!-- -->
     > var adder = fn (a, b) a + b; adder(10, 20)
