@@ -584,14 +584,14 @@ You can assign to the above notation to replace the substring instead.
 You may use regular expressions on strings with the `~=` operator.
 
 ## JSON compatibility
-An Array constructor is something like `[1,2,"red","green"]`. A Map constructor is
-something like `{'name': Bob, 'age': 32}`. These are 100% compatible with JSON.
+An Array constructor is something like `["red",2,3.1459,null]`. A Map constructor is
+something like `{"name": Bob, "age": 32}`. These are 100% compatible with JSON.
 
-You can use the Array() and Map() type conversion functions to convert a String
-containing an Array constructor or a Map constructor to an Array or a Map object.
+The String() type conversion function can be used to convert Arrays and Maps to Strings
+for external storage or transmission.
 
-Inversely, you can use the String() type conversion function to convert Arrays and
-Maps to Strings.
+The Array() and Map() type conversion functions can be used to convert a String containing
+an Array constructor or a Map constructor back to an Array or a Map object.
 
 See [examples/json.pl](examples/json.pl) for more details.
 
