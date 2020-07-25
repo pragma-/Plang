@@ -6,11 +6,11 @@
 # Here's a quick refresher:
 
 # Arrays
-var array = ["red", "green", 1, 2]
+var array = ['green', 2, 3.1459, null]
 
 print(type(array))   # prints Array
 print(array[1])      # prints green
-print(array)         # prints ["red","green",1,2]
+print(array)         # prints ["green",2,3.1459,null]
 
 # Maps
 var map = { 'name': 'Grok', 'health': 200 }
@@ -18,6 +18,9 @@ var map = { 'name': 'Grok', 'health': 200 }
 print(type(map))     # prints Map
 print(map['name'])   # prints Grok
 print(map)           # prints {"name": "Grok", "health": 200}
+
+# Note that conversions from Array/Map to String replaces the single-quotes
+# with double-quotes.
 
 # Looks awfully like JSON, doesn't it?
 
@@ -33,7 +36,7 @@ var string2 = String(map)
 print(type(string2)) # prints String
 print(string2)       # prints {"name": "Grok", "health": 200}
 
-# You can also convert from a String to an Array or a Map.
+# You can convert back from a String to an Array or a Map:
 var array2 = Array("[1,2,'blue','green']")
 
 print(type(array2))  # prints Array
@@ -50,7 +53,7 @@ print(map2['b'])     # prints 2
 # You can then use the String() type conversion function to
 # convert them to strings for external storage or transmission.
 
-# You can also use the Array() and Map() type conversion
-# functions to convert a String.
+# To convert the strings back to Arrays or Maps, you can use
+# the Array() and Map() type conversion functions.
 
 # These Strings are 100% compatible with JSON! Absolutely brilliant.
