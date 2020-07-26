@@ -342,7 +342,7 @@ sub ArrayConstructor {
     $parser->backtrack;
 }
 
-# Grammar: Initializer ::= ASSIGN (MapConstructor | ArrayConstructor | Expression)
+# Grammar: Initializer ::= ASSIGN Expression
 sub Initializer {
     my ($parser) = @_;
 
@@ -358,6 +358,8 @@ sub Initializer {
                 $parser->advance;
                 return $expr;
             }
+
+            return expected($parser, 'expression for initializer');
         }
     }
 
@@ -429,7 +431,7 @@ sub FunctionDefinition {
 
 # Grammar: IdentifierList      ::= L_PAREN (TypeAndOrIdentifier Initializer? COMMA?)* R_PAREN
 #          TypeAndOrIdentifier ::= Type Identifier | Identifier
-#          Type ::= Null | Boolean | Number | String | Array | Map | Function | Builtin
+#          Type ::= Any | Null | Boolean | Number | String | Array | Map | Function | Builtin
 sub IdentifierList {
     my ($parser) = @_;
 
