@@ -265,7 +265,7 @@ If you pass a `String` to it, it will blow-up inside the function body:
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
 
-However, if you apply the Number() type conversion function on the arguments inside
+However, if you apply the Number() type conversion function on the parameters inside
 the function body you will make a polymorphic function with implicit type conversion:
 
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
