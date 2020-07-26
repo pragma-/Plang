@@ -30,6 +30,7 @@ Here's a helpful table of contents:
     * [Trivial examples](#trivial-examples)
     * [Default arguments](#default-arguments)
     * [Anonymous functions](#anonymous-functions)
+    * [Type-checking](#type-checking)
     * [Closures](#closures)
     * [Currying](#currying)
     * [Lazy evaluation](#lazy-evaluation)
@@ -196,16 +197,21 @@ Variables that have not yet been assigned a value will produce an error.
      Error: `b` not defined.
 
 ### Functions
-    FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
-    IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
+    FunctionDefinition  ::= "fn" Type? Identifier? IdentifierList? Statement
+    IdentifierList      ::= "(" (TypeAndOrIdentifier Initializer? ","?)* ")"
+    TypeAndOrIdentifier ::= Type Identifier | Identifier
+    Type ::= "Any" "Null" "Boolean" "Number" "String" "Array" "Map" "Function" "Builtin"
 
-A function definition is created by using the `fn` keyword followed by: an identifer (which may
-be omitted to create an anonymous function), an identifier list (which may be omitted if there
-are no parameters desired), and finally either a group of statements or a single statement.
+A function definition is created by using the `fn` keyword followed by:
+ * a type specifier (which may be omitted to specifiy the `Any` type)
+ * an identifer (which may be omitted to create an anonymous function)
+ * an identifier list (which may be omitted if there are no parameters desired)
+ * and finally either a group of statements or a single statement
 
-An identifier list is a list of identifiers enclosed in parentheses. The list is separated
-by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
-be followed by an optional initializer to create a default value.
+An identifier list is a list of identifiers, each optionally prefixed with a type specifier,
+enclosed in parentheses. The list is separated by a comma and/or whitespace. In other
+words, the comma is optional. Each identifier may be followed by an optional initializer
+to create a default value.
 
 Plang functions automatically return the value of the last statement or statement group.
 You may use the `return` keyword to return the value of an ealier statement.
@@ -223,8 +229,8 @@ The `fn` statement returns a reference to the newly defined function.
     > fn square(x) x * x; square(2 + 2)
      16
 <!-- -->
-    > fn add(a, b) a + b; add(2, 3)
-     5
+    > fn add(a, b) a + b; add(3, 4)
+     7
 
 #### Default arguments
     > fn add(a, b = 10) a + b; add(5);
@@ -242,6 +248,41 @@ The `fn` statement returns a reference to the newly defined function.
 <!-- -->
     > (fn 42)()
      42
+
+#### Type-checking
+With no explicit type-specifiers, all types default to the special `Any` type.
+
+Consider an `add` function with no type-specifiers:
+
+    > fn add(a, b) a + b; print(type(add)); add(3, 4)
+     Function (Any a, Any b) -> Any
+     7
+
+If you pass a `String` to it, it will blow-up inside the function body:
+
+    > fn add(a, b) a + b; add(3, "4")
+     Error: cannot apply binary operator ADD (have types Number and String)
+
+However, if you apply the Number() type conversion function:
+
+    > fn add(a, b) Number(a) + Number(b); add(3, "4")
+     7
+
+As you can see, this is a way to make a polymorphic function with implicit type conversion.
+
+But if you prefer stricter type-checking you can addtype-specifiers before each parameter name:
+
+    > fn add(Number a, Number b) a + b; print(type(add)); add(3, "4")
+     Function (Number a, Number b) -> Any
+     Error: In function call for `add`, expected Number for parameter `b` but got String
+
+Now the function type-checks its parameters and throws a more detailed error if the types
+do not match, before entering the function body.
+
+You can also specify a return type by putting a type-specifier before the function identifier:
+
+    > fn Number add(Number a, Number b) a + b; print(type(add))
+     Function (Number a, Number b) -> Number
 
 #### Closures
 The following snippet:
