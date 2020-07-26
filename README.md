@@ -125,7 +125,7 @@ A [Map constructor](#map) is something like `{"name": Bob, "age": 32}`.
 It's no coincidence that this syntax is compatible with JSON. This allows easy and
 convenient serialization of Plang data structures for data-exchange and interoperability.
 
-The String() type conversion function can be used to convert or serialize Arrays
+The String() [type conversion function](#type-conversion) can be used to convert or serialize Arrays
 and Maps to Strings for external storage or transmission.
 
 The Array() and Map() type conversion functions can be used to convert a String containing
@@ -268,6 +268,14 @@ Function | Parameters | Description
 --- | --- | ---
 print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
 type | `expr` | Returns the type of an expression, as a string.
+Null | `expr` | Converts the value of `expr` to a value of type `Null`
+Boolean | `expr` | Converts the value of `expr` to a value of type `Boolean`
+Number | `expr` | Converts the value of `expr` to a value of type `Number`
+String | `expr` | Converts the value of `expr` to a value of type `String`
+Array | `expr` | Converts the value of `expr` to a value of type `Array`
+Map | `expr` | Converts the value of `expr` to a value of type `Map`
+Function | `expr` | Converts the value of `expr` to a value of type `Function`
+Builtin | `expr` | Converts the value of `expr` to a value of type `Builtin`
 
 ### Types
 Currently implemented types are:
