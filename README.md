@@ -121,7 +121,7 @@ unit-test script](test/unit_tests.pl) for a simple example. For a more advanced 
 ## JSON compatibility/serialization
 An [Array constructor](#array) is something like `["red",2,3.1459,null]`.
 
-A [Map constructor](#map) is something like `{"name": Bob, "age": 32}`.
+A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
 
 It's no coincidence that this syntax is compatible with JSON. This allows easy and
 convenient serialization of Plang data structures for data-exchange and interoperability.
