@@ -250,7 +250,9 @@ The `fn` statement returns a reference to the newly defined function.
      42
 
 #### Type-checking
-With no explicit type-specifiers, all types default to the special `Any` type.
+With no explicit type-specifiers, the function's return type and types of its parameters
+will default to the special `Any` type. The `Any` type means that the function will
+accept an argument of any type for that parameter.
 
 Consider an `add` function with no type-specifiers:
 
