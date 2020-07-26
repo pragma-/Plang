@@ -115,6 +115,10 @@ sub initialize {
         'exists', 'delete',
     );
 
+    $self->{parser}->define_types(
+        'Any', 'Null', 'Boolean', 'Number', 'String', 'Array', 'Map', 'Function', 'Builtin',
+    );
+
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});
 }
 

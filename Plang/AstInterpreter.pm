@@ -45,24 +45,6 @@ sub initialize {
     $self->{repl_context}   = undef; # persistent repl context
 }
 
-my %pretty_types = (
-    'NULL'    => 'Null',
-    'NUM'     => 'Number',
-    'STRING'  => 'String',
-    'BOOL'    => 'Boolean',
-    'FUNC'    => 'Function',
-    'BUILTIN' => 'Builtin',
-    'MAP'     => 'Map',
-    'ARRAY'   => 'Array',
-);
-
-sub pretty_type {
-    my ($self, $value) = @_;
-    my $type = $pretty_types{$value->[0]};
-    return $value->[0] if not defined $type;
-    return $type;
-}
-
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
@@ -194,47 +176,112 @@ sub binary_op {
 # builtin functions
 my %function_builtins = (
     'print'   => {
-        # [['param1 name', default value], ['param2 name', default value], [...]]
-        params => [['expr', undef], ['end', ['STRING', "\n"]]],
+        # [['param1 type', 'param1 name', default value], ['param2 type', 'param2 name', default value], [...]]
+        params => [['Any', 'expr', undef], ['String', 'end', ['STRING', "\n"]]],
+        ret    => 'Null',
         subref => \&function_builtin_print,
     },
     'type'   => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'String',
         subref => \&function_builtin_type,
     },
     'Number' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Number',
         subref => \&function_builtin_Number,
     },
     'String' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'String',
         subref => \&function_builtin_String,
     },
     'Boolean' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Boolean',
         subref => \&function_builtin_Boolean,
     },
     'Null' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Null',
         subref => \&function_builtin_Null,
     },
     'Function' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Null',
         subref => \&function_builtin_CannotConvert,
     },
     'Builtin' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Null',
         subref => \&function_builtin_CannotConvert,
     },
     'Map' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Map',
         subref => \&function_builtin_Map,
     },
     'Array' => {
-        params => [['expr', undef]],
+        params => [['Any', 'expr', undef]],
+        ret    => 'Array',
         subref => \&function_builtin_Array,
     },
 );
+
+my %pretty_types = (
+    'NULL'    => 'Null',
+    'NUM'     => 'Number',
+    'STRING'  => 'String',
+    'BOOL'    => 'Boolean',
+    'FUNC'    => 'Function',
+    'BUILTIN' => 'Builtin',
+    'MAP'     => 'Map',
+    'ARRAY'   => 'Array',
+);
+
+sub pretty_type {
+    my ($self, $value) = @_;
+    my $type = $pretty_types{$value->[0]};
+    return $value->[0] if not defined $type;
+
+    if ($type eq 'Function') {
+        my $ret_type = $value->[1]->[1];
+        my @params;
+        foreach my $param (@{$value->[1]->[2]}) {
+            if (defined $param->[2]) {
+                my $default_value = $self->statement($self->new_context, $param->[2]);
+                push @params, "$param->[0] $param->[1] = " . $self->output_value($default_value, literal => 1);
+            } else {
+                push @params, "$param->[0] $param->[1]";
+            }
+        }
+
+        $type = "Function ";
+        $type .= '(' . join(', ', @params) . ') ' if @params;
+        $type .= "-> $ret_type";
+    }
+
+    elsif ($type eq 'Builtin') {
+        my $builtin = $function_builtins{$value->[1]};
+
+        my $ret_type = $builtin->{ret};
+        my @params;
+        foreach my $param (@{$builtin->{params}}) {
+            if (defined $param->[2]) {
+                my $default_value = $self->statement($self->new_context, $param->[2]);
+                push @params, "$param->[0] $param->[1] = " . $self->output_value($default_value, literal => 1);
+            } else {
+                push @params, "$param->[0] $param->[1]";
+            }
+        }
+
+        $type = "Builtin ";
+        $type .= '(' . join(', ', @params) . ') ' if @params;
+        $type .= "-> $ret_type";
+    }
+
+    return $type;
+}
 
 # builtin print
 sub function_builtin_print {
@@ -384,8 +431,8 @@ sub function_builtin_CannotConvert {
 }
 
 sub add_builtin_function {
-    my ($self, $name, $parameters, $subref) = @_;
-    $function_builtins{$name} = { params => $parameters, subref => $subref };
+    my ($self, $name, $parameters, $return_type, $subref) = @_;
+    $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref };
 }
 
 sub get_builtin_function {
@@ -413,18 +460,25 @@ sub process_function_call_arguments {
     for (my $i = 0; $i < @$parameters; $i++) {
         if (not defined $arguments->[$i]) {
             # no argument provided
-            if (defined $parameters->[$i]->[1]) {
+            if (defined $parameters->[$i]->[2]) {
                 # found default argument
-                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[1]);
-                $context->{locals}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
+                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+                $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
             } else {
                 # no argument or default argument
-                $self->error($context, "Missing argument `$parameters->[$i]->[0]` to function `$name`.\n"),
+                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`.\n"),
             }
         } else {
             # argument provided
             $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-            $context->{locals}->{$parameters->[$i]->[0]} = $evaluated_arguments->[$i];
+
+            # check type
+            if ($parameters->[$i]->[0] ne 'Any' and $parameters->[$i]->[0] ne $self->pretty_type($evaluated_arguments->[$i])) {
+                $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameters->[$i])
+                    . " for parameter `$parameters->[$i]->[1]` but got " . $self->pretty_type($evaluated_arguments->[$i]));
+            }
+
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         }
     }
 
@@ -438,11 +492,12 @@ sub process_function_call_arguments {
 sub function_definition {
     my ($self, $context, $data) = @_;
 
-    my $name       = $data->[1];
-    my $parameters = $data->[2];
-    my $statements = $data->[3];
+    my $ret_type   = $data->[1];
+    my $name       = $data->[2];
+    my $parameters = $data->[3];
+    my $statements = $data->[4];
 
-    my $func = ['FUNC', [$context, $parameters, $statements]];
+    my $func = ['FUNC', [$context, $ret_type, $parameters, $statements]];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
@@ -495,8 +550,9 @@ sub function_call {
     }
 
     my $closure    = $func->[1]->[0];
-    my $parameters = $func->[1]->[1];
-    my $statements = $func->[1]->[2];
+    my $ret_type   = $func->[1]->[1];
+    my $parameters = $func->[1]->[2];
+    my $statements = $func->[1]->[3];
 
     # wedge closure in between current scope and previous scope
     my $new_context = $self->new_context($closure);
@@ -1022,14 +1078,7 @@ sub map_to_string {
     while (my ($key, $value) = each %$hash) {
         $key = $self->output_string_literal($key);
         my $entry = "$key: ";
-
-        if ($value->[0] eq 'STRING') {
-            $entry .= $self->output_string_literal($value->[1]);
-        } elsif ($value->[0] eq 'NULL') {
-            $entry .= 'null';
-        } else {
-            $entry .= $self->output_value($value);
-        }
+        $entry .= $self->output_value($value, literal => 1);
         push @entries, $entry;
     }
 
@@ -1048,13 +1097,7 @@ sub array_to_string {
 
     my @entries;
     foreach my $entry (@$array) {
-        if ($entry->[0] eq 'STRING') {
-            push @entries, $self->output_string_literal($entry->[1]);
-        } elsif ($entry->[0] eq 'NULL') {
-            push @entries, 'null';
-        } else {
-            push @entries, $self->output_value($entry);
-        }
+        push @entries, $self->output_value($entry, literal => 1);
     }
 
     $string .= join(',', @entries);
@@ -1074,7 +1117,7 @@ sub output_string_literal {
 }
 
 sub output_value {
-    my ($self, $value) = @_;
+    my ($self, $value, %opts) = @_;
 
     my $result = "";
 
@@ -1106,9 +1149,20 @@ sub output_value {
         $result .= $self->array_to_string($value);
     }
 
-    # STRING and NUM returned as-is
+    # STRING and NUM
     else {
-        $result .= $value->[1];
+        if ($opts{literal}) {
+            # output literals
+            if ($value->[0] eq 'STRING') {
+                $result .= $self->output_string_literal($value->[1]);
+            } elsif ($value->[0] eq 'NULL') {
+                $result .= 'null';
+            } else {
+                $result .= $value->[1];
+            }
+        } else {
+            $result .= $value->[1];
+        }
     }
 
     return $result;

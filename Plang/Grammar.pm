@@ -36,6 +36,7 @@ my %pretty_tokens = (
 sub pretty_token {
     my ($token) = @_;
     return 'keyword' if $token =~ /^KEYWORD_/;
+    return 'type'    if $token =~ /^TYPE_/;
     return $pretty_tokens{$token} // $token;
 }
 
@@ -256,12 +257,12 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-# Grammar: MapInitializer ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
+# Grammar: MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
 #          String ::= DQUOTE_STRING | SQUOTE_STRING
-sub MapInitializer {
+sub MapConstructor {
     my ($parser) = @_;
 
-    $parser->try('MapInitializer');
+    $parser->try('MapConstructor');
 
     {
         if ($parser->consume('L_BRACE')) {
@@ -310,11 +311,11 @@ sub MapInitializer {
     $parser->backtrack;
 }
 
-# Grammar: ArrayInitializer ::= "[" (Expression ","?)* "]"
-sub ArrayInitializer {
+# Grammar: ArrayConstructor ::= "[" (Expression ","?)* "]"
+sub ArrayConstructor {
     my ($parser) = @_;
 
-    $parser->try('ArrayInitializer');
+    $parser->try('ArrayConstructor');
 
     {
         if ($parser->consume('L_BRACKET')) {
@@ -341,7 +342,7 @@ sub ArrayInitializer {
     $parser->backtrack;
 }
 
-# Grammar: Initializer ::= ASSIGN (MapInitializer | ArrayInitializer | Expression)
+# Grammar: Initializer ::= ASSIGN (MapConstructor | ArrayConstructor | Expression)
 sub Initializer {
     my ($parser) = @_;
 
@@ -363,7 +364,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? (StatementGroup | Statement)
+# Grammar: FunctionDefinition ::= KEYWORD_fn TYPE? IDENT? IdentifierList? (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -371,7 +372,15 @@ sub FunctionDefinition {
 
     {
         if ($parser->consume('KEYWORD_fn')) {
-            my $token = $parser->consume('IDENT');
+            my $token = $parser->next_token('peek');
+
+            my $return_type = 'Any';
+            if ($token->[0] =~ /^TYPE_(.*)/) {
+                $return_type = $1;
+                $parser->consume;
+            }
+
+            $token = $parser->consume('IDENT');
 
             my $name;
 
@@ -394,7 +403,7 @@ sub FunctionDefinition {
 
                 if ($statement_group) {
                     $parser->advance;
-                    return ['FUNCDEF', $name, $identlist, $statement_group->[1]];
+                    return ['FUNCDEF', $return_type, $name, $identlist, $statement_group->[1]];
                 }
             }
 
@@ -406,7 +415,7 @@ sub FunctionDefinition {
 
                 if ($statement) {
                     $parser->advance;
-                    return ['FUNCDEF', $name, $identlist, [$statement]];
+                    return ['FUNCDEF', $return_type, $name, $identlist, [$statement]];
                 }
             }
 
@@ -418,7 +427,9 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList ::= L_PAREN (IDENT Initializer? COMMA?)* R_PAREN
+# Grammar: IdentifierList      ::= L_PAREN (TypeAndOrIdentifier Initializer? COMMA?)* R_PAREN
+#          TypeAndOrIdentifier ::= Type Identifier | Identifier
+#          Type ::= Null | Boolean | Number | String | Array | Map | Function | Builtin
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -429,10 +440,18 @@ sub IdentifierList {
 
         my $identlist = [];
         while (1) {
-            if (my $token = $parser->consume('IDENT')) {
+            my $token = $parser->next_token('peek');
+
+            my $type = 'Any';
+            if ($token->[0] =~ /^TYPE_(.*)/) {
+                $type = $1;
+                $parser->consume;
+            }
+
+            if ($token = $parser->consume('IDENT')) {
                 my $name = $token->[1];
                 my $initializer = Initializer($parser);
-                push @{$identlist}, [$name, $initializer];
+                push @{$identlist}, [$type, $name, $initializer];
                 $parser->consume('COMMA');
                 next;
             }
@@ -807,11 +826,11 @@ sub Prefix {
     return if $parser->errored;
     return $if if $if;
 
-    my $map = MapInitializer($parser);
+    my $map = MapConstructor($parser);
     return if $parser->errored;
     return $map if $map;
 
-    my $array = ArrayInitializer($parser);
+    my $array = ArrayConstructor($parser);
     return if $parser->errored;
     return $array if $array;
 
@@ -833,6 +852,16 @@ sub Prefix {
 
     if ($token = $parser->consume('HEX')) {
         return ['NUM', hex $token->[1]];
+    }
+
+    # special case types as identifiers here
+    $token = $parser->next_token('peek');
+    if ($token->[0] =~ /TYPE_(.*)/) {
+        my $ident = $1;
+        $parser->consume;
+        my $postfix = Postfix($parser, ['IDENT', $ident]);
+        return if $parser->errored;
+        return $postfix;
     }
 
     if ($token = $parser->consume('IDENT')) {
@@ -972,7 +1001,7 @@ sub Postfix {
             }
 
             last if $parser->consume('R_PAREN');
-            return expected($parser, 'Expression or closing ")" for function call argument list');
+            return expected($parser, 'expression or closing ")" for function call argument list');
         }
 
         return ['CALL', $left, $arguments];

@@ -10,6 +10,7 @@ BEGIN {
 }
 
 use utf8;
+STDOUT->autoflush(1);
 
 # format is:
 # ['code', ['expected type', 'expected value'], ['STDOUT', 'expected output']]
@@ -68,7 +69,7 @@ CODE
         ,
         ['NUM', 5             ]],
     ['type(fn)',
-        ['STRING', 'Function' ]],
+        ['STRING', 'Function -> Any' ]],
     ['type(1==1)',
         ['STRING', 'Boolean'  ]],
     ['type("hi")',
@@ -171,7 +172,9 @@ my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
 $plang->{interpreter}->add_builtin_function('print',
     # these are the parameters we want: `expr` and `end`.
     # `expr` has no default value; `end` has default value [STRING, "\n"]
-    [['expr', undef], ['end', ['STRING', "\n"]]],
+    [['Any', 'expr', undef], ['String', 'end', ['STRING', "\n"]]],
+    # the type of value print() returns
+    'Null',
     # subref to our function that will override the `print` function
     \&print_override);
 
