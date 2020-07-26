@@ -19,26 +19,34 @@ Here's a helpful table of contents:
 * [Running Plang in the Bash shell](#running-plang-in-the-bash-shell)
   * [DEBUG environment variable](#debug-environment-variable)
 * [Embedding Plang](#embedding-plang)
+* [Example Plang scripts](#example-plang-scripts)
+* [JSON compatibility/serialization](#json-compatibilityserialization)
 * [The Plang Language (so far)](#the-plang-language-so-far)
-  * [Expressions](#expressions)
-    * [Operators](#operators)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
+  * [Scoping](#scoping)
   * [Variables](#variables)
-    * [Types](#types)
-      * [Null](#null)
-      * [Boolean](#boolean)
-      * [Number](#number)
-      * [String](#string)
-      * [Array](#array)
-        * [Creating and accessing arrays](#creating-and-accessing-arrays)
-      * [Map](#map)
-        * [Creating and accessing maps](#creating-and-accessing-maps)
-        * [Exists](#exists)
-        * [Delete](#delete)
+  * [Functions](#functions)
+    * [Trivial examples](#trivial-examples)
+    * [Default arguments](#default-arguments)
+    * [Anonymous functions](#anonymous-functions)
+    * [Closures](#closures)
+    * [Currying](#currying)
+    * [Lazy evaluation](#lazy-evaluation)
+    * [Built-in functions](#built-in-functions)
+  * [Types](#types)
+    * [Null](#null)
+    * [Boolean](#boolean)
+    * [Number](#number)
+    * [String](#string)
+    * [Array](#array)
+      * [Creating and accessing arrays](#creating-and-accessing-arrays)
+    * [Map](#map)
+      * [Creating and accessing maps](#creating-and-accessing-maps)
+      * [Exists](#exists)
+      * [Delete](#delete)
       * [Function](#function)
       * [Builtin](#builtin)
-    * [Truthiness](#truthiness)
     * [Type conversion](#type-conversion)
       * [Null()](#null-1)
       * [Boolean()](#boolean-1)
@@ -48,18 +56,12 @@ Here's a helpful table of contents:
       * [Map()](#map-1)
       * [Function()](#function-1)
       * [Builtin()](#builtin-1)
-  * [Scoping](#scoping)
-  * [Functions](#functions)
-    * [Trivial examples](#trivial-examples)
-    * [Default arguments](#default-arguments)
-    * [Anonymous functions](#anonymous-functions)
-    * [Closures](#closures)
-    * [Currying](#currying)
-    * [Lazy evaluation](#lazy-evaluation)
-    * [Built-in functions](#built-in-functions)
   * [Statements and StatementGroups](#statements-and-statementgroups)
     * [if/then/else](#ifthenelse)
     * [while/next/last](#whilenextlast)
+  * [Expressions](#expressions)
+    * [Operators](#operators)
+    * [Truthiness](#truthiness)
   * [String operations](#string-operations)
     * [Relational operations](#relational-operations)
     * [Interpolation](#interpolation)
@@ -68,8 +70,6 @@ Here's a helpful table of contents:
     * [Indexing](#indexing)
     * [Substring](#substring)
     * [Regular expressions](#regular-expressions)
-* [JSON compatibility](#json-compatibility)
-* [Example Plang scripts](#example-plang-scripts)
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
@@ -114,57 +114,26 @@ I will get around to documenting this soon. In the meantime, take a look at [thi
 unit-test script](test/unit_tests.pl) for a simple example. For a more advanced example, see
  [PBot's Plang plugin.](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
 
+## Example Plang scripts
+[Check out some examples!](examples/)
+
+## JSON compatibility/serialization
+An [Array constructor](#array) is something like `["red",2,3.1459,null]`.
+
+A [Map constructor](#map) is something like `{"name": Bob, "age": 32}`.
+
+It's no coincidence that this syntax is compatible with JSON. This allows easy and
+convenient serialization of Plang data structures for data-exchange and interoperability.
+
+The String() type conversion function can be used to convert or serialize Arrays
+and Maps to Strings for external storage or transmission.
+
+The Array() and Map() type conversion functions can be used to convert a String containing
+an Array constructor or a Map constructor back to an Array or a Map object.
+
+See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/json.pl](examples/json.pl) for more details.
+
 ## The Plang Language (so far)
-### Expressions
-Expressions perform arithmetic, logical or assignment operations.
-
-#### Operators
-These are the operators implemented so far, from highest to lowest precedence.
-
-The precedence values are large to give me some space to add new operators with
-new precedence. When the dust settles, the values will be made more sensible.
-
-P | Operator | Description | Type
---- | --- | --- | ---
-100 | () | Function call    |
-70 | [] | Array notation    | Postfix
-70 | ++ | Post-increment    | Postfix
-70 | -- | Post-decrement    | Postfix
-60 | ++ | Pre-increment     | Prefix
-60 | -- | Pre-decrement     | Prefix
-60 | !  | Logical negation  | Prefix
-50 | ** | Exponent          | Infix (right-to-left)
-50 | %  | Remainder         | Infix (left-to-right)
-40 | *  | Product           | Infix (left-to-right)
-40 | /  | Division          | Infix (left-to-right)
-30 | +  | Addition          | Infix (left-to-right)
-30 | -  | Subtraction       | Infix (left-to-right)
-25 | .  | String concatenation | Infix (left-to-right)
-25 | ~  | Substring index      | Infix (left-to-right)
-23 | >= | Greater or equal  | Infix (left-to-right)
-23 | <= | Less or equal     | Infix (left-to-right)
-23 | >  | Greater           | Infix (left-to-right)
-23 | <  | Less              | Infix (left-to-right)
-20 | == | Equality          | Infix (left-to-right)
-20 | != | Inequality        | Infix (left-to-right)
-17 | && | Logical and       | Infix (left-to-right)
-16 | \|\| | Logical or        | Infix (left-to-right)
-15 | ?: | Conditional       | Infix ternary (right-to-left)
-10 | =  | Assignment        | Infix (right-to-left)
-10 | += | Addition assignment     | Infix (right-to-left)
-10 | -= | Subtraction assignment  | Infix (right-to-left)
-10 | \*= | Product assignment     | Infix (right-to-left)
-10 | /= | Division assignment     | Infix (right-to-left)
-7  | .= | String concat assignment | Infix (right-to-left)
-5  | ,  | Comma             | Infix (left-to-right)
-4  | not | Logical negation | Prefix
-3  | and | Logical and      | Infix (left-to-right)
-2  | or  | Logical or       | Infix (left-to-right)
-
-`!`, `&&`, and `||` have high precedence such that they are useful in constructing an expression;
-`not`, `and`, and `or` have low precedence such that they are useful for flow control between
-what are essentially different expressions.
-
 ### Identifiers
     Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
     Letter     ::=  "a" - "z" | "A" - "Z"
@@ -193,6 +162,9 @@ next | jump to the next iteration of the loop
 exists | test if a key exists in a Map
 delete | deletes a key from a Map
 
+### Scoping
+Variables and functions are lexically scoped. Statement groups introduce a new lexical scope.
+
 ### Variables
     VariableDeclaration ::= "var" Identifier Initializer?
     Initializer         ::= "=" Statement
@@ -200,6 +172,10 @@ delete | deletes a key from a Map
 Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
 may optionally have an initializer that assigns a default value. Without an initializer, the value of
 variables will default to `null`, which has type `Null`.
+
+Types of variables are inferred from the type of their value. All variables are simply declared with `var`
+and no type specifier. However, there is no implicit conversion between types. You must [explicitly convert](#type-conversion) a
+value to change its type.
 
 The `var` statement returns the value of the variable.
 
@@ -219,51 +195,121 @@ Variables that have not yet been assigned a value will produce an error.
     > var a = 5; var b; a + b
      Error: `b` not defined.
 
-#### Types
-Types of variables are inferred from the type of their value. All variables are simply declared with `var`
-and no type specifier. However, there is no implicit conversion between types. You must [explicitly convert](#type-conversion) a
-value to change its type.
+### Functions
+    FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
+    IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
 
+A function definition is created by using the `fn` keyword followed by: an identifer (which may
+be omitted to create an anonymous function), an identifier list (which may be omitted if there
+are no parameters desired), and finally either a group of statements or a single statement.
+
+An identifier list is a list of identifiers enclosed in parentheses. The list is separated
+by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
+be followed by an optional initializer to create a default value.
+
+Plang functions automatically return the value of the last statement or statement group.
+You may use the `return` keyword to return the value of an ealier statement.
+
+To call a function, write its identifier followed by a list of arguments enclosed in
+parentheses. The argument list is separated the same way as the identifier list. Arguments
+may be any valid expression.
+
+The `fn` statement returns a reference to the newly defined function.
+
+#### Trivial examples
+    > fn say_hello print("Hello, world!"); say_hello()
+     Hello, world!
+<!-- -->
+    > fn square(x) x * x; square(2 + 2)
+     16
+<!-- -->
+    > fn add(a, b) a + b; add(2, 3)
+     5
+
+#### Default arguments
+    > fn add(a, b = 10) a + b; add(5);
+     15
+
+#### Anonymous functions
+    > var greeter = fn { print("Hello!") }; greeter()
+     Hello!
+<!-- -->
+    > var adder = fn (a, b) a + b; adder(10, 20)
+     30
+<!-- -->
+    > (fn (a, b) a + b)(1, 2)
+     3
+<!-- -->
+    > (fn 42)()
+     42
+
+#### Closures
+The following snippet:
+
+    fn counter { var i = 0; fn ++i }
+    var count1 = counter()
+    var count2 = counter()
+    $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}"
+
+produces the output:
+
+    1 2 3 1 4 2
+
+#### Currying
+    > var a = fn (x) fn (y) x + y;  a(3)(4)
+     7
+
+#### Lazy evaluation
+    > fn force(f) f(); var lazy = fn 1 + 1; force(lazy)
+     2
+
+#### Built-in functions
+Function | Parameters | Description
+--- | --- | ---
+print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
+type | `expr` | Returns the type of an expression, as a string.
+
+### Types
 Currently implemented types are:
 
-##### Null
+#### Null
      Null ::= "null"
 
 The `Null` type signifies that there is no value.
 
-##### Boolean
+#### Boolean
     Boolean ::= "true" | "false"
 
 A `Boolean` is either true or false.
 
-##### Number
+#### Number
     Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
 
 `Number`s are things like `-100`, `+4.20`, `2001`, `1e1`, `0x4a`, etc.
 
 In Plang, the `Number` type is equivalent to a double-precision type.
 
-##### String
+#### String
     String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
     StringContents ::= TODO
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no difference between the quotes.
 
-##### Array
+#### Array
     ArrayConstructor ::= "[" (Expression ","?)* "]"
 
 An `Array` is a collection of values. Array elements can be any type.
 
 See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
 
-###### Creating and accessing arrays
+##### Creating and accessing arrays
 Creating an array and accessing an element:
 
     > var array = ["red, "green", 3, 4]; array[1]
      "green"
 
-##### Map
+#### Map
     MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
@@ -271,7 +317,7 @@ values can be any type.
 
 See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
 
-###### Creating and accessing maps
+##### Creating and accessing maps
 Creating a map and accessing a key:
 
     > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
@@ -290,7 +336,7 @@ Nested maps:
     > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
      42
 
-###### Exists
+##### Exists
 To check for existence of a map key, use the `exists` keyword. If the key exists then
 `true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
 delete the key. See the [`delete`](#delete) keyword.
@@ -298,7 +344,7 @@ delete the key. See the [`delete`](#delete) keyword.
     > var map = { "a": 1, "b": 2 }; exists map["a"]
      true
 
-###### Delete
+##### Delete
 To delete keys from a map, use the `delete` keyword. Setting a key to `null` does not
 delete the key.
 
@@ -316,17 +362,6 @@ The `Function` type identifies a Plang function. See [functions](#functions) for
 
 ##### Builtin
 The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
-
-#### Truthiness
-For the logical operators (==, ||, &&, etc), this is how truthiness
-is evaluated for each type. If a type is omitted from the table, it is an error
-to use that type in a truthy expression.
-
-Type | Truthiness
---- | ---
-Boolean | `false` when value is `false`; `true` otherwise.
-Number | `false` when value is `0`; `true` otherwise.
-String | `false` when value is empty string; `true` otherwise.
 
 #### Type conversion
 Plang does not allow implicit conversion between types. You must convert a value explicitly
@@ -408,85 +443,6 @@ It is an error to convert anything to or from `Function`.
 ##### Builtin()
 It is an error to convert anything to or from `Builtin`.
 
-### Scoping
-Functions and variables are lexically scoped. A statement group introduces a new lexical scope. There is some
-consideration about allowing a way to write to the enclosing scope's identifiers.  `global` and
-`nonlocal` are potential keywords.
-
-### Functions
-    FunctionDefinition ::= "fn" Identifier? IdentifierList? Statement
-    IdentifierList     ::= "(" (Identifier Initializer? ","?)* ")"
-
-A function definition is created by using the `fn` keyword followed by: an identifer (which may
-be omitted to create an anonymous function), an identifier list (which may be omitted if there
-are no parameters desired), and finally either a group of statements or a single statement.
-
-An identifier list is a list of identifiers enclosed in parentheses. The list is separated
-by a comma and/or whitespace. In other words, the comma is optional. Each identifier may
-be followed by an optional initializer to create a default value.
-
-Plang functions automatically return the value of the last statement or statement group.
-You may use the `return` keyword to return the value of an ealier statement.
-
-To call a function, write its identifier followed by a list of arguments enclosed in
-parentheses. The argument list is separated the same way as the identifier list. Arguments
-may be any valid expression.
-
-The `fn` statement returns a reference to the newly defined function.
-
-#### Trivial examples
-    > fn say_hello print("Hello, world!"); say_hello()
-     Hello, world!
-<!-- -->
-    > fn square(x) x * x; square(2 + 2)
-     16
-<!-- -->
-    > fn add(a, b) a + b; add(2, 3)
-     5
-
-#### Default arguments
-    > fn add(a, b = 10) a + b; add(5);
-     15
-
-#### Anonymous functions
-    > var greeter = fn { print("Hello!") }; greeter()
-     Hello!
-<!-- -->
-    > var adder = fn (a, b) a + b; adder(10, 20)
-     30
-<!-- -->
-    > (fn (a, b) a + b)(1, 2)
-     3
-<!-- -->
-    > (fn 42)()
-     42
-
-#### Closures
-The following snippet:
-
-    fn counter { var i = 0; fn ++i }
-    var count1 = counter()
-    var count2 = counter()
-    $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}"
-
-produces the output:
-
-    1 2 3 1 4 2
-
-#### Currying
-    > var a = fn (x) fn (y) x + y;  a(3)(4)
-     7
-
-#### Lazy evaluation
-    > fn force(f) f(); var lazy = fn 1 + 1; force(lazy)
-     2
-
-#### Built-in functions
-Function | Parameters | Description
---- | --- | ---
-print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
-type | `expr` | Returns the type of an expression, as a string.
-
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
                       | IfStatement
@@ -532,6 +488,67 @@ The value of the `while` statement is `null`.
 The `next` keyword can be used to immediately jump to the next iteration of the loop.
 
 The `last` keyword can be used to immediately exit the loop.
+
+### Expressions
+Expressions perform arithmetic, logical or assignment operations.
+
+#### Operators
+These are the operators implemented so far, from highest to lowest precedence.
+
+The precedence values are large to give me some space to add new operators with
+new precedence. When the dust settles, the values will be made more sensible.
+
+P | Operator | Description | Type
+--- | --- | --- | ---
+100 | () | Function call    |
+70 | [] | Array notation    | Postfix
+70 | ++ | Post-increment    | Postfix
+70 | -- | Post-decrement    | Postfix
+60 | ++ | Pre-increment     | Prefix
+60 | -- | Pre-decrement     | Prefix
+60 | !  | Logical negation  | Prefix
+50 | ** | Exponent          | Infix (right-to-left)
+50 | %  | Remainder         | Infix (left-to-right)
+40 | *  | Product           | Infix (left-to-right)
+40 | /  | Division          | Infix (left-to-right)
+30 | +  | Addition          | Infix (left-to-right)
+30 | -  | Subtraction       | Infix (left-to-right)
+25 | .  | String concatenation | Infix (left-to-right)
+25 | ~  | Substring index      | Infix (left-to-right)
+23 | >= | Greater or equal  | Infix (left-to-right)
+23 | <= | Less or equal     | Infix (left-to-right)
+23 | >  | Greater           | Infix (left-to-right)
+23 | <  | Less              | Infix (left-to-right)
+20 | == | Equality          | Infix (left-to-right)
+20 | != | Inequality        | Infix (left-to-right)
+17 | && | Logical and       | Infix (left-to-right)
+16 | \|\| | Logical or        | Infix (left-to-right)
+15 | ?: | Conditional       | Infix ternary (right-to-left)
+10 | =  | Assignment        | Infix (right-to-left)
+10 | += | Addition assignment     | Infix (right-to-left)
+10 | -= | Subtraction assignment  | Infix (right-to-left)
+10 | \*= | Product assignment     | Infix (right-to-left)
+10 | /= | Division assignment     | Infix (right-to-left)
+7  | .= | String concat assignment | Infix (right-to-left)
+5  | ,  | Comma             | Infix (left-to-right)
+4  | not | Logical negation | Prefix
+3  | and | Logical and      | Infix (left-to-right)
+2  | or  | Logical or       | Infix (left-to-right)
+
+`!`, `&&`, and `||` have high precedence such that they are useful in constructing an expression;
+`not`, `and`, and `or` have low precedence such that they are useful for flow control between
+what are essentially different expressions.
+
+#### Truthiness
+For the logical operators (==, ||, &&, etc), this is how truthiness
+is evaluated for each type. If a type is omitted from the table, it is an error
+to use that type in a truthy expression.
+
+Type | Truthiness
+--- | ---
+Boolean | `false` when value is `false`; `true` otherwise.
+Number | `false` when value is `0`; `true` otherwise.
+String | `false` when value is empty string; `true` otherwise.
 
 ### String operations
 #### Relational operations
@@ -588,19 +605,4 @@ You can assign to the above notation to replace the substring instead.
 
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
-
-## JSON compatibility
-An Array constructor is something like `["red",2,3.1459,null]`. A Map constructor is
-something like `{"name": Bob, "age": 32}`. These are 100% compatible with JSON.
-
-The String() type conversion function can be used to convert Arrays and Maps to Strings
-for external storage or transmission.
-
-The Array() and Map() type conversion functions can be used to convert a String containing
-an Array constructor or a Map constructor back to an Array or a Map object.
-
-See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/json.pl](examples/json.pl) for more details.
-
-## Example Plang scripts
-[Check out some examples!](examples/)
 
