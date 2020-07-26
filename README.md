@@ -263,21 +263,20 @@ If you pass a `String` to it, it will blow-up inside the function body:
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
 
-However, if you apply the Number() type conversion function:
+However, if you apply the Number() type conversion function on the arguments inside
+the function body you will make a polymorphic function with implicit type conversion:
 
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-As you can see, this is a way to make a polymorphic function with implicit type conversion.
-
-But if you prefer stricter type-checking you can addtype-specifiers before each parameter name:
+But if you prefer stricter type-checking you can add type-specifiers before each parameter name:
 
     > fn add(Number a, Number b) a + b; print(type(add)); add(3, "4")
      Function (Number a, Number b) -> Any
      Error: In function call for `add`, expected Number for parameter `b` but got String
 
-Now the function type-checks its parameters and throws a more detailed error if the types
-do not match, before entering the function body.
+Now the function throws a more detailed error if the types of the arguments do not match the types
+specified for the parameters, before entering the function body.
 
 You can also specify a return type by putting a type-specifier before the function identifier:
 
