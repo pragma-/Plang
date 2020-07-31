@@ -13,8 +13,6 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 
 This README describes what is implemented so far.
 
-Here's a helpful table of contents:
-
 <!-- md-toc-begin -->
 * [Running Plang in the Bash shell](#running-plang-in-the-bash-shell)
   * [DEBUG environment variable](#debug-environment-variable)
