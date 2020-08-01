@@ -441,10 +441,12 @@ sub get_builtin_function {
 }
 
 sub call_builtin_function {
-    my ($self, $context, $data, $name) = @_;
+    my ($self, $context, $data, $name, $builtins) = @_;
 
-    my $parameters = $function_builtins{$name}->{params};
-    my $func       = $function_builtins{$name}->{subref};
+    $builtins ||= \%function_builtins;
+
+    my $parameters = $builtins->{$name}->{params};
+    my $func       = $builtins->{$name}->{subref};
     my $arguments  = $data->[2];
 
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
@@ -501,16 +503,6 @@ sub function_definition {
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
-        $name =~ s/ARRAY\(/@/;
-        $name =~ s/\)$//;
-    }
-
-    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0] ne 'BUILTIN') {
-        $self->error($context, "cannot define function `$name` with same name as existing local");
-    }
-
-    if ($self->get_builtin_function($name)) {
-        $self->error($context, "cannot redefine builtin function `$name`");
     }
 
     $context->{locals}->{$name} = $func;
@@ -529,24 +521,14 @@ sub function_call {
     if ($target->[0] eq 'IDENT') {
         $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n");
         $func = $self->get_variable($context, $target->[1]);
-        $func = undef if $func->[0] eq 'BUILTIN';
+
+        if (defined $func and $func->[0] eq 'BUILTIN') {
+            # builtin function
+            return $self->call_builtin_function($context, $data, $target->[1]);
+        }
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n");
         $func = $self->statement($context, $target);
-    }
-
-    if (not defined $func) {
-        if ($target->[0] eq 'IDENT' and exists $function_builtins{$target->[1]}) {
-            # builtin function
-            return $self->call_builtin_function($context, $data, $target->[1]);
-        } else {
-            # undefined function
-            $self->error($context, "Undefined function `" . $self->output_value($target) . "`.");
-        }
-    }
-
-    if ($func->[0] ne 'FUNC') {
-        $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->pretty_type($func) . ")");
     }
 
     my $closure    = $func->[1]->[0];
@@ -559,7 +541,7 @@ sub function_call {
     $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
     $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
 
-    my $ret = $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
+    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
@@ -567,7 +549,7 @@ sub function_call {
     }
 
     # invoke the function
-    my $result = $self->interpret_ast($new_context, $statements);;
+    my $result = $self->interpret_ast($new_context, $statements);
     $self->{recursion}--;
     return $result;
 }
@@ -590,6 +572,12 @@ sub is_truthy {
     }
 
     return;
+}
+
+sub is_arithmetic_type {
+    my ($self, $value) = @_;
+    return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
+    return 0;
 }
 
 # TODO: do this much more efficiently
@@ -620,334 +608,552 @@ sub interpolate_string {
     return $new_string;
 }
 
+sub statement_group {
+    my ($self, $context, $data) = @_;
+    my $new_context = $self->new_context($context);
+    return $self->interpret_ast($new_context, $data->[1]);
+}
+
+sub variable_declaration {
+    my ($self, $context, $data) = @_;
+
+    my $initializer = $data->[2];
+    my $right_value = undef;
+
+    if ($initializer) {
+        $right_value = $self->statement($context, $initializer);
+    } else {
+        $right_value = ['NULL', undef];
+    }
+
+    if (!$self->{repl} and (my $var = $self->get_variable($context, $data->[1], locals_only => 1))) {
+        if ($var->[0] ne 'BUILTIN') {
+            $self->error($context, "cannot redeclare existing local `$data->[1]`");
+        }
+    }
+
+    if ($self->get_builtin_function($data->[1])) {
+        $self->error($context, "cannot override builtin function `$data->[1]`");
+    }
+
+    $self->set_variable($context, $data->[1], $right_value);
+    return $right_value;
+}
+
+sub map_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $map     = $data->[1];
+    my $hashref = {};
+
+    foreach my $entry (@$map) {
+        if ($entry->[0]->[0] eq 'IDENT') {
+            my $var = $self->get_variable($context, $entry->[0]->[1]);
+            return $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
+
+            if ($var->[0] eq 'STRING') {
+                $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+                next;
+            }
+
+            $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
+        }
+
+        if ($entry->[0]->[0] eq 'STRING') {
+            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
+            next;
+        }
+
+        $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
+    }
+
+    return ['MAP', $hashref];
+}
+
+sub array_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $array    = $data->[1];
+    my $arrayref = [];
+
+    foreach my $entry (@$array) {
+        push @$arrayref, $self->statement($context, $entry);
+    }
+
+    return ['ARRAY', $arrayref];
+}
+
+sub keyword_exists {
+    my ($self, $context, $data) = @_;
+
+    # check for key in map
+    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+        my $var = $self->statement($context, $data->[1]->[1]);
+
+        # map index
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $data->[1]->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                if (exists $var->[1]->{$key->[1]}) {
+                    return ['BOOL', 1];
+                } else {
+                    return ['BOOL', 0];
+                }
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+}
+
+sub keyword_delete {
+    my ($self, $context, $data) = @_;
+
+    # delete one key in map
+    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+        my $var = $self->statement($context, $data->[1]->[1]);
+
+        # map index
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $data->[1]->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                my $val = delete $var->[1]->{$key->[1]};
+                return ['NULL', undef] if not defined $val;
+                return $val;
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    # delete all keys in map
+    if ($data->[1]->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $data->[1]->[1]);
+
+        if ($var->[0] eq 'MAP') {
+            $var->[1] = {};
+            return $var;
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+}
+
+sub conditional {
+    my ($self, $context, $data) = @_;
+
+    if ($self->is_truthy($context, $data->[1])) {
+        return $self->interpret_ast($context, [$data->[2]]);
+    } else {
+        return $self->interpret_ast($context, [$data->[3]]);
+    }
+}
+
+sub keyword_return {
+    my ($self, $context, $data) = @_;
+    return ['RETURN', $self->statement($context, $data->[1]->[1])];
+}
+
+sub keyword_next {
+    my ($self, $context, $data) = @_;
+    return ['NEXT', undef];
+}
+
+sub keyword_last {
+    my ($self, $context, $data) = @_;
+    return ['LAST', undef];
+}
+
+sub keyword_while {
+    my ($self, $context, $data) = @_;
+
+    while ($self->is_truthy($context, $data->[1])) {
+        if (++$self->{iterations} > $self->{max_iterations}) {
+            $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
+        }
+
+        my $result = $self->statement($context, $data->[2]);
+
+        next if $result->[0] eq 'NEXT';
+        last if $result->[0] eq 'LAST';
+        return $result if $result->[0] eq 'ERROR';
+    }
+
+    return ['NULL', undef];
+}
+
+sub keyword_if {
+    my ($self, $context, $data) = @_;
+
+    if ($self->is_truthy($context, $data->[1])) {
+        return $self->statement($context, $data->[2]);
+    } else {
+        return $self->statement($context, $data->[3]);
+    }
+}
+
+sub add_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] += $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub sub_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] -= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub mul_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] *= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub div_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] /= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub cat_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    $left->[1] .= $right->[1];
+    return $left;
+}
+
+sub identifier {
+    my ($self, $context, $data) = @_;
+    my $var = $self->get_variable($context, $data->[1]);
+    $self->error($context, "undeclared variable `$data->[1]`") if not defined $var;
+    return $var;
+}
+
+sub stmt_literal {
+    my ($self, $context, $data) = @_;
+    return ['NUM',    $data->[1]] if $data->[0] eq 'NUM';
+    return ['STRING', $data->[1]] if $data->[0] eq 'STRING';
+    return ['BOOL',   $data->[1]] if $data->[0] eq 'BOOL';
+    return undef;
+}
+
+sub prefix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        $var->[1]++;
+        return $var;
+    }
+
+    $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
+}
+
+sub prefix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        $var->[1]--;
+        return $var;
+    }
+
+    $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
+}
+
+sub postfix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]++;
+        return $temp_var;
+    }
+
+    $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
+}
+
+sub postfix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]--;
+        return $temp_var;
+    }
+
+    $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
+}
+
+sub logical_and {
+    my ($self, $context, $data) = @_;
+    my $left_value = $self->statement($context, $data->[1]);
+    return $left_value if not $self->is_truthy($context, $left_value);
+    return $self->statement($context, $data->[2]);
+}
+
+sub logical_or {
+    my ($self, $context, $data) = @_;
+    my $left_value = $self->statement($context, $data->[1]);
+    return $left_value if $self->is_truthy($context, $left_value);
+    return $self->statement($context, $data->[2]);
+}
+
+sub range_operator {
+    my ($self, $context, $data) = @_;
+
+    my ($to, $from) = ($data->[1], $data->[2]);
+
+    $to   = $self->statement($context, $to);
+    $from = $self->statement($context, $from);
+
+    return ['RANGE', $to, $from];
+}
+
+# lvalue assignment
+sub assignment {
+    my ($self, $context, $data) = @_;
+
+    my $left_value  = $data->[1];
+    my $right_value = $self->statement($context, $data->[2]);
+
+    # lvalue variable
+    if ($left_value->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $left_value->[1]);
+        $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
+        $self->set_variable($context, $left_value->[1], $right_value);
+        return $right_value;
+    }
+
+    # lvalue array index
+    if ($left_value->[0] eq 'ARRAY_INDEX') {
+        my $var = $self->statement($context, $left_value->[1]);
+
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $left_value->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                my $val = $self->statement($context, $right_value);
+                $var->[1]->{$key->[1]} = $val;
+                return $val;
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        if ($var->[0] eq 'ARRAY') {
+            my $index = $self->statement($context, $left_value->[2]);
+
+            if ($index->[0] eq 'NUM') {
+                my $val = $self->statement($context, $right_value);
+                $var->[1]->[$index->[1]] = $val;
+                return $val;
+            }
+
+            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+        }
+
+        if ($var->[0] eq 'STRING') {
+            my $value = $self->statement($context, $left_value->[2]->[1]);
+
+            if ($value->[0] eq 'RANGE') {
+                my $from = $value->[1];
+                my $to   = $value->[2];
+
+                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
+                    if ($right_value->[0] eq 'STRING') {
+                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
+                        return ['STRING', $var->[1]];
+                    }
+
+                    if ($right_value->[0] eq 'NUM') {
+                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
+                        return ['STRING', $var->[1]];
+                    }
+
+                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix []");
+                }
+
+                $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix []");
+            }
+
+            if ($value->[0] eq 'NUM') {
+                my $index = $value->[1];
+                if ($right_value->[0] eq 'STRING') {
+                    substr ($var->[1], $index, 1) = $right_value->[1];
+                    return ['STRING', $var->[1]];
+                }
+
+                if ($right_value->[0] eq 'NUM') {
+                    substr ($var->[1], $index, 1) = chr $right_value->[1];
+                    return ['STRING', $var->[1]];
+                }
+
+                $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix []");
+            }
+
+            $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix []");
+        }
+
+        $self->error($context, "cannot assign to postfix [] on type " . $self->pretty_type($var));
+    }
+
+    # a statement
+    my $eval = $self->statement($context, $data->[1]);
+    $self->error($context, "cannot assign to non-lvalue type " . $self->pretty_type($eval));
+}
+
+# rvalue array/map index
+sub array_index_notation {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    # map index
+    if ($var->[0] eq 'MAP') {
+        my $key = $self->statement($context, $data->[2]);
+
+        if ($key->[0] eq 'STRING') {
+            my $val = $var->[1]->{$key->[1]};
+            return ['NULL', undef] if not defined $val;
+            return $val;
+        }
+
+        $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+    }
+
+    # array index
+    if ($var->[0] eq 'ARRAY') {
+        my $index = $self->statement($context, $data->[2]);
+
+        # number index
+        if ($index->[0] eq 'NUM') {
+            my $val = $var->[1]->[$index->[1]];
+            return ['NULL', undef] if not defined $val;
+            return $val;
+        }
+
+        # TODO support RANGE and x:y splices and negative indexing
+
+        $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+    }
+
+    # string index
+    if ($var->[0] eq 'STRING') {
+        my $value = $self->statement($context, $data->[2]->[1]);
+
+        if ($value->[0] eq 'RANGE') {
+            my $from = $value->[1];
+            my $to = $value->[2];
+
+            if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
+                return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+            }
+
+            $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix []");
+        }
+
+        if ($value->[0] eq 'NUM') {
+            my $index = $value->[1];
+            return ['STRING', substr($var->[1], $index, 1) // ""];
+        }
+
+        $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix []");
+    }
+
+    $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
+}
+
 sub statement {
     my ($self, $context, $data) = @_;
     return if not $data;
 
-    my $ins   = $data->[0];
-    my $value = $data->[1];
-
+    my $ins = $data->[0];
     $Data::Dumper::Indent = 0;
-    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($value) . ")\n");
-
-    if ($ins eq 'STMT') {
-        return $self->statement($context, $data->[1]);
-    }
-
-    # statement group
-    if ($ins eq 'STMT_GROUP') {
-        my $new_context = $self->new_context($context);
-        return $self->interpret_ast($new_context, $value);
-    }
+    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n");
 
     # literals
-    return ['NUM',    $value] if $ins eq 'NUM';
-    return ['STRING', $value] if $ins eq 'STRING';
-    return ['BOOL',   $value] if $ins eq 'BOOL';
-
-    # interpolated string
-    if ($ins eq 'STRING_I') {
-        $value = $self->interpolate_string($context, $value);
-        return ['STRING', $value];
+    if (defined (my $literal = $self->stmt_literal($context, $data))) {
+        return $literal;
     }
 
-    # variable declaration
-    if ($ins eq 'VAR') {
-        my $initializer = $data->[2];
-        my $right_value = undef;
-
-        if ($initializer) {
-            $right_value = $self->statement($context, $initializer);
-        } else {
-            $right_value = ['NULL', undef];
-        }
-
-        if (!$self->{repl} and (my $var = $self->get_variable($context, $value, locals_only => 1))) {
-            if ($var->[0] ne 'BUILTIN') {
-                $self->error($context, "cannot redeclare existing local `$value`");
-            }
-        }
-
-        if ($self->get_builtin_function($value)) {
-            $self->error($context, "cannot override builtin function `$value`");
-        }
-
-        $self->set_variable($context, $value, $right_value);
-        return $right_value;
-    }
-
-    # map initializer
-    if ($ins eq 'MAPINIT') {
-        my $map     = $data->[1];
-        my $hashref = {};
-
-        foreach my $entry (@$map) {
-            if ($entry->[0]->[0] eq 'IDENT') {
-                my $var = $self->get_variable($context, $entry->[0]->[1]);
-                return $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
-
-                if ($var->[0] eq 'STRING') {
-                    $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
-                    next;
-                }
-
-                $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
-            }
-
-            if ($entry->[0]->[0] eq 'STRING') {
-                $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
-                next;
-            }
-
-            $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
-        }
-
-        return ['MAP', $hashref];
-    }
-
-    # array initializer
-    if ($ins eq 'ARRAYINIT') {
-        my $array    = $data->[1];
-        my $arrayref = [];
-
-        foreach my $entry (@$array) {
-            push @$arrayref, $self->statement($context, $entry);
-        }
-
-        return ['ARRAY', $arrayref];
-    }
-
-    # exists keyword
-    if ($ins eq 'EXISTS') {
-        # check for key in map
-        if ($value->[0] eq 'ARRAY_INDEX') {
-            my $var = $self->statement($context, $value->[1]);
-
-            # map index
-            if ($var->[0] eq 'MAP') {
-                my $key = $self->statement($context, $value->[2]);
-
-                if ($key->[0] eq 'STRING') {
-                    if (exists $var->[1]->{$key->[1]}) {
-                        return ['BOOL', 1];
-                    } else {
-                        return ['BOOL', 0];
-                    }
-                }
-
-                $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-            }
-
-            $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
-        }
-
-        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($value) . ")");
-    }
-
-    # delete keyword
-    if ($ins eq 'DELETE') {
-        # delete one key in map
-        if ($value->[0] eq 'ARRAY_INDEX') {
-            my $var = $self->statement($context, $value->[1]);
-
-            # map index
-            if ($var->[0] eq 'MAP') {
-                my $key = $self->statement($context, $value->[2]);
-
-                if ($key->[0] eq 'STRING') {
-                    my $val = delete $var->[1]->{$key->[1]};
-                    return ['NULL', undef] if not defined $val;
-                    return $val;
-                }
-
-                $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-            }
-
-            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
-        }
-
-        # delete all keys in map
-        if ($value->[0] eq 'IDENT') {
-            my $var = $self->get_variable($context, $value->[1]);
-
-            if ($var->[0] eq 'MAP') {
-                $var->[1] = {};
-                return $var;
-            }
-
-            $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
-        }
-
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($value) . ")");
-    }
-
-    # ternary ?: conditional operator
-    if ($ins eq 'COND') {
-        if ($self->is_truthy($context, $data->[1])) {
-            return $self->interpret_ast($context, [$data->[2]]);
-        } else {
-            return $self->interpret_ast($context, [$data->[3]]);
-        }
-    }
-
-    # return
-    if ($ins eq 'RET') {
-        return ['RETURN', $self->statement($context, $value->[1])];
-    }
-
-    # next
-    if ($ins eq 'NEXT') {
-        return ['NEXT', undef];
-    }
-
-    # last
-    if ($ins eq 'LAST') {
-        return ['LAST', undef];
-    }
-
-    # while loop
-    if ($ins eq 'WHILE') {
-        while ($self->is_truthy($context, $data->[1])) {
-            if (++$self->{iterations} > $self->{max_iterations}) {
-                $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
-            }
-
-            my $result = $self->statement($context, $data->[2]);
-
-            next if $result->[0] eq 'NEXT';
-            last if $result->[0] eq 'LAST';
-            return $result if $result->[0] eq 'ERROR';
-        }
-
-        return ['NULL', undef];
-    }
-
-    # if/else
-    if ($ins eq 'IF') {
-        if ($self->is_truthy($context, $data->[1])) {
-            return $self->statement($context, $data->[2]);
-        } else {
-            return $self->statement($context, $data->[3]);
-        }
-    }
-
-    # assignment
-    if ($ins eq 'ASSIGN') {
-        return $self->assignment($context, $data);
-    }
-
-    if ($ins eq 'ADD_ASSIGN') {
-        my $left  = $self->statement($context, $data->[1]);
-        my $right = $self->statement($context, $data->[2]);
-
-        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-            $left->[1] += $right->[1];
-            return $left;
-        }
-
-        $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
-    }
-
-    if ($ins eq 'SUB_ASSIGN') {
-        my $left  = $self->statement($context, $data->[1]);
-        my $right = $self->statement($context, $data->[2]);
-
-        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-            $left->[1] -= $right->[1];
-            return $left;
-        }
-
-        $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
-    }
-
-    if ($ins eq 'MUL_ASSIGN') {
-        my $left  = $self->statement($context, $data->[1]);
-        my $right = $self->statement($context, $data->[2]);
-
-        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-            $left->[1] *= $right->[1];
-            return $left;
-        }
-
-        $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
-    }
-
-    if ($ins eq 'DIV_ASSIGN') {
-        my $left  = $self->statement($context, $data->[1]);
-        my $right = $self->statement($context, $data->[2]);
-
-        if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-            $left->[1] /= $right->[1];
-            return $left;
-        }
-
-        $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
-    }
-
-    if ($ins eq 'CAT_ASSIGN') {
-        my $left  = $self->statement($context, $data->[1]);
-        my $right = $self->statement($context, $data->[2]);
-
-        $left->[1] .= $right->[1];
-        return $left;
-    }
-
-    # variable
-    if ($ins eq 'IDENT') {
-        my $var = $self->get_variable($context, $value);
-        $self->error($context, "undeclared variable `$value`") if not defined $var;
-        return $var;
-    }
-
-    # function definition
-    if ($ins eq 'FUNCDEF') {
-        return $self->function_definition($context, $data);
-    }
-
-    # function call
-    if ($ins eq 'CALL') {
-        return $self->function_call($context, $data);
-    }
-
-    # prefix increment
-    if ($ins eq 'PREFIX_ADD') {
-        my $var = $self->statement($context, $value);
-
-        if ($self->is_arithmetic_type($var)) {
-            $var->[1]++;
-            return $var;
-        }
-
-        $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
-    }
-
-    # prefix decrement
-    if ($ins eq 'PREFIX_SUB') {
-        my $var = $self->statement($context, $value);
-
-        if ($self->is_arithmetic_type($var)) {
-            $var->[1]--;
-            return $var;
-        }
-
-        $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
-    }
-
-    # short-circuiting logical and
-    if ($ins eq 'AND') {
-        my $left_value = $self->statement($context, $data->[1]);
-        return $left_value if not $self->is_truthy($context, $left_value);
-        return $self->statement($context, $data->[2]);
-    }
-
-    # short-circuiting logical or
-    if ($ins eq 'OR') {
-        my $left_value = $self->statement($context, $data->[1]);
-        return $left_value if $self->is_truthy($context, $left_value);
-        return $self->statement($context, $data->[2]);
-    }
+    return $self->statement($context, $data->[1])       if $ins eq 'STMT';
+    return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
+    return $self->variable_declaration($context, $data) if $ins eq 'VAR';
+    return $self->map_constructor($context, $data)      if $ins eq 'MAPINIT';
+    return $self->array_constructor($context, $data)    if $ins eq 'ARRAYINIT';
+    return $self->keyword_exists($context, $data)       if $ins eq 'EXISTS';
+    return $self->keyword_delete($context, $data)       if $ins eq 'DELETE';
+    return $self->conditional($context, $data)          if $ins eq 'COND';
+    return $self->keyword_while($context, $data)        if $ins eq 'WHILE';
+    return $self->keyword_next($context, $data)         if $ins eq 'NEXT';
+    return $self->keyword_last($context, $data)         if $ins eq 'LAST';
+    return $self->keyword_if($context, $data)           if $ins eq 'IF';
+    return $self->logical_and($context, $data)          if $ins eq 'AND';
+    return $self->logical_or($context, $data)           if $ins eq 'OR';
+    return $self->assignment($context, $data)           if $ins eq 'ASSIGN';
+    return $self->add_assign($context, $data)           if $ins eq 'ADD_ASSIGN';
+    return $self->sub_assign($context, $data)           if $ins eq 'SUB_ASSIGN';
+    return $self->mul_assign($context, $data)           if $ins eq 'MUL_ASSIGN';
+    return $self->div_assign($context, $data)           if $ins eq 'DIV_ASSIGN';
+    return $self->cat_assign($context, $data)           if $ins eq 'CAT_ASSIGN';
+    return $self->identifier($context, $data)           if $ins eq 'IDENT';
+    return $self->function_definition($context, $data)  if $ins eq 'FUNCDEF';
+    return $self->function_call($context, $data)        if $ins eq 'CALL';
+    return $self->keyword_return($context, $data)       if $ins eq 'RET';
+    return $self->prefix_increment($context, $data)     if $ins eq 'PREFIX_ADD';
+    return $self->prefix_decrement($context, $data)     if $ins eq 'PREFIX_SUB';
+    return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
+    return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
+    return $self->range_operator($context, $data)       if $ins eq 'RANGE';
+    return $self->array_index_notation($context, $data) if $ins eq 'ARRAY_INDEX';
+
+    return ['STRING', $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
 
     # unary operators
+    my $value;
     return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '!/not $a'));
     return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
     return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
@@ -968,101 +1174,7 @@ sub statement {
     return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
     return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
 
-    # postfix increment
-    if ($ins eq 'POSTFIX_ADD') {
-        my $var = $self->statement($context, $data->[1]);
-
-        if ($self->is_arithmetic_type($var)) {
-            my $temp_var = [$var->[0], $var->[1]];
-            $var->[1]++;
-            return $temp_var;
-        }
-
-        $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
-    }
-
-    # postfix decrement
-    if ($ins eq 'POSTFIX_SUB') {
-        my $var = $self->statement($context, $data->[1]);
-
-        if ($self->is_arithmetic_type($var)) {
-            my $temp_var = [$var->[0], $var->[1]];
-            $var->[1]--;
-            return $temp_var;
-        }
-
-        $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
-    }
-
-    # range operator
-    if ($ins eq 'RANGE') {
-        my ($to, $from) = ($data->[1], $data->[2]);
-
-        $to   = $self->statement($context, $to);
-        $from = $self->statement($context, $from);
-
-        return ['RANGE', $to, $from];
-    }
-
-    # rvalue array index
-    if ($ins eq 'ARRAY_INDEX') {
-        my $var = $self->statement($context, $data->[1]);
-
-        # map index
-        if ($var->[0] eq 'MAP') {
-            my $key = $self->statement($context, $data->[2]);
-
-            if ($key->[0] eq 'STRING') {
-                my $val = $var->[1]->{$key->[1]};
-                return ['NULL', undef] if not defined $val;
-                return $val;
-            }
-
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-        }
-
-        # array index
-        if ($var->[0] eq 'ARRAY') {
-            my $index = $self->statement($context, $data->[2]);
-
-            # number index
-            if ($index->[0] eq 'NUM') {
-                my $val = $var->[1]->[$index->[1]];
-                return ['NULL', undef] if not defined $val;
-                return $val;
-            }
-
-            # TODO support RANGE and x:y splices and negative indexing
-
-            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
-        }
-
-        # string index
-        if ($var->[0] eq 'STRING') {
-            my $value = $self->statement($context, $data->[2]->[1]);
-
-            if ($value->[0] eq 'RANGE') {
-                my $from = $value->[1];
-                my $to = $value->[2];
-
-                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                    return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
-                }
-
-                $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix []");
-            }
-
-            if ($value->[0] eq 'NUM') {
-                my $index = $value->[1];
-                return ['STRING', substr($var->[1], $index, 1) // ""];
-            }
-
-            $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix []");
-        }
-
-        $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
-    }
-
+    # unknown instruction
     return $data;
 }
 
@@ -1161,110 +1273,11 @@ sub output_value {
                 $result .= $value->[1];
             }
         } else {
-            $result .= $value->[1];
+            $result .= $value->[1] if defined $value->[1];
         }
     }
 
     return $result;
-}
-
-# lvalue assignment
-sub assignment {
-    my ($self, $context, $data) = @_;
-
-    my $left_value  = $data->[1];
-    my $right_value = $self->statement($context, $data->[2]);
-
-    # lvalue variable
-    if ($left_value->[0] eq 'IDENT') {
-        my $var = $self->get_variable($context, $left_value->[1]);
-        $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
-        $self->set_variable($context, $left_value->[1], $right_value);
-        return $right_value;
-    }
-
-    # lvalue array index
-    if ($left_value->[0] eq 'ARRAY_INDEX') {
-        my $var = $self->statement($context, $left_value->[1]);
-
-        if ($var->[0] eq 'MAP') {
-            my $key = $self->statement($context, $left_value->[2]);
-
-            if ($key->[0] eq 'STRING') {
-                my $val = $self->statement($context, $right_value);
-                $var->[1]->{$key->[1]} = $val;
-                return $val;
-            }
-
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-        }
-
-        if ($var->[0] eq 'ARRAY') {
-            my $index = $self->statement($context, $left_value->[2]);
-
-            if ($index->[0] eq 'NUM') {
-                my $val = $self->statement($context, $right_value);
-                $var->[1]->[$index->[1]] = $val;
-                return $val;
-            }
-
-            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
-        }
-
-        if ($var->[0] eq 'STRING') {
-            my $value = $self->statement($context, $left_value->[2]->[1]);
-
-            if ($value->[0] eq 'RANGE') {
-                my $from = $value->[1];
-                my $to   = $value->[2];
-
-                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                    if ($right_value->[0] eq 'STRING') {
-                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
-                        return ['STRING', $var->[1]];
-                    }
-
-                    if ($right_value->[0] eq 'NUM') {
-                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
-                        return ['STRING', $var->[1]];
-                    }
-
-                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix []");
-                }
-
-                $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix []");
-            }
-
-            if ($value->[0] eq 'NUM') {
-                my $index = $value->[1];
-                if ($right_value->[0] eq 'STRING') {
-                    substr ($var->[1], $index, 1) = $right_value->[1];
-                    return ['STRING', $var->[1]];
-                }
-
-                if ($right_value->[0] eq 'NUM') {
-                    substr ($var->[1], $index, 1) = chr $right_value->[1];
-                    return ['STRING', $var->[1]];
-                }
-
-                $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix []");
-            }
-
-            $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix []");
-        }
-
-        $self->error($context, "cannot assign to postfix [] on type " . $self->pretty_type($var));
-    }
-
-    # a statement
-    my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "cannot assign to non-lvalue type " . $self->pretty_type($eval));
-}
-
-sub is_arithmetic_type {
-    my ($self, $value) = @_;
-    return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
-    return 0;
 }
 
 # runs a new Plang program with a fresh environment
@@ -1316,6 +1329,8 @@ sub run {
 
 sub interpret_ast {
     my ($self, $context, $ast) = @_;
+
+    $Data::Dumper::Indent = 0;
 
     $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n");
 

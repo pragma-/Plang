@@ -29,11 +29,11 @@ sub plang {
 
 # and that's all there is to it!
 
-# example using slightly more control over the lex/parse/interpret stages
+# example using more control over the lex/parse/validate/interpret stages
 my $debug = $ENV{DEBUG} // 0;
 my @debug_tags = split /,/, $debug;
 
-# Grammar rule: DumpToken --> *
+# Grammar rule: DumpToken ::= *
 sub DumpToken {
     my ($parser) = @_;
     return $parser->next_token;
@@ -76,6 +76,16 @@ sub plang_dbg {
     # unless --dumptokens was specified on the command-line, interpret the AST
     # and exit with the return value.
     return 0 if $dumptokens;
+
+    # validate the program
+    my $errors = $plang->{validator}->validate($result);
+
+    if ($errors) {
+        print STDERR $errors->[1];
+        exit 1;
+    }
+
+    # interpret the program
     return $plang->{interpreter}->run($result);
 }
 
@@ -90,8 +100,12 @@ my $ret;
 #
 # $ret = plang;  # interpet stdin; e.g. `$ ./plang <<< '2 * 3'` or `$ ./plang < program.p`
 
-# but for this program, we'll run the dbg example:
-$ret = plang_dbg;
+# but for this program, we'll run the dbg example, unless PLANG_EMBED is defined:
+if ($ENV{PLANG_EMBED}) {
+    $ret = plang;
+} else {
+    $ret = plang_dbg;
+}
 
 no warnings;
 exit $ret;

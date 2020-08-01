@@ -8,6 +8,7 @@ use strict;
 use Plang::Lexer;
 use Plang::Parser;
 use Plang::Grammar qw/Program/;
+use Plang::Validator;
 use Plang::AstInterpreter;
 
 sub new {
@@ -119,6 +120,8 @@ sub initialize {
         'Any', 'Null', 'Boolean', 'Number', 'String', 'Array', 'Map', 'Function', 'Builtin',
     );
 
+    $self->{validator}   = Plang::Validator->new(debug => $conf{debug});
+
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});
 }
 
@@ -145,6 +148,11 @@ sub multiline_comment {
             $$text = undef;
         }
     }
+}
+
+sub add_builtin_function {
+    my $self = shift;
+    $self->{interpreter}->add_builtin_function(@_);
 }
 
 sub parse {
@@ -190,10 +198,30 @@ sub handle_parse_errors {
     return;
 }
 
+sub validate_program {
+    my ($self, $ast) = @_;
+    return $self->{validator}->validate($ast);
+}
+
 sub interpret {
     my ($self, %opt) = @_;
+
     my $errors = $self->handle_parse_errors;
     return ['ERROR', $errors] if defined $errors;
+
+    $errors = $self->validate_program($self->{ast});
+
+    if ($errors) {
+        if (not $self->{embedded}) {
+            # not embedded: print errors and exit
+            print STDERR $errors->[1];
+            exit 1;
+        } else {
+            # embedded: return as-is
+            return $errors;
+        }
+    }
+
     return $self->{interpreter}->run($self->{ast}, %opt);
 }
 

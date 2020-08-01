@@ -169,7 +169,7 @@ my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
 
 # override the Plang builtin `print` function so we can collect
 # the output for testing, instead of printing it
-$plang->{interpreter}->add_builtin_function('print',
+$plang->add_builtin_function('print',
     # these are the parameters we want: `expr` and `end`.
     # `expr` has no default value; `end` has default value [STRING, "\n"]
     [['Any', 'expr', undef], ['String', 'end', ['STRING', "\n"]]],
