@@ -48,7 +48,7 @@ sub initialize {
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
-    $self->{dprint}->('ERRORS', "Got error: $err_msg\n");
+    $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Error: $err_msg\n";
 }
 
@@ -64,13 +64,13 @@ sub new_context {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{locals}->{$name} = $value;
-    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context->{locals}) . "\n");
+    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
 }
 
 sub get_variable {
     my ($self, $context, $name, %opt) = @_;
 
-    $self->{dprint}->('VARS', "get_variable: $name\n" . Dumper($context->{locals}) . "\n");
+    $self->{dprint}->('VARS', "get_variable: $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
 
     # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
@@ -127,7 +127,7 @@ sub unary_op {
 
         if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n");
+            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
         }
 
         if ($self->is_arithmetic_type($value)) {
@@ -151,7 +151,7 @@ sub binary_op {
         if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
             $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n");
+            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
         }
 
         if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
@@ -519,7 +519,7 @@ sub function_call {
     my $func;
 
     if ($target->[0] eq 'IDENT') {
-        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n");
+        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
 
         if (defined $func and $func->[0] eq 'BUILTIN') {
@@ -527,7 +527,7 @@ sub function_call {
             return $self->call_builtin_function($context, $data, $target->[1]);
         }
     } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n");
+        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);
     }
 
@@ -1112,7 +1112,7 @@ sub statement {
 
     my $ins = $data->[0];
     $Data::Dumper::Indent = 0;
-    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n");
+    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n") if $self->{debug};
 
     # literals
     if (defined (my $literal = $self->stmt_literal($context, $data))) {
@@ -1217,6 +1217,7 @@ sub array_to_string {
     return $string;
 }
 
+# TODO: do this more efficiently
 sub output_string_literal {
     my ($self, $text) = @_;
     $Data::Dumper::Indent = 0;
@@ -1332,7 +1333,7 @@ sub interpret_ast {
 
     $Data::Dumper::Indent = 0;
 
-    $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n");
+    $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n") if $self->{debug};
 
     # try
     my $last_statement_result = eval {
@@ -1345,12 +1346,12 @@ sub interpret_ast {
                 $result = $self->handle_statement_result($result) if defined $result;
 
                 if (defined $result) {
-                    $self->{dprint}->('AST', "Statement result: " . (defined $result->[1] ? $result->[1] : 'undef') . " ($result->[0])\n");
+                    $self->{dprint}->('AST', "Statement result: " . (defined $result->[1] ? $result->[1] : 'undef') . " ($result->[0])\n") if $self->{debug};
                     return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
                     return $result->[1] if $result->[0] eq 'RETURN';
                     return $result if $result->[0] eq 'ERROR';
                 } else {
-                    $self->{dprint}->('AST', "Statement result: none\n");
+                    $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }
             }
         }
@@ -1373,7 +1374,7 @@ sub handle_statement_result {
 
     return if not defined $result;
 
-    $self->{dprint}->('RESULT', "handle result: " . Dumper($result) . "\n");
+    $self->{dprint}->('RESULT', "handle result: " . Dumper($result) . "\n") if $self->{debug};
 
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself
