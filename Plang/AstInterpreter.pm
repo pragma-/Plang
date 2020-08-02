@@ -43,6 +43,38 @@ sub initialize {
     $self->{iterations}     = 0;
 
     $self->{repl_context}   = undef; # persistent repl context
+
+    $self->{eval_unary_op_NUM} = {
+        'NOT' => sub { ['BOOL', int ! $_[0]] },
+        'NEG' => sub { ['NUM',      - $_[0]] },
+        'POS' => sub { ['NUM',      + $_[0]] },
+    };
+
+    $self->{eval_binary_op_NUM} = {
+        'POW' => sub { ['NUM',  $_[0] ** $_[1]] },
+        'REM' => sub { ['NUM',  $_[0]  % $_[1]] },
+        'MUL' => sub { ['NUM',  $_[0]  * $_[1]] },
+        'DIV' => sub { ['NUM',  $_[0]  / $_[1]] },
+        'ADD' => sub { ['NUM',  $_[0]  + $_[1]] },
+        'SUB' => sub { ['NUM',  $_[0]  - $_[1]] },
+        'GTE' => sub { ['BOOL', $_[0] >= $_[1]] },
+        'LTE' => sub { ['BOOL', $_[0] <= $_[1]] },
+        'GT'  => sub { ['BOOL', $_[0]  > $_[1]] },
+        'LT'  => sub { ['BOOL', $_[0]  < $_[1]] },
+        'EQ'  => sub { ['BOOL', $_[0] == $_[1]] },
+        'NEQ' => sub { ['BOOL', $_[0] != $_[1]] },
+    };
+
+    $self->{eval_binary_op_STRING} = {
+        'EQ'     => sub { ['BOOL',    $_[0]  eq $_[1]] },
+        'NEQ'    => sub { ['BOOL',    $_[0]  ne $_[1]] },
+        'LT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) == -1] },
+        'GT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) ==  1] },
+        'LTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) <=  0] },
+        'GTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) >=  0] },
+        'STRCAT' => sub { ['STRING',  $_[0]   . $_[1]] },
+        'STRIDX' => sub { ['NUM', index $_[0], $_[1]] },
+    };
 }
 
 sub error {
@@ -87,57 +119,20 @@ sub get_variable {
     return undef;
 }
 
-my %eval_unary_op_NUM = (
-    'NOT' => sub { ['BOOL', int ! $_[0]] },
-    'NEG' => sub { ['NUM',      - $_[0]] },
-    'POS' => sub { ['NUM',      + $_[0]] },
-);
-
-my %eval_binary_op_NUM = (
-    'POW' => sub { ['NUM',  $_[0] ** $_[1]] },
-    'REM' => sub { ['NUM',  $_[0]  % $_[1]] },
-    'MUL' => sub { ['NUM',  $_[0]  * $_[1]] },
-    'DIV' => sub { ['NUM',  $_[0]  / $_[1]] },
-    'ADD' => sub { ['NUM',  $_[0]  + $_[1]] },
-    'SUB' => sub { ['NUM',  $_[0]  - $_[1]] },
-    'GTE' => sub { ['BOOL', $_[0] >= $_[1]] },
-    'LTE' => sub { ['BOOL', $_[0] <= $_[1]] },
-    'GT'  => sub { ['BOOL', $_[0]  > $_[1]] },
-    'LT'  => sub { ['BOOL', $_[0]  < $_[1]] },
-    'EQ'  => sub { ['BOOL', $_[0] == $_[1]] },
-    'NEQ' => sub { ['BOOL', $_[0] != $_[1]] },
-);
-
-my %eval_binary_op_STRING = (
-    'EQ'     => sub { ['BOOL',    $_[0]  eq $_[1]] },
-    'NEQ'    => sub { ['BOOL',    $_[0]  ne $_[1]] },
-    'LT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) == -1] },
-    'GT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) ==  1] },
-    'LTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) <=  0] },
-    'GTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) >=  0] },
-    'STRCAT' => sub { ['STRING',  $_[0]   . $_[1]] },
-    'STRIDX' => sub { ['NUM', index $_[0], $_[1]] },
-);
-
 sub unary_op {
     my ($self, $context, $data, $op, $debug_msg) = @_;
 
     if ($data->[0] eq $op) {
-        my $value  = $self->statement($context, $data->[1]);
+        my $value = $self->statement($context, $data->[1]);
 
         if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+            $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
-        if ($self->is_arithmetic_type($value)) {
-            if (exists $eval_unary_op_NUM{$op}) {
-                return $eval_unary_op_NUM{$op}->($value->[1]);
-            }
-        }
-
-        $self->error($context, "cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
+        return $self->{eval_unary_op_NUM}->{$op}->($value->[1]);
     }
+
     return;
 }
 
@@ -151,25 +146,20 @@ sub binary_op {
         if ($self->{debug} and $debug_msg) {
             $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
             $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+            $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
         if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
-            if (exists $eval_binary_op_NUM{$op}) {
-                return $eval_binary_op_NUM{$op}->($left_value->[1], $right_value->[1]);
-            }
+            return $self->{eval_binary_op_NUM}->{$op}->($left_value->[1], $right_value->[1]);
         }
 
         if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
-            if (exists $eval_binary_op_STRING{$op}) {
-                $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
-                $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
-                return $eval_binary_op_STRING{$op}->($left_value->[1], $right_value->[1]);
-            }
+            $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
+            $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
+            return $self->{eval_binary_op_STRING}->{$op}->($left_value->[1], $right_value->[1]);
         }
-
-        $self->error($context, "cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
     }
+
     return;
 }
 
@@ -461,31 +451,15 @@ sub process_function_call_arguments {
 
     for (my $i = 0; $i < @$parameters; $i++) {
         if (not defined $arguments->[$i]) {
-            # no argument provided
-            if (defined $parameters->[$i]->[2]) {
-                # found default argument
-                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
-                $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
-            } else {
-                # no argument or default argument
-                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`.\n"),
-            }
+            # no argument provided, but there's guaranteed to be a default
+            # argument here since validator caught missing arguments, etc
+            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         } else {
             # argument provided
             $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-
-            # check type
-            if ($parameters->[$i]->[0] ne 'Any' and $parameters->[$i]->[0] ne $self->pretty_type($evaluated_arguments->[$i])) {
-                $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameters->[$i])
-                    . " for parameter `$parameters->[$i]->[1]` but got " . $self->pretty_type($evaluated_arguments->[$i]));
-            }
-
             $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         }
-    }
-
-    if (@$arguments > @$parameters) {
-        $self->error($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
     }
 
     return $evaluated_arguments;
@@ -626,16 +600,6 @@ sub variable_declaration {
         $right_value = ['NULL', undef];
     }
 
-    if (!$self->{repl} and (my $var = $self->get_variable($context, $data->[1], locals_only => 1))) {
-        if ($var->[0] ne 'BUILTIN') {
-            $self->error($context, "cannot redeclare existing local `$data->[1]`");
-        }
-    }
-
-    if ($self->get_builtin_function($data->[1])) {
-        $self->error($context, "cannot override builtin function `$data->[1]`");
-    }
-
     $self->set_variable($context, $data->[1], $right_value);
     return $right_value;
 }
@@ -649,22 +613,14 @@ sub map_constructor {
     foreach my $entry (@$map) {
         if ($entry->[0]->[0] eq 'IDENT') {
             my $var = $self->get_variable($context, $entry->[0]->[1]);
-            return $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
-
-            if ($var->[0] eq 'STRING') {
-                $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
-                next;
-            }
-
-            $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
+            $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+            next;
         }
 
         if ($entry->[0]->[0] eq 'STRING') {
             $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
             next;
         }
-
-        $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
     }
 
     return ['MAP', $hashref];
@@ -686,29 +642,14 @@ sub array_constructor {
 sub keyword_exists {
     my ($self, $context, $data) = @_;
 
-    # check for key in map
-    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
-        my $var = $self->statement($context, $data->[1]->[1]);
+    my $var = $self->statement($context, $data->[1]->[1]);
+    my $key = $self->statement($context, $data->[1]->[2]);
 
-        # map index
-        if ($var->[0] eq 'MAP') {
-            my $key = $self->statement($context, $data->[1]->[2]);
-
-            if ($key->[0] eq 'STRING') {
-                if (exists $var->[1]->{$key->[1]}) {
-                    return ['BOOL', 1];
-                } else {
-                    return ['BOOL', 0];
-                }
-            }
-
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-        }
-
-        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
+    if (exists $var->[1]->{$key->[1]}) {
+        return ['BOOL', 1];
+    } else {
+        return ['BOOL', 0];
     }
-
-    $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
 }
 
 sub keyword_delete {
@@ -717,36 +658,19 @@ sub keyword_delete {
     # delete one key in map
     if ($data->[1]->[0] eq 'ARRAY_INDEX') {
         my $var = $self->statement($context, $data->[1]->[1]);
+        my $key = $self->statement($context, $data->[1]->[2]);
 
-        # map index
-        if ($var->[0] eq 'MAP') {
-            my $key = $self->statement($context, $data->[1]->[2]);
-
-            if ($key->[0] eq 'STRING') {
-                my $val = delete $var->[1]->{$key->[1]};
-                return ['NULL', undef] if not defined $val;
-                return $val;
-            }
-
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
-        }
-
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        my $val = delete $var->[1]->{$key->[1]};
+        return ['NULL', undef] if not defined $val;
+        return $val;
     }
 
     # delete all keys in map
     if ($data->[1]->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $data->[1]->[1]);
-
-        if ($var->[0] eq 'MAP') {
-            $var->[1] = {};
-            return $var;
-        }
-
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        $var->[1] = {};
+        return $var;
     }
-
-    $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
 }
 
 sub conditional {
@@ -806,59 +730,38 @@ sub add_assign {
     my ($self, $context, $data) = @_;
     my $left  = $self->statement($context, $data->[1]);
     my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] += $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $left->[1] += $right->[1];
+    return $left;
 }
 
 sub sub_assign {
     my ($self, $context, $data) = @_;
     my $left  = $self->statement($context, $data->[1]);
     my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] -= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $left->[1] -= $right->[1];
+    return $left;
 }
 
 sub mul_assign {
     my ($self, $context, $data) = @_;
     my $left  = $self->statement($context, $data->[1]);
     my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] *= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $left->[1] *= $right->[1];
+    return $left;
 }
 
 sub div_assign {
     my ($self, $context, $data) = @_;
     my $left  = $self->statement($context, $data->[1]);
     my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] /= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $left->[1] /= $right->[1];
+    return $left;
 }
 
 sub cat_assign {
     my ($self, $context, $data) = @_;
     my $left  = $self->statement($context, $data->[1]);
     my $right = $self->statement($context, $data->[2]);
-
     $left->[1] .= $right->[1];
     return $left;
 }
@@ -881,51 +784,31 @@ sub stmt_literal {
 sub prefix_increment {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        $var->[1]++;
-        return $var;
-    }
-
-    $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
+    $var->[1]++;
+    return $var;
 }
 
 sub prefix_decrement {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        $var->[1]--;
-        return $var;
-    }
-
-    $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
+    $var->[1]--;
+    return $var;
 }
 
 sub postfix_increment {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]++;
-        return $temp_var;
-    }
-
-    $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
+    my $temp_var = [$var->[0], $var->[1]];
+    $var->[1]++;
+    return $temp_var;
 }
 
 sub postfix_decrement {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]--;
-        return $temp_var;
-    }
-
-    $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
+    my $temp_var = [$var->[0], $var->[1]];
+    $var->[1]--;
+    return $temp_var;
 }
 
 sub logical_and {

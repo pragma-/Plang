@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# Pupose: validates the syntax tree by performing static type-checking,
+# Purpose: validates the syntax tree by performing static type-checking,
 # semantic-analysis, etc.
 
 package Plang::Validator;
@@ -11,6 +11,289 @@ use strict;
 use parent 'Plang::AstInterpreter';
 
 use Data::Dumper;
+
+sub variable_declaration {
+    my ($self, $context, $data) = @_;
+
+    my $initializer = $data->[2];
+    my $right_value = undef;
+
+    if ($initializer) {
+        $right_value = $self->statement($context, $initializer);
+    } else {
+        $right_value = ['NULL', undef];
+    }
+
+    if (!$self->{repl} and (my $var = $self->get_variable($context, $data->[1], locals_only => 1))) {
+        if ($var->[0] ne 'BUILTIN') {
+            $self->error($context, "cannot redeclare existing local `$data->[1]`");
+        }
+    }
+
+    if ($self->get_builtin_function($data->[1])) {
+        $self->error($context, "cannot override builtin function `$data->[1]`");
+    }
+
+    $self->set_variable($context, $data->[1], $right_value);
+    return $right_value;
+}
+
+sub map_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $map     = $data->[1];
+    my $hashref = {};
+
+    foreach my $entry (@$map) {
+        if ($entry->[0]->[0] eq 'IDENT') {
+            my $var = $self->get_variable($context, $entry->[0]->[1]);
+
+            if (not defined $var) {
+                $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
+            }
+
+            if ($var->[0] eq 'STRING') {
+                $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+                next;
+            }
+
+            $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
+        }
+
+        if ($entry->[0]->[0] eq 'STRING') {
+            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
+            next;
+        }
+
+        $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
+    }
+
+    return ['MAP', $hashref];
+}
+
+sub keyword_exists {
+    my ($self, $context, $data) = @_;
+
+    # check for key in map
+    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+        my $var = $self->statement($context, $data->[1]->[1]);
+
+        # map index
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $data->[1]->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                if (exists $var->[1]->{$key->[1]}) {
+                    return ['BOOL', 1];
+                } else {
+                    return ['BOOL', 0];
+                }
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+}
+
+sub keyword_delete {
+    my ($self, $context, $data) = @_;
+
+    # delete one key in map
+    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+        my $var = $self->statement($context, $data->[1]->[1]);
+
+        # map index
+        if ($var->[0] eq 'MAP') {
+            my $key = $self->statement($context, $data->[1]->[2]);
+
+            if ($key->[0] eq 'STRING') {
+                my $val = delete $var->[1]->{$key->[1]};
+                return ['NULL', undef] if not defined $val;
+                return $val;
+            }
+
+            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    # delete all keys in map
+    if ($data->[1]->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $data->[1]->[1]);
+
+        if ($var->[0] eq 'MAP') {
+            $var->[1] = {};
+            return $var;
+        }
+
+        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+    }
+
+    $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+}
+
+sub unary_op {
+    my ($self, $context, $data, $op, $debug_msg) = @_;
+
+    if ($data->[0] eq $op) {
+        my $value  = $self->statement($context, $data->[1]);
+
+        if ($self->{debug} and $debug_msg) {
+            $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
+            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+        }
+
+        if ($self->is_arithmetic_type($value)) {
+            if (exists $self->{eval_unary_op_NUM}->{$op}) {
+                return $self->{eval_unary_op_NUM}->{$op}->($value->[1]);
+            }
+        }
+
+        $self->error($context, "cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
+    }
+
+    return;
+}
+
+sub binary_op {
+    my ($self, $context, $data, $op, $debug_msg) = @_;
+
+    if ($data->[0] eq $op) {
+        my $left_value  = $self->statement($context, $data->[1]);
+        my $right_value = $self->statement($context, $data->[2]);
+
+        if ($self->{debug} and $debug_msg) {
+            $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
+            $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
+            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+        }
+
+        if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
+            if (exists $self->{eval_binary_op_NUM}->{$op}) {
+                return $self->{eval_binary_op_NUM}->{$op}->($left_value->[1], $right_value->[1]);
+            }
+        }
+
+        if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
+            if (exists $self->{eval_binary_op_STRING}->{$op}) {
+                $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
+                $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
+                return $self->{eval_binary_op_STRING}->{$op}->($left_value->[1], $right_value->[1]);
+            }
+        }
+
+        $self->error($context, "cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
+    }
+
+    return;
+}
+
+sub prefix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        $var->[1]++;
+        return $var;
+    }
+
+    $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
+}
+
+sub prefix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        $var->[1]--;
+        return $var;
+    }
+
+    $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
+}
+
+sub postfix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]++;
+        return $temp_var;
+    }
+
+    $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
+}
+
+sub postfix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    if ($self->is_arithmetic_type($var)) {
+        my $temp_var = [$var->[0], $var->[1]];
+        $var->[1]--;
+        return $temp_var;
+    }
+
+    $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
+}
+
+sub add_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] += $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub sub_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] -= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub mul_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] *= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
+
+sub div_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        $left->[1] /= $right->[1];
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+}
 
 sub function_definition {
     my ($self, $context, $data) = @_;
@@ -35,7 +318,66 @@ sub function_definition {
     }
 
     $context->{locals}->{$name} = $func;
+
+    my $new_context = $self->new_context($context);
+    my $got_default_value = 0;
+
+    foreach my $param (@$parameters) {
+        my ($type, $ident, $default_value) = @$param;
+
+        my $value = $self->statement($new_context, $default_value);
+
+        if (not defined $value) {
+            if ($got_default_value) {
+                $self->error($new_context, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value");
+            }
+        } else {
+            $got_default_value = 1;
+
+            if ($type ne 'Any' and $type ne $self->pretty_type($value)) {
+                $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as $type but default value has type " . $self->pretty_type($value));
+            }
+        }
+    }
+
     return $func;
+}
+
+sub process_function_call_arguments {
+    my ($self, $context, $name, $parameters, $arguments) = @_;
+
+    my $evaluated_arguments;
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        if (not defined $arguments->[$i]) {
+            # no argument provided
+            if (defined $parameters->[$i]->[2]) {
+                # found default argument
+                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+                $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            } else {
+                # no argument or default argument
+                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`.\n"),
+            }
+        } else {
+            # argument provided
+            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
+
+            # check type
+            if ($parameters->[$i]->[0] ne 'Any' and $parameters->[$i]->[0] ne $self->pretty_type($evaluated_arguments->[$i])) {
+                $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameters->[$i])
+                    . " for parameter `$parameters->[$i]->[1]` but got " . $self->pretty_type($evaluated_arguments->[$i]));
+            }
+
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+        }
+    }
+
+    if (@$arguments > @$parameters) {
+        $self->error($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
+    }
+
+    return $evaluated_arguments;
 }
 
 sub function_call {
@@ -46,11 +388,11 @@ sub function_call {
     my $func;
 
     if ($target->[0] eq 'IDENT') {
-        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n");
+        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
         $func = undef if defined $func and $func->[0] eq 'BUILTIN';
     } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n");
+        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);
     }
 
