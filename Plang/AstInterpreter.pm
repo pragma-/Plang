@@ -848,7 +848,6 @@ sub assignment {
     # lvalue variable
     if ($left_value->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $left_value->[1]);
-        $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
         $self->set_variable($context, $left_value->[1], $right_value);
         return $right_value;
     }
@@ -859,26 +858,16 @@ sub assignment {
 
         if ($var->[0] eq 'MAP') {
             my $key = $self->statement($context, $left_value->[2]);
-
-            if ($key->[0] eq 'STRING') {
-                my $val = $self->statement($context, $right_value);
-                $var->[1]->{$key->[1]} = $val;
-                return $val;
-            }
-
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            my $val = $self->statement($context, $right_value);
+            $var->[1]->{$key->[1]} = $val;
+            return $val;
         }
 
         if ($var->[0] eq 'ARRAY') {
             my $index = $self->statement($context, $left_value->[2]);
-
-            if ($index->[0] eq 'NUM') {
-                my $val = $self->statement($context, $right_value);
-                $var->[1]->[$index->[1]] = $val;
-                return $val;
-            }
-
-            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+            my $val = $self->statement($context, $right_value);
+            $var->[1]->[$index->[1]] = $val;
+            return $val;
         }
 
         if ($var->[0] eq 'STRING') {
@@ -888,47 +877,29 @@ sub assignment {
                 my $from = $value->[1];
                 my $to   = $value->[2];
 
-                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                    if ($right_value->[0] eq 'STRING') {
-                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
-                        return ['STRING', $var->[1]];
-                    }
-
-                    if ($right_value->[0] eq 'NUM') {
-                        substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
-                        return ['STRING', $var->[1]];
-                    }
-
-                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix []");
-                }
-
-                $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix []");
-            }
-
-            if ($value->[0] eq 'NUM') {
-                my $index = $value->[1];
                 if ($right_value->[0] eq 'STRING') {
-                    substr ($var->[1], $index, 1) = $right_value->[1];
+                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
                     return ['STRING', $var->[1]];
                 }
 
                 if ($right_value->[0] eq 'NUM') {
-                    substr ($var->[1], $index, 1) = chr $right_value->[1];
+                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
                     return ['STRING', $var->[1]];
                 }
-
-                $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix []");
             }
 
-            $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix []");
+            my $index = $value->[1];
+            if ($right_value->[0] eq 'STRING') {
+                substr ($var->[1], $index, 1) = $right_value->[1];
+                return ['STRING', $var->[1]];
+            }
+
+            if ($right_value->[0] eq 'NUM') {
+                substr ($var->[1], $index, 1) = chr $right_value->[1];
+                return ['STRING', $var->[1]];
+            }
         }
-
-        $self->error($context, "cannot assign to postfix [] on type " . $self->pretty_type($var));
     }
-
-    # a statement
-    my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "cannot assign to non-lvalue type " . $self->pretty_type($eval));
 }
 
 # rvalue array/map index
@@ -939,21 +910,15 @@ sub array_index_notation {
     # map index
     if ($var->[0] eq 'MAP') {
         my $key = $self->statement($context, $data->[2]);
-
-        if ($key->[0] eq 'STRING') {
-            my $val = $var->[1]->{$key->[1]};
-            return ['NULL', undef] if not defined $val;
-            return $val;
-        }
-
-        $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        my $val = $var->[1]->{$key->[1]};
+        return ['NULL', undef] if not defined $val;
+        return $val;
     }
 
     # array index
     if ($var->[0] eq 'ARRAY') {
         my $index = $self->statement($context, $data->[2]);
 
-        # number index
         if ($index->[0] eq 'NUM') {
             my $val = $var->[1]->[$index->[1]];
             return ['NULL', undef] if not defined $val;
@@ -961,8 +926,6 @@ sub array_index_notation {
         }
 
         # TODO support RANGE and x:y splices and negative indexing
-
-        $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
     }
 
     # string index
@@ -972,23 +935,14 @@ sub array_index_notation {
         if ($value->[0] eq 'RANGE') {
             my $from = $value->[1];
             my $to = $value->[2];
-
-            if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
-            }
-
-            $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix []");
+            return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
         }
 
         if ($value->[0] eq 'NUM') {
             my $index = $value->[1];
             return ['STRING', substr($var->[1], $index, 1) // ""];
         }
-
-        $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix []");
     }
-
-    $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
 }
 
 sub statement {
