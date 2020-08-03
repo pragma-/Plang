@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# Interprets a Plang syntax tree.
+
 package Plang::AstInterpreter;
 
 use warnings;

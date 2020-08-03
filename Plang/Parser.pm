@@ -1,5 +1,15 @@
 #!/usr/bin/env perl
 
+# Generic parser class.
+#
+# Gets tokens from Plang::Lexer and parses them using keywords,
+# types and rules defined by define_keywords(), define_types()
+# and add_rule(). Typically only the start-rule need be added.
+#
+# See Plang::Grammar::Program() for the start-rule for a Plang program.
+#
+# See Plang::Interpreter for token, keyword and type definitions.
+
 package Plang::Parser;
 
 use warnings;

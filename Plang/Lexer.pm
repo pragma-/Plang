@@ -1,5 +1,11 @@
 #!/usr/bin/env perl
 
+# Converts a stream of characters into a stream of tokens.
+#
+# Use define_tokens() to define the rules for creating tokens.
+#
+# See Plang::Interpreter::initialize() for Plang's token definitions.
+
 package Plang::Lexer;
 
 use warnings;

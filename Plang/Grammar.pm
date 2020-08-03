@@ -1,12 +1,17 @@
 #!/usr/bin/env perl
 
+# Recursive descent rules to parse a Plang program using
+# the Plang::Parser class.
+#
+# Program() is the start-rule.
+
 package Plang::Grammar;
 
 use warnings;
 use strict;
 
 use base 'Exporter';
-our @EXPORT_OK = qw/Program/;
+our @EXPORT_OK = qw/Program/; # start-rule
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 
 sub error {
@@ -59,6 +64,7 @@ sub expected {
     }
 }
 
+# start-rule:
 # Grammar: Program ::= Statement+
 sub Program {
     my ($parser) = @_;

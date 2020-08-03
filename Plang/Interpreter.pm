@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+# Plang interpreter main entry point and API.
+#
+# Defines tokens, keywords, types and rules. Reads input from streams
+# or strings and sends it to be parsed and interpreted.
+
 package Plang::Interpreter;
 
 use warnings;

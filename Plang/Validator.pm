@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 
-# Purpose: validates the syntax tree by performing static type-checking,
-# semantic-analysis, etc.
+# Validates a Plang syntax tree by performing static type-checking,
+# semantic-analysis, etc, so the interpreter need not concern itself
+# with these potentially expensive operations.
 
 package Plang::Validator;
 
