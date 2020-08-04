@@ -344,40 +344,93 @@ sub function_definition {
     return $func;
 }
 
-sub process_function_call_arguments {
-    my ($self, $context, $name, $parameters, $arguments) = @_;
+sub validate_function_argument_type {
+    my ($self, $context, $name, $parameter, $arg_type) = @_;
 
-    my $evaluated_arguments;
-
-    for (my $i = 0; $i < @$parameters; $i++) {
-        if (not defined $arguments->[$i]) {
-            # no argument provided
-            if (defined $parameters->[$i]->[2]) {
-                # found default argument
-                $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
-                $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
-            } else {
-                # no argument or default argument
-                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`.\n"),
-            }
-        } else {
-            # argument provided
-            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-
-            # check type
-            if ($parameters->[$i]->[0] ne 'Any' and $parameters->[$i]->[0] ne $self->pretty_type($evaluated_arguments->[$i])) {
-                $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameters->[$i])
-                    . " for parameter `$parameters->[$i]->[1]` but got " . $self->pretty_type($evaluated_arguments->[$i]));
-            }
-
-            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
-        }
+    if ($parameter->[0] ne 'Any' and $parameter->[0] ne $arg_type) {
+        $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameter)
+            . " for parameter `$parameter->[1]` but got " . $arg_type);
     }
+}
+
+sub process_function_call_arguments {
+    my ($self, $context, $name, $parameters, $arguments, $data) = @_;
 
     if (@$arguments > @$parameters) {
         $self->error($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
     }
 
+    my $evaluated_arguments;
+    my $processed_arguments = [];
+
+    for (my $i = 0; $i < @$arguments; $i++) {
+        my $arg = $arguments->[$i];
+        if ($arg->[0] eq 'ASSIGN') {
+            # named argument
+            if (not defined $parameters->[$i]->[2]) {
+                # ensure positional arguments are filled first
+                $self->error($context, "positional parameter `$parameters->[$i]->[1]` must be filled before using named argument");
+            }
+
+            my $named_arg = $arguments->[$i]->[1];
+            my $value     = $arguments->[$i]->[2];
+
+            if ($named_arg->[0] eq 'IDENT') {
+                my $ident = $named_arg->[1];
+
+                my $found = 0;
+                for (my $j = 0; $j < @$parameters; $j++) {
+                    if ($parameters->[$j]->[1] eq $ident) {
+                        $processed_arguments->[$j] = $value;
+                        $evaluated_arguments->[$j] = $self->statement($context, $value);
+                        $self->validate_function_argument_type($context, $name, $parameters->[$j], $self->pretty_type($evaluated_arguments->[$j]));
+                        $context->{locals}->{$parameters->[$j]->[1]} = $evaluated_arguments->[$j];
+                        $found = 1;
+                        last;
+                    }
+                }
+
+                if (not $found) {
+                    $self->error($context, "function `$name` has no parameter named `$ident`");
+                }
+            } else {
+                $self->error($context, "named argument must be an identifier (got " . $self->pretty_type($named_arg) . ")");
+            }
+        } else {
+            # normal argument
+            $processed_arguments->[$i] = $arg;
+            $evaluated_arguments->[$i] = $self->statement($context, $arg);
+            $self->validate_function_argument_type($context, $name, $parameters->[$i], $self->pretty_type($evaluated_arguments->[$i]));
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+        }
+    }
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        if (defined $evaluated_arguments->[$i]) {
+            next;
+        }
+
+        if (defined $parameters->[$i]->[2]) {
+            # found default argument
+            $processed_arguments->[$i] = $parameters->[$i]->[2];
+            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+        } else {
+            # no argument or default argument
+            if (not defined $evaluated_arguments->[$i]) {
+                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`."),
+            }
+        }
+    }
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        if (not defined $evaluated_arguments->[$i]) {
+            $self->error($context, "missing argument `$parameters->[$i]->[1]` to function `$name`.");
+        }
+    }
+
+    # rewrite CALL arguments with positional arguments
+    $data->[2] = $processed_arguments;
     return $evaluated_arguments;
 }
 
@@ -438,7 +491,8 @@ sub function_call {
     $new_context->{locals} = { %{$context->{locals}} };
     $new_context = $self->new_context($new_context);
 
-    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
+    # process args and validate types
+    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments, $data);
 
     foreach my $stmt (@$statements) {
         if ($stmt->[0] eq 'RET') {
