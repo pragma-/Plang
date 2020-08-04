@@ -203,7 +203,7 @@ sub handle_parse_errors {
     return;
 }
 
-sub validate_program {
+sub validate {
     my ($self, $ast) = @_;
     return $self->{validator}->validate($ast);
 }
@@ -214,7 +214,7 @@ sub interpret {
     my $errors = $self->handle_parse_errors;
     return ['ERROR', $errors] if defined $errors;
 
-    $errors = $self->validate_program($self->{ast});
+    $errors = $self->validate($self->{ast});
 
     if ($errors) {
         if (not $self->{embedded}) {
