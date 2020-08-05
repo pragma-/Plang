@@ -434,6 +434,22 @@ sub process_function_call_arguments {
     return $evaluated_arguments;
 }
 
+sub type_check_builtin_function {
+    my ($self, $context, $data, $name) = @_;
+
+    my $builtin = $self->get_builtin_function($name);
+
+    my $parameters = $builtin->{params};
+    my $func       = $builtin->{subref};
+    my $arguments  = $data->[2];
+
+    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
+
+    # don't actually invoke builtin function; return an object of its return-type instead
+    return [$builtin->{ret}, undef];
+}
+
+
 sub function_call {
     my ($self, $context, $data) = @_;
 
@@ -445,6 +461,8 @@ sub function_call {
         $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
         $func = undef if defined $func and $func->[0] eq 'BUILTIN';
+    } elsif ($target->[0] eq 'FUNC') {
+        $func = $target;
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);
@@ -475,8 +493,7 @@ sub function_call {
                     # skip builtin print() call
                     $return = ['NULL', undef];
                 } elsif ($target->[1] eq 'filter' or $target->[1] eq 'map') {
-                    # skip builtin map() and filter()
-                    $return = ['ARRAY', undef];
+                    $return = $self->type_check_builtin_function($context, $data, $target->[1]);
                 } else {
                     $return = $self->call_builtin_function($context, $data, $target->[1]);
                 }

@@ -480,12 +480,10 @@ sub get_builtin_function {
 }
 
 sub call_builtin_function {
-    my ($self, $context, $data, $name, $builtins) = @_;
+    my ($self, $context, $data, $name) = @_;
 
-    $builtins ||= \%function_builtins;
-
-    my $parameters = $builtins->{$name}->{params};
-    my $func       = $builtins->{$name}->{subref};
+    my $parameters = $function_builtins{$name}->{params};
+    my $func       = $function_builtins{$name}->{subref};
     my $arguments  = $data->[2];
 
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
