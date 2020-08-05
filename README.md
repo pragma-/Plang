@@ -268,7 +268,8 @@ function call, and will be replaced with the value of the default argument.
 In a function call, arguments can be passed positionally or by name. Arguments that are
 passed by name are called named arguments.
 
-Named arguments can passed only to parameters that have a default value. All positional
+Named arguments can passed only to parameters that have a default argument value. All
+parameters without a default arguments are strictly positional parameters. All positional
 arguments must be passed prior to passing a named argument.
 
 Consider a function that has many default arguments:
