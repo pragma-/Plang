@@ -25,10 +25,10 @@ This README describes what is implemented so far.
   * [Scoping](#scoping)
   * [Variables](#variables)
   * [Functions](#functions)
-    * [Trivial examples](#trivial-examples)
-    * [Default arguments](#default-arguments)
-    * [Anonymous functions](#anonymous-functions)
     * [Type-checking](#type-checking)
+    * [Default arguments](#default-arguments)
+    * [Named arguments](#named-arguments)
+    * [Anonymous functions](#anonymous-functions)
     * [Closures](#closures)
     * [Currying](#currying)
     * [Lazy evaluation](#lazy-evaluation)
@@ -220,33 +220,6 @@ may be any valid expression.
 
 The `fn` statement returns a reference to the newly defined function.
 
-#### Trivial examples
-    > fn say_hello print("Hello, world!"); say_hello()
-     Hello, world!
-<!-- -->
-    > fn square(x) x * x; square(2 + 2)
-     16
-<!-- -->
-    > fn add(a, b) a + b; add(3, 4)
-     7
-
-#### Default arguments
-    > fn add(a, b = 10) a + b; add(5);
-     15
-
-#### Anonymous functions
-    > var greeter = fn { print("Hello!") }; greeter()
-     Hello!
-<!-- -->
-    > var adder = fn (a, b) a + b; adder(10, 20)
-     30
-<!-- -->
-    > (fn (a, b) a + b)(1, 2)
-     3
-<!-- -->
-    > (fn 42)()
-     42
-
 #### Type-checking
 With no explicit type-specifiers, the function's return type and types of its parameters
 will default to the special `Any` type. The `Any` type means that the function will
@@ -282,6 +255,54 @@ You can also specify a return type by putting a type-specifier before the functi
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number a, Number b) -> Number
+
+#### Default arguments
+In a function definition, parameters may optionally be followed by an initializer. This is
+called a default argument. Parameters that have a default argument may be omitted from the
+function call, and will be replaced with the value of the default argument.
+
+    > fn add(a, b = 10) a + b; add(5);
+     15
+
+#### Named arguments
+In a function call, arguments can be passed positionally or by name. Arguments that are
+passed by name are called named arguments.
+
+Named arguments can passed only to parameters that have a default value. All positional
+arguments must be passed prior to passing a named argument.
+
+Consider a function that has many default arguments:
+
+    fn new_creature(name = "a creature", health = 100, armor = 50, damage = 10) ...
+
+You can memorize the order of arguments:
+
+    new_creature("a troll", 100, 100, 25)
+
+Or you can used named arguments, which not only helps readability but also lets you specify
+arguments in any order:
+
+    new_creature(damage = 25, health = 100, armor = 100, name = "a troll")
+
+But the real benefit of named arguments comes into play when you want to omit some arguments. With
+positional arguments, if you wanted to set only the 4th argument you'd also need to set each previous
+argument as well. But with named arguments you can simply specify which arguments you care about and
+let the default arguments fill in the rest:
+
+    new_creature(damage = 100)
+
+#### Anonymous functions
+    > var greeter = fn { print("Hello!") }; greeter()
+     Hello!
+<!-- -->
+    > var adder = fn (a, b) a + b; adder(10, 20)
+     30
+<!-- -->
+    > (fn (a, b) a + b)(1, 2)
+     3
+<!-- -->
+    > (fn 42)()
+     42
 
 #### Closures
 The following snippet:
