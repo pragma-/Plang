@@ -285,10 +285,10 @@ arguments in any order:
 
     new_creature(damage = 25, health = 100, armor = 100, name = "a troll")
 
-But the real benefit of named arguments comes into play when you want to omit some arguments. With
-positional arguments, if you wanted to set only the 4th argument you'd also need to set each previous
-argument as well. But with named arguments you can simply specify which arguments you care about and
-let the default arguments fill in the rest:
+Another advantage of named arguments comes into play when you want to omit some arguments. With
+positional arguments, if you wanted to set only a specific argument, say the last one, you'd
+need to set each prior argument. With named arguments you can simply specify which arguments you
+care about and let the default arguments fill in the rest:
 
     new_creature(damage = 100)
 
