@@ -646,7 +646,7 @@ To find the index of a substring within a string, use the `~` operator.
      6
 
 #### Indexing
-To get a positional character from a string, you can use postfix `[]` array notation.
+To get a positional character from a string, you can use postfix `[]` access notation.
 
     > "Hello!"[0]
      "H"
@@ -663,7 +663,7 @@ You can assign to the above notation to replace the character instead.
 
 #### Substring
 To extract a substring from a string, you can use the `..` range operator inside
-postfix `[]` array notation.
+postfix `[]` access notation.
 
     > "Hello!"[1..4]
      "ello"
