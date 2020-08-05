@@ -348,7 +348,7 @@ sub validate_function_argument_type {
     my ($self, $context, $name, $parameter, $arg_type) = @_;
 
     if ($parameter->[0] ne 'Any' and $parameter->[0] ne $arg_type) {
-        $self->error($context, "In function call for `$name`, expected " . $self->pretty_type($parameter)
+        $self->error($context, "in function call for `$name`, expected " . $self->pretty_type($parameter)
             . " for parameter `$parameter->[1]` but got " . $arg_type);
     }
 }
@@ -474,6 +474,9 @@ sub function_call {
                 if ($target->[1] eq 'print') {
                     # skip builtin print() call
                     $return = ['NULL', undef];
+                } elsif ($target->[1] eq 'filter' or $target->[1] eq 'map') {
+                    # skip builtin map() and filter()
+                    $return = ['ARRAY', undef];
                 } else {
                     $return = $self->call_builtin_function($context, $data, $target->[1]);
                 }

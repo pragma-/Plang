@@ -9,15 +9,15 @@ print(array[1])    # prints green
 print(array)       # prints ["red","green",1,2]
 
 # Basic Map
-var map = {
+var map1 = {
     'name'   : "Grok",
     'health' : 200,
     'iq'     : 75
 }
 
-print(type(map))     # prints Map
-print(map['name'])   # prints Grok
-print(map)           # prints {"name": "Grok", "health": 200, "iq": 75}
+print(type(map1))    # prints Map
+print(map1['name'])  # prints Grok
+print(map1)          # prints {"name": "Grok", "health": 200, "iq": 75}
 
 # Array of anonymous Arrays
 var arrays = [[1,2], [3,4], [5,6]]

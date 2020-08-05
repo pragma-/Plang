@@ -13,11 +13,11 @@ print(array[0])      # prints green
 print(array)         # prints ["green",2,3.1459,null]
 
 # Maps
-var map = { 'name': 'Grok', 'health': 200 }
+var map1 = { 'name': 'Grok', 'health': 200 }
 
-print(type(map))     # prints Map
-print(map['name'])   # prints Grok
-print(map)           # prints {"name": "Grok", "health": 200}
+print(type(map1))    # prints Map
+print(map1['name'])  # prints Grok
+print(map1)          # prints {"name": "Grok", "health": 200}
 
 # Note that conversions from Array/Map to String replaces the single-quotes
 # with double-quotes.
@@ -31,7 +31,7 @@ print(type(string1)) # prints String
 print(string1)       # prints ["green",2,3.1459,null]
 
 # Likewise for Maps:
-var string2 = String(map)
+var string2 = String(map1)
 
 print(type(string2)) # prints String
 print(string2)       # prints {"name": "Grok", "health": 200}
@@ -58,4 +58,4 @@ print(map2)          # prints {"a": 1, "b": 2}
 # To convert the strings back to Arrays or Maps, you can use
 # the Array() and Map() type conversion functions.
 
-# These Strings are 100% compatible with JSON! Absolutely brilliant.
+# These Strings are 100% compatible with JSON.

@@ -178,6 +178,16 @@ my %function_builtins = (
         ret    => 'String',
         subref => \&function_builtin_type,
     },
+    'map'   => {
+        params => [['Function (Any it) -> Any', 'func', undef], ['Array', 'list', undef]],
+        ret    => 'Array',
+        subref => \&function_builtin_map,
+    },
+    'filter'   => {
+        params => [['Function (Any it) -> Boolean', 'func', undef], ['Array', 'list', undef]],
+        ret    => 'Array',
+        subref => \&function_builtin_filter,
+    },
     'Number' => {
         params => [['Any', 'expr', undef]],
         ret    => 'Number',
@@ -288,6 +298,43 @@ sub function_builtin_type {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return ['STRING', $self->pretty_type($expr)];
+}
+
+# builtin map
+sub function_builtin_map {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($func, $list) = ($arguments->[0], $arguments->[1]);
+
+    my $data = ['CALL', $func, undef];
+
+    foreach my $val (@{$list->[1]}) {
+        $data->[2] = [$val];
+        my $result = $self->function_call($context, $data);
+        $val = $result;
+    }
+
+    return $list;
+}
+
+# builtin filter
+sub function_builtin_filter {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($func, $list) = ($arguments->[0], $arguments->[1]);
+
+    my $data = ['CALL', $func, undef];
+
+    my $new_list = [];
+
+    foreach my $val (@{$list->[1]}) {
+        $data->[2] = [$val];
+        my $result = $self->function_call($context, $data);
+
+        if ($result->[1]) {
+            push @$new_list, $val;
+        }
+    }
+
+    return ['ARRAY', $new_list];
 }
 
 # cast functions
@@ -502,6 +549,8 @@ sub function_call {
             # builtin function
             return $self->call_builtin_function($context, $data, $target->[1]);
         }
+    } elsif ($target->[0] eq 'FUNC') {
+        $func = $target;
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);

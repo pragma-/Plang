@@ -134,7 +134,7 @@ CODE
         ['NULL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
     ['var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]',
         ['NUM', 75]],
-    ['var map = {}; map["color"] = "blue"; $"The color is {map[\\"color\\"]}!"',
+    ['var a = {}; a["color"] = "blue"; $"The color is {a[\\"color\\"]}!"',
         ['STRING', 'The color is blue!']],
     ['var a = {"x": 42}; ++a["x"]; a["x"] += 5; a["x"] + 1',
         ['NUM', 49]],
