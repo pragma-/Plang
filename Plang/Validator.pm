@@ -357,7 +357,7 @@ sub process_function_call_arguments {
     my ($self, $context, $name, $parameters, $arguments, $data) = @_;
 
     if (@$arguments > @$parameters) {
-        $self->error($context, "Extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
+        $self->error($context, "extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
     }
 
     my $evaluated_arguments;
@@ -736,6 +736,19 @@ sub array_index_notation {
     $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
 }
 
+sub function_builtin_length {
+     my ($self, $context, $name, $arguments) = @_;
+     my ($val) = ($arguments->[0]);
+
+     my $type = $val->[0];
+
+     if ($type ne 'STRING' and $type ne 'ARRAY' and $type ne 'MAP') {
+         $self->error($context, "cannot get length of a " . $self->pretty_type($val));
+     }
+
+     return ['NUM', 0];
+}
+
 sub handle_statement_result {
     my ($self, $result) = @_;
     return $result;
@@ -744,7 +757,14 @@ sub handle_statement_result {
 # validate the program
 sub validate {
     my ($self, $ast) = @_;
-    my $result = $self->run($ast); # invoke AstInterpreter's run()
+
+    # override builtins for typechecking
+    $self->add_builtin_function('length',
+        [['Any', 'it']],
+        'Number',
+        \&function_builtin_length);
+
+    my $result = $self->run($ast, typecheck => 1);
     return if not defined $result;
     return if $result->[0] ne 'ERROR';
     return $result;

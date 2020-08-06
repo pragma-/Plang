@@ -173,18 +173,28 @@ my %function_builtins = (
         ret    => 'Null',
         subref => \&function_builtin_print,
     },
-    'type'   => {
+    'type' => {
         params => [['Any', 'expr', undef]],
         ret    => 'String',
         subref => \&function_builtin_type,
     },
-    'map'   => {
-        params => [['Function (Any it) -> Any', 'func', undef], ['Array', 'list', undef]],
+    'whatis' => {
+        params => [['Any', 'expr', undef]],
+        ret    => 'String',
+        subref => \&function_builtin_whatis,
+    },
+    'length' => {
+        params => [['Any', 'it', undef]],
+        ret    => 'Number',
+        subref => \&function_builtin_length,
+    },
+    'map' => {
+        params => [['Function (Any) -> Any', 'func', undef], ['Array', 'list', undef]],
         ret    => 'Array',
         subref => \&function_builtin_map,
     },
-    'filter'   => {
-        params => [['Function (Any it) -> Boolean', 'func', undef], ['Array', 'list', undef]],
+    'filter' => {
+        params => [['Function (Any) -> Boolean', 'func', undef], ['Array', 'list', undef]],
         ret    => 'Array',
         subref => \&function_builtin_filter,
     },
@@ -241,7 +251,7 @@ my %pretty_types = (
     'ARRAY'   => 'Array',
 );
 
-sub pretty_type {
+sub introspect {
     my ($self, $value) = @_;
     my $type = $pretty_types{$value->[0]};
     return $value->[0] if not defined $type;
@@ -285,6 +295,40 @@ sub pretty_type {
     return $type;
 }
 
+sub pretty_type {
+    my ($self, $value) = @_;
+    my $type = $pretty_types{$value->[0]};
+    return $value->[0] if not defined $type;
+
+    if ($type eq 'Function') {
+        my $ret_type = $value->[1]->[1];
+        my @params;
+        foreach my $param (@{$value->[1]->[2]}) {
+            push @params, $param->[0];
+        }
+
+        $type = "Function ";
+        $type .= '(' . join(', ', @params) . ') ' if @params;
+        $type .= "-> $ret_type";
+    }
+
+    elsif ($type eq 'Builtin') {
+        my $builtin = $function_builtins{$value->[1]};
+
+        my $ret_type = $builtin->{ret};
+        my @params;
+        foreach my $param (@{$builtin->{params}}) {
+            push @params, $param->[0];
+        }
+
+        $type = "Builtin ";
+        $type .= '(' . join(', ', @params) . ') ' if @params;
+        $type .= "-> $ret_type";
+    }
+
+    return $type;
+}
+
 # builtin print
 sub function_builtin_print {
     my ($self, $context, $name, $arguments) = @_;
@@ -298,6 +342,31 @@ sub function_builtin_type {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return ['STRING', $self->pretty_type($expr)];
+}
+
+# builtin whatis
+sub function_builtin_whatis {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+    return ['STRING', $self->introspect($expr)];
+}
+
+# builtin length
+sub function_builtin_length {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($val) = ($arguments->[0]);
+
+    if ($val->[0] eq 'STRING') {
+        return ['NUM', length $val->[1]];
+    }
+
+    if ($val->[0] eq 'ARRAY') {
+        return ['NUM', scalar @{$val->[1]}];
+    }
+
+    if ($val->[0] eq 'MAP') {
+        return ['NUM', scalar %{$val->[1]}];
+    }
 }
 
 # builtin map
@@ -1178,6 +1247,14 @@ sub run {
     if (not $ast) {
         print STDERR "No program to run.\n";
         return;
+    }
+
+    if (not $opt{typecheck}) {
+        # restore builtins overridden for typechecking
+        $self->add_builtin_function('length',
+            [['Any', 'it']],
+            'Number',
+            \&function_builtin_length);
     }
 
     # set up the global environment
