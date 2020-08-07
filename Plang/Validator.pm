@@ -25,23 +25,23 @@ sub initialize {
     };
 
     $self->{eval_binary_op_ANY} = {
-        'POW' => sub { ['NUM',  0 ]},
-        'REM' => sub { ['NUM',  0 ]},
-        'MUL' => sub { ['NUM',  0 ]},
-        'DIV' => sub { ['NUM',  0 ]},
-        'ADD' => sub { ['NUM',  0 ]},
-        'SUB' => sub { ['NUM',  0 ]},
-        'GTE' => sub { ['BOOL', 0 ]},
-        'LTE' => sub { ['BOOL', 0 ]},
-        'GT'  => sub { ['BOOL', 0 ]},
-        'LT'  => sub { ['BOOL', 0 ]},
-        'EQ'  => sub { ['BOOL', 0 ]},
-        'NEQ' => sub { ['BOOL', 0 ]},
-        'STRCAT' => sub { ['STRING', "" ] },
-        'STRIDX' => sub { ['NUM',    0  ] },
+        'POW'    => sub { ['NUM',    0  ]},
+        'REM'    => sub { ['NUM',    0  ]},
+        'MUL'    => sub { ['NUM',    0  ]},
+        'DIV'    => sub { ['NUM',    0  ]},
+        'ADD'    => sub { ['NUM',    0  ]},
+        'SUB'    => sub { ['NUM',    0  ]},
+        'GTE'    => sub { ['BOOL',   0  ]},
+        'LTE'    => sub { ['BOOL',   0  ]},
+        'GT'     => sub { ['BOOL',   0  ]},
+        'LT'     => sub { ['BOOL',   0  ]},
+        'EQ'     => sub { ['BOOL',   0  ]},
+        'NEQ'    => sub { ['BOOL',   0  ]},
+        'STRCAT' => sub { ['STRING', "" ]},
+        'STRIDX' => sub { ['NUM',    0  ]},
     };
 
-    $self->{ugly_types} = {
+    $self->{internal_types} = {
         'Any'     => 'ANY',
         'Null'    => 'NULL',
         'Boolean' => 'BOOL',
@@ -55,8 +55,8 @@ sub initialize {
 sub parse_pretty_type {
     my ($self, $pretty_type) = @_;
 
-    if (exists $self->{ugly_types}->{$pretty_type}) {
-        return [$self->{ugly_types}->{$pretty_type}];
+    if (exists $self->{internal_types}->{$pretty_type}) {
+        return [$self->{internal_types}->{$pretty_type}];
     }
 
     if ($pretty_type =~ /^(?:Builtin|Function)\s/) {
@@ -83,8 +83,8 @@ sub parse_pretty_type_function {
         my $type = $1;
         my $rest;
 
-        if (exists $self->{ugly_types}->{$type}) {
-            push @$result, $self->{ugly_types}->{$type};
+        if (exists $self->{internal_types}->{$type}) {
+            push @$result, $self->{internal_types}->{$type};
         }
 
         elsif ($type eq 'Function' or $type eq 'Builtin') {
@@ -105,8 +105,8 @@ sub parse_pretty_type_function {
     my $type = $1;
     my $rest;
 
-    if (exists $self->{ugly_types}->{$type}) {
-        push @$result, $self->{ugly_types}->{$type};
+    if (exists $self->{internal_types}->{$type}) {
+        push @$result, $self->{internal_types}->{$type};
         return ($result, $pretty_type);
     }
 
@@ -185,106 +185,82 @@ sub binary_op {
     return;
 }
 
-sub prefix_increment {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+sub type_check_prefix_postfix_op {
+    my ($self, $context, $data, $op) = @_;
 
-    if ($self->is_arithmetic_type($var)) {
-        $var->[1]++;
-        return $var;
+    if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ARRAY_INDEX' && $data->[1]->[1]->[0] eq 'IDENT') {
+        my $var = $self->statement($context, $data->[1]);
+
+        if ($self->is_arithmetic_type($var)) {
+            return $var;
+        }
+
+        if ($var->[0] eq 'Any') {
+            return $var;
+        }
+
+        $self->error($context, "cannot apply $op to type " . $self->pretty_type($var));
     }
 
-    $self->error($context, "cannot apply prefix-increment to type " . $self->pretty_type($var));
+    $self->error($context, "cannot apply $op to type " . $self->pretty_type($data->[1]));
+
+}
+
+sub prefix_increment {
+    my ($self, $context, $data) = @_;
+    $self->type_check_prefix_postfix_op($context, $data, 'prefix-increment');
 }
 
 sub prefix_decrement {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        $var->[1]--;
-        return $var;
-    }
-
-    $self->error($context, "cannot apply prefix-decrement to type " . $self->pretty_type($var));
+    $self->type_check_prefix_postfix_op($context, $data, 'prefix-decrement');
 }
 
 sub postfix_increment {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-
-    if ($self->is_arithmetic_type($var)) {
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]++;
-        return $temp_var;
-    }
-
-    $self->error($context, "cannot apply postfix-increment to type " . $self->pretty_type($var));
+    $self->type_check_prefix_postfix_op($context, $data, 'postfix-increment');
 }
 
 sub postfix_decrement {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    $self->type_check_prefix_postfix_op($context, $data, 'postfix-decrement');
+}
 
-    if ($self->is_arithmetic_type($var)) {
-        my $temp_var = [$var->[0], $var->[1]];
-        $var->[1]--;
-        return $temp_var;
+sub type_check_op_assign {
+    my ($self, $context, $data, $op) = @_;
+
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+
+    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+        return $left;
     }
 
-    $self->error($context, "cannot apply postfix-decrement to type " . $self->pretty_type($var));
+    if ($left->[0] eq 'Any' and $self->is_arithmetic_type($right)) {
+        return $left;
+    }
+
+    $self->error($context, "cannot apply operator $op (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
 }
 
 sub add_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] += $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator ADD (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $self->type_check_op_assign($context, $data, 'ADD');
 }
 
 sub sub_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] -= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator SUB (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $self->type_check_op_assign($context, $data, 'SUB');
 }
 
 sub mul_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] *= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator MUL (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $self->type_check_op_assign($context, $data, 'MUL');
 }
 
 sub div_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
-        $left->[1] /= $right->[1];
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator DIV (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $self->type_check_op_assign($context, $data, 'DIV');
 }
 
 sub variable_declaration {
@@ -671,11 +647,6 @@ sub function_call {
 
     my $evaled_args = $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments, $data);
 
-    # type-check only arguments, ignoring return type until it's inferred later
-    for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($context, $name, $parameters->[$i], $self->pretty_type($evaled_args->[$i]), skip_return_type => 1);
-    }
-
     foreach my $stmt (@$statements) {
         if ($stmt->[0] eq 'RET') {
             $return = $self->statement($new_context, $stmt->[1]);
@@ -700,7 +671,7 @@ sub function_call {
         $func->[1]->[1] = $self->pretty_type($return);
     }
 
-    # type-check arguments and return type
+    # type-check arguments after inference
     if (defined $parameters) {
         for (my $i = 0; $i < @$parameters; $i++) {
             $self->validate_function_argument_type($context, $name, $parameters->[$i], $self->pretty_type($evaled_args->[$i]));
@@ -723,6 +694,16 @@ sub keyword_last {
 sub keyword_return {
     my ($self, $context, $data) = @_;
     $self->error($context, "cannot use `return` outside of function");
+}
+
+sub conditional {
+    my ($self, $context, $data) = @_;
+
+    if ($self->is_truthy($context, $data->[1])) {
+        return $self->statement($context, [$data->[2]]);
+    } else {
+        return $self->statement($context, [$data->[3]]);
+    }
 }
 
 sub keyword_if {
@@ -854,6 +835,11 @@ sub assignment {
 sub array_index_notation {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
+
+    # infer type
+    if ($var->[0] eq 'Any') {
+        return $var;
+    }
 
     # map index
     if ($var->[0] eq 'MAP') {
