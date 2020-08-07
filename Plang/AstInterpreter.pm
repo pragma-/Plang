@@ -184,7 +184,7 @@ my %function_builtins = (
         subref => \&function_builtin_whatis,
     },
     'length' => {
-        params => [['Any', 'it', undef]],
+        params => [['Any', 'expr', undef]],
         ret    => 'Number',
         subref => \&function_builtin_length,
     },
@@ -378,8 +378,7 @@ sub function_builtin_map {
 
     foreach my $val (@{$list->[1]}) {
         $data->[2] = [$val];
-        my $result = $self->function_call($context, $data);
-        $val = $result;
+        $val = $self->function_call($context, $data);
     }
 
     return $list;
@@ -643,6 +642,10 @@ sub function_call {
     # invoke the function
     my $result = $self->interpret_ast($new_context, $statements);
     $self->{recursion}--;
+
+    # update inferred return type
+    $func->[1]->[1] = $self->pretty_type($result);
+
     return $result;
 }
 
@@ -1252,9 +1255,19 @@ sub run {
     if (not $opt{typecheck}) {
         # restore builtins overridden for typechecking
         $self->add_builtin_function('length',
-            [['Any', 'it']],
+            [['Any', 'expr']],
             'Number',
             \&function_builtin_length);
+
+        $self->add_builtin_function('map',
+            [['Function (Any) -> Any', 'func', undef], ['Array', 'list', undef]],
+            'Array',
+            \&function_builtin_map);
+
+        $self->add_builtin_function('filter',
+            [['Function (Any) -> Boolean', 'func', undef], ['Array', 'list', undef]],
+            'Array',
+            \&function_builtin_filter);
     }
 
     # set up the global environment
@@ -1323,9 +1336,7 @@ sub interpret_ast {
     };
 
     # catch
-    if ($@) {
-        return ['ERROR', $@];
-    }
+    die $@ if $@;
 
     return $last_statement_result;
 }

@@ -192,6 +192,7 @@ sub print_override {
 my @selected_tests;
 
 if (@ARGV) {
+    # select comma-separated list of test ids
     my $args = "@ARGV";
     my @wanted = split /\s*,\s*/, $args;
 
@@ -199,6 +200,7 @@ if (@ARGV) {
         push @selected_tests, $tests[$id - 1];
     }
 } else {
+    # select all tests
     @selected_tests = @tests;
 }
 
@@ -212,7 +214,8 @@ my $i = 0;
 foreach my $test (@selected_tests) {
     $i++;
     $output = "";
-    my $result     = $plang->interpret_string($test->[0]);
+    my $result     = eval { $plang->interpret_string($test->[0]) };
+    $result = ['ERROR', $@] if $@;
     my $expected   = $test->[1];
     my $stdout     = ['STDOUT', $output];
     my $exp_stdout = $test->[2] // ['STDOUT', ''];
