@@ -235,44 +235,42 @@ paramenters and return value:
     > fn add(a, b) a + b; add(3, 4);
      7
 
-Be careful. If you pass a `String` to it, it will blow-up inside the function body with
-an undesirable run-time error:
+If you pass a `String` to it, it will blow-up with an undesirable run-time error:
 
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
 
-However, if you apply the Number() type conversion function on the parameters inside
-the function body you will make a polymorphic function with implicit type conversion:
+If you apply the Number() type conversion function on the parameters inside the function body
+you will make a polymorphic function with implicit dynamic type conversion:
 
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-If you're sensible and you prefer explicit type-checking you can add type-specifiers
-before each parameter identifier:
+If you desire explicit type-checking you can add type-specifiers before each parameter identifier:
 
     > fn add(Number a, Number b) a + b; print(type(add));
       Function (Number, Number) -> Any
 
-Now the function throws a compile-time error if the types of the arguments do not match the types
-specified for the parameters:
+This version of `add` returns `Any` and its return type will be dynamically inferred at
+run-time from the value being returned. Now `add` throws a compile-time error if the types
+of the arguments do not match the types specified for the parameters:
 
     > fn add(Number a, Number b) a + b; add(3, "4")
      Error: In function call for `add`, expected Number for parameter `b` but got String
 
-This version of `add` returns `Any` and its return type will be dynamically inferred at
-run-time from the value being returned. If you prefer explicit type-checking, you can
-place the return type-specifier before the function identifier:
+If you prefer explicit return type-checking, you can place the return type-specifier before
+the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
 
-Now Plang will throw a compile-time error if you try to do something weird like return a `String`:
+Now Plang will throw a compile-time error if you try to return a `String`:
 
     > fn Number add(Number a, Number b) "42"; add(3, 4)
      Error: cannot return String from function declared to return Number
 
-This flexible system building from dynamic run-time type-inference to static compile-time type-checking
-is known as Gradual Typing.
+This flexible system building from dynamic run-time type-inference to static compile-time
+type-checking is known as Gradual Typing.
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
