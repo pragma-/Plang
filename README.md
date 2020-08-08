@@ -219,12 +219,12 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-Plang has a flexible type system that allows a mixture of dynamic run-time type-inference
-and static compile-time type-checking, known as Gradual Typing.
+Plang has a flexible type system that allows a mixture of dynamic run-time type inference
+and static compile-time type checking, known as Gradual Typing.
 
 Type-inference is useful for writing short concise code for embedding or prototyping,
-but runs the risk of run-time errors. Static-typing is slightly more verbose, but gives
-you the safety of compile-time type-checking. You can use a blend of both worlds in Plang.
+but runs the risk of run-time errors. Static typing is slightly more verbose, but gives
+you the safety of compile-time type checking. You can use a blend of both worlds in Plang.
 
 Let's consider a simple `add` function. With no explicit type-specifiers, the
 function's return type and types of its parameters will default to the `Any` type:
@@ -251,7 +251,7 @@ dynamic type-conversion that can accept any argument that can be converted to `N
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-On the other hand, if you desire explicit type-checking on the parameters you can add
+On the other hand, if you desire explicit type checking on the parameters you can add
 type-specifiers before each parameter identifier:
 
     > fn add(Number a, Number b) a + b; print(type(add));
@@ -266,7 +266,7 @@ types specified for the parameters:
 This version of `add` returns `Any` and its return type will be dynamically inferred at
 run-time from the value being returned.
 
-Let's delve a bit into return type-inference by considering the `filter` built-in function:
+Let's delve a bit into return type inference by considering the `filter` built-in function:
 
     > print(type(filter))
      Builtin (Function (Any) -> Boolean, Array) -> Array
@@ -275,7 +275,7 @@ It has two parameters and returns an `Array`. The first parameter is a `Function
 that takes one `Any` argument and returns a `Boolean` value. The second parameter
 is an `Array`.
 
-With dynamic type-inference, a simple anonymous function can be passed as the first
+With dynamic type inference, a simple anonymous function can be passed as the first
 argument:
 
     > filter(fn(a) a<4, [1,2,3,4,5])
@@ -288,8 +288,8 @@ Plang will throw a run-time error:
      Error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Number
 
-Let's return back to the `add` function. If you want compile-time type-checking,
-you can place its type-specifier before the function identifier:
+Let's return to the `add` function. If you want compile-time type checking, you can
+place its type-specifier before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
