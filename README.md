@@ -219,8 +219,8 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-Plang uses a flexible system building from dynamic run-time type-inference to static compile-time
-type-checking known as Gradual Typing. Let's consider a simple `add` function with various
+Plang uses a flexible system that allows dynamic run-time type-inference and static compile-time
+type-checking, known as Gradual Typing. Let's consider a simple `add` function with various
 levels of type-safety.
 
 With no explicit type-specifiers, the function's return type and types of its parameters
