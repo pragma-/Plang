@@ -222,7 +222,7 @@ The `fn` statement returns a reference to the newly defined function.
 Plang has a flexible type system that allows a mixture of dynamic run-time type inference
 and static compile-time type checking, known as Gradual Typing.
 
-Type-inference is useful for writing short concise code for embedding or prototyping,
+Type inference is useful for writing short concise code for embedding or prototyping,
 but runs the risk of run-time errors. Static typing is slightly more verbose, but gives
 you the safety of compile-time type checking. You can use a blend of both worlds in Plang.
 
