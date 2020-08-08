@@ -227,21 +227,16 @@ figure things out at run-time or to write static-typed functions that are checke
 at compile-time.
 
 Type-inference is useful for writing short concise code for embedding or prototyping,
-but runs the risk of run-time errors.
+but runs the risk of run-time errors. Static-typing is slightly more verbose, but gives
+you the safety of compile-time type-checking. You can use a blend of both worlds in Plang.
 
-Static-typing is slightly more verbose, but brings you the safety of compile-time
-type-checking.
-
-You can use a blend of both systems in Plang scripts.
-
-Let's consider a simple `add` function with various levels of type-safety. With no
-explicit type-specifiers, the function's return type and types of its parameters will
-default to the `Any` type:
+Let's consider a simple `add` function. With no explicit type-specifiers, the
+function's return type and types of its parameters will default to the `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-It will dynamically infer, at run-time, the types of its parameters/return value
+It will dynamically infer, at run-time, the types of its parameters and return value
 from the types of the arguments passed to it and the value returned.
 
     > fn add(a, b) a + b; add(3, 4)
