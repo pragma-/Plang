@@ -196,9 +196,8 @@ Variables that have not yet been assigned a value will produce an error.
 
 ### Functions
     FunctionDefinition  ::= "fn" Type? Identifier? IdentifierList? Statement
-    IdentifierList      ::= "(" (TypeAndOrIdentifier Initializer? ","?)* ")"
-    TypeAndOrIdentifier ::= Type Identifier | Identifier
-    Type ::= "Any" "Null" "Boolean" "Number" "String" "Array" "Map" "Function" "Builtin"
+    IdentifierList      ::= "(" (Type? Identifier Initializer? ","?)* ")"
+    Type ::= "Any" | "Null" | "Boolean" | "Number" | "String" | "Array" | "Map" | "Function" | "Builtin"
 
 A function definition is created by using the `fn` keyword followed by:
  * a type specifier (which may be omitted to specifiy the `Any` type)
@@ -206,10 +205,9 @@ A function definition is created by using the `fn` keyword followed by:
  * an identifier list (which may be omitted if there are no parameters desired)
  * and finally either a group of statements or a single statement
 
-An identifier list is a list of identifiers, each optionally prefixed with a type specifier,
-enclosed in parentheses. The list is separated by a comma and/or whitespace. In other
-words, the comma is optional. Each identifier may be followed by an optional initializer
-to create a default value.
+An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
+a comma and/or whitespace. Each identifier optionally may be prefixed with a type specifier.
+Each identifier may optionally be followed by an initializer to create a default value.
 
 Plang functions automatically return the value of the last statement or statement group.
 You may use the `return` keyword to return the value of an ealier statement.
@@ -227,11 +225,18 @@ accept an argument of any type for that parameter.
 
 Consider an `add` function with no type-specifiers:
 
-    > fn add(a, b) a + b; print(type(add)); add(3, 4)
-     Function (Any a, Any b) -> Any
+    > fn add(a, b) a + b; print(type(add));
+     Function (Any, Any) -> Any
+
+This type syntax means that `add` is a `Function` that takes two `Any` parameters and
+returns an `Any` value. Plang will perform dynamic run-time type inference on `add`'s
+paramenters and return value:
+
+    > fn add(a, b) a + b; add(3, 4);
      7
 
-If you pass a `String` to it, it will blow-up inside the function body:
+Be careful. If you pass a `String` to it, it will blow-up inside the function body with
+an undesirable run-time error:
 
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
@@ -242,19 +247,32 @@ the function body you will make a polymorphic function with implicit type conver
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-But if you prefer stricter type-checking you can add type-specifiers before each parameter name:
+If you're sensible and you prefer explicit type-checking you can add type-specifiers
+before each parameter identifier:
 
-    > fn add(Number a, Number b) a + b; print(type(add)); add(3, "4")
-     Function (Number a, Number b) -> Any
+    > fn add(Number a, Number b) a + b; print(type(add));
+      Function (Number a, Number b) -> Any
+
+Now the function throws a compile-time error if the types of the arguments do not match the types
+specified for the parameters:
+
+    > fn add(Number a, Number b) a + b; add(3, "4")
      Error: In function call for `add`, expected Number for parameter `b` but got String
 
-Now the function throws a more detailed error if the types of the arguments do not match the types
-specified for the parameters, before entering the function body.
-
-You can also specify a return type by putting a type-specifier before the function identifier:
+Since this version of `add` returns `Any`, the type of the return value will be inferred
+from the value being returned. If you prefer strict type-checking of the return value,
+you can specify the return type by putting its type-specifier before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number a, Number b) -> Number
+
+Now Plang will throw a compile-time error if you try to do something weird like return a `String`:
+
+    > fn Number add(Number a, Number b) "42"; add(3, 4)
+     Error: cannot return String from function declared to return Number
+
+This flexible system building from dynamic run-time type-inference to static compile-time type-checking
+is known as Gradual Typing.
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
@@ -276,21 +294,23 @@ Consider a function that has many default arguments:
 
     fn new_creature(name = "a creature", health = 100, armor = 50, damage = 10) ...
 
-You can memorize the order of arguments:
+You can memorize the order of arguments, which can be error-prone and confusing:
 
-    new_creature("a troll", 100, 100, 25)
+    new_creature("a troll", 125, 75, 25)
 
 Or you can used named arguments, which not only helps readability but also lets you specify
 arguments in any order:
 
-    new_creature(damage = 25, health = 100, armor = 100, name = "a troll")
+    new_creature(damage = 25, health = 125, armor = 75, name = "a troll")
 
 Another advantage of named arguments comes into play when you want to omit some arguments. With
-positional arguments, if you wanted to set only a specific argument, say the last one, you'd also
-need to set each prior argument. With named arguments you can simply specify which arguments you
-care about and let the default arguments fill in the rest:
+positional arguments, if you wanted to set specific arguments you'd also need to set each
+each prior argument, defeating the purpose of the default arguments.
 
-    new_creature(damage = 100)
+With named arguments you can simply specify the arguments you care about and let the
+default arguments do their job for the rest:
+
+    new_creature(armor = 200, damage = 100)
 
 #### Anonymous functions
     > var greeter = fn { print("Hello!") }; greeter()
