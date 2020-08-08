@@ -251,7 +251,7 @@ If you're sensible and you prefer explicit type-checking you can add type-specif
 before each parameter identifier:
 
     > fn add(Number a, Number b) a + b; print(type(add));
-      Function (Number a, Number b) -> Any
+      Function (Number, Number) -> Any
 
 Now the function throws a compile-time error if the types of the arguments do not match the types
 specified for the parameters:
@@ -259,12 +259,12 @@ specified for the parameters:
     > fn add(Number a, Number b) a + b; add(3, "4")
      Error: In function call for `add`, expected Number for parameter `b` but got String
 
-Since this version of `add` returns `Any`, the type of the return value will be inferred
-from the value being returned. If you prefer strict type-checking of the return value,
-you can specify the return type by putting its type-specifier before the function identifier:
+This version of `add` returns `Any` and its return type will be dynamically inferred at
+run-time from the value being returned. If you prefer explicit type-checking, you can
+place the return type-specifier before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
-     Function (Number a, Number b) -> Number
+     Function (Number, Number) -> Number
 
 Now Plang will throw a compile-time error if you try to do something weird like return a `String`:
 
