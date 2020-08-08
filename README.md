@@ -260,8 +260,26 @@ types specified for the parameters:
 This version of `add` returns `Any` and its return type will be dynamically inferred at
 run-time from the value being returned.
 
-If you prefer explicit return type-checking, you can place the return type-specifier before
-the function identifier:
+For an example of return type-inference, consider the `filter` built-in function:
+
+    > print(type(filter))
+     Builtin (Function (Any) -> Boolean, Array) -> Array
+
+It returns an `Array` and takes one parameter: a function that takes one `Any` and returns
+a `Boolean`. With type-inference, it can be used with a simple anonymous function:
+
+    > filter(fn(a) a<4, [1,2,3,4,5])
+     [1,2,3]
+
+If we attempt to pass a function dynamically inferred to return a `Number`, for
+example, Plang will throw a run-time error:
+
+    > filter(fn(a) 4, [1, 2, 3, 4, 5])
+     Error: in function call for `filter`, expected Function (Any) -> Boolean
+       for parameter `func` but got Function (Any) -> Number
+
+Let's return back to the `add` function's return type. If you want compile-time
+type-checking, you can place its type-specifier before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
@@ -270,11 +288,6 @@ Now Plang will throw a compile-time error if `add` tries to return a `String`:
 
     > fn Number add(Number a, Number b) "42"; add(3, 4)
      Error: cannot return String from function declared to return Number
-
-The fully-typed `add` function:
-
-    > fn Number add(Number a, Number b) a + b; add(3, 4)
-     7
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
