@@ -245,8 +245,8 @@ run-time error:
      Error: cannot apply binary operator ADD (have types Number and String)
 
 One way to resolve this is to apply the `Number()` type-conversion function to the
-parameters inside the function body, creating a polymorphic function with
-dynamic type-conversion that can accept any argument that can be converted to `Number`:
+parameters inside the function body, creating a polymorphic function that can accept
+any arguments that can be converted to `Number`:
 
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
