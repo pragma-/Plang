@@ -219,7 +219,7 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-Plang uses a flexible system that allows a mixture of dynamic run-time type-inference
+Plang has a flexible type system that allows a mixture of dynamic run-time type-inference
 and static compile-time type-checking, known as Gradual Typing.
 
 Type-inference is useful for writing short concise code for embedding or prototyping,
@@ -232,7 +232,7 @@ function's return type and types of its parameters will default to the `Any` typ
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-It will dynamically infer, at run-time, the types of its parameters and return value
+Plang will infer, at run-time, the types of its parameters and return value
 from the types of the arguments passed to it and the value returned.
 
     > fn add(a, b) a + b; add(3, 4)
@@ -244,7 +244,7 @@ run-time error:
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
 
-One way to resolve this is to apply the Number() type-conversion function to the
+One way to resolve this is to apply the `Number()` type-conversion function to the
 parameters inside the function body, creating a polymorphic function with
 dynamic type-conversion that can accept any argument that can be converted to `Number`:
 
