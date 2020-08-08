@@ -220,7 +220,7 @@ The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
 Plang has a flexible type system that allows a mixture of dynamic run-time type inference
-and static compile-time type checking, known as Gradual Typing.
+and static compile-time type checking, known as gradual typing.
 
 Type inference is useful for writing short concise code for embedding or prototyping,
 but runs the risk of run-time errors. Static typing is slightly more verbose, but gives
@@ -238,8 +238,8 @@ from the types of the arguments passed to it and the value returned.
     > fn add(a, b) a + b; add(3, 4)
      7
 
-But be careful. If a `String` gets passed to it, it will blow-up with an undesirable
-run-time error:
+But be careful. If a `String` gets passed to it, Plang will terminate its execution
+with an undesirable run-time error:
 
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
@@ -257,7 +257,7 @@ type-specifiers before each parameter identifier:
     > fn add(Number a, Number b) a + b; print(type(add));
       Function (Number, Number) -> Any
 
-Now `add` will throw a compile-time error if the types of the arguments do not match the
+Now Plang will throw a compile-time error if the types of the arguments do not match the
 types specified for the parameters:
 
     > fn add(Number a, Number b) a + b; add(3, "4")
@@ -281,20 +281,20 @@ argument:
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
-But if we pass a function dynamically inferred to return a `Number`, for example,
-Plang will throw a run-time error:
+If we pass a function dynamically inferred to return a `Number`, for example, Plang
+will throw a compile-time error:
 
     > filter(fn(a) 4, [1, 2, 3, 4, 5])
      Error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Number
 
-Let's return to the `add` function. If you want compile-time type checking, you can
-place its type-specifier before the function identifier:
+Let's return to the `add` function. To enable compile-time type checking of the return
+value, you can place its type-specifier before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
 
-Now Plang will throw a compile-time error if `add` tries to return a value that
+Now Plang will throw a compile-time error if `add` attempts to return a value that
 is not a `Number`:
 
     > fn Number add(Number a, Number b) "42"; add(3, 4)
