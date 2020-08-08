@@ -21,7 +21,6 @@ sub new {
 
 sub initialize {
     my ($self, %conf) = @_;
-
     $self->{tokentypes} = [];
 }
 

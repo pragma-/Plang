@@ -60,10 +60,8 @@ sub parse_pretty_type {
     }
 
     if ($pretty_type =~ /^(?:Builtin|Function)\s/) {
-        my $result = [];
         my ($type, $rest) = $self->parse_pretty_type_function($pretty_type);
-        push @$result, $type;
-        return $result;
+        return [$type];
     }
 
     die "unknown type `$pretty_type`";
@@ -203,7 +201,6 @@ sub type_check_prefix_postfix_op {
     }
 
     $self->error($context, "cannot apply $op to type " . $self->pretty_type($data->[1]));
-
 }
 
 sub prefix_increment {
@@ -711,15 +708,12 @@ sub keyword_if {
 
     # validate conditional
     my $result = $self->statement($context, $data->[1]);
-    return $result if defined $result and $result->[0] eq 'ERROR';
 
     # validate then
     $result = $self->statement($context, $data->[2]);
-    return $result if defined $result and $result->[0] eq 'ERROR';
 
     # validate else
     $result = $self->statement($context, $data->[3]);
-    return $result if defined $result and $result->[0] eq 'ERROR';
 
     return ['NULL', undef];
 }
@@ -729,11 +723,9 @@ sub keyword_while {
 
     # validate conditional
     my $result = $self->statement($context, $data->[1]);
-    return $result if defined $result and $result->[0] eq 'ERROR';
 
     # validate statements
     $result = $self->statement($context, $data->[2]);
-    return $result if defined $result and $result->[0] eq 'ERROR';
 
     return ['NULL', undef];
 }
