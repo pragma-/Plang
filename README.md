@@ -219,44 +219,46 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-With no explicit type-specifiers, the function's return type and types of its parameters
-will default to the special `Any` type. The `Any` type means that the function will
-accept an argument of any type for that parameter.
+Plang uses a flexible system building from dynamic run-time type-inference to static compile-time
+type-checking known as Gradual Typing. Let's consider a simple `add` function with various
+levels of type-safety.
 
-Consider an `add` function with no type-specifiers:
+With no explicit type-specifiers, the function's return type and types of its parameters
+will default to the special `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-This type syntax means that `add` is a `Function` that takes two `Any` parameters and
-returns an `Any` value. Plang will perform dynamic run-time type inference on `add`'s
-paramenters and return value:
-
     > fn add(a, b) a + b; add(3, 4);
      7
 
-If you pass a `String` to it, it will blow-up with an undesirable run-time error:
+But be careful. If a `String` gets passed to it, it will blow-up with an undesirable
+run-time error:
 
     > fn add(a, b) a + b; add(3, "4")
      Error: cannot apply binary operator ADD (have types Number and String)
 
-If you apply the Number() type conversion function on the parameters inside the function body
-you will make a polymorphic function with implicit dynamic type conversion:
+One way to resolve this is to apply the Number() type-conversion function on the
+parameters inside the function body, creating a polymorphic function with implicit
+dynamic type-conversion:
 
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-If you desire explicit type-checking you can add type-specifiers before each parameter identifier:
+On the other hand, if you desire explicit type-checking on the parameters you can add
+type-specifiers before each parameter identifier:
 
     > fn add(Number a, Number b) a + b; print(type(add));
       Function (Number, Number) -> Any
 
-This version of `add` returns `Any` and its return type will be dynamically inferred at
-run-time from the value being returned. Now `add` throws a compile-time error if the types
-of the arguments do not match the types specified for the parameters:
+Now `add` throws a compile-time error if the types of the arguments do not match the
+types specified for the parameters:
 
     > fn add(Number a, Number b) a + b; add(3, "4")
      Error: In function call for `add`, expected Number for parameter `b` but got String
+
+This version of `add` returns `Any` and its return type will be dynamically inferred at
+run-time from the value being returned.
 
 If you prefer explicit return type-checking, you can place the return type-specifier before
 the function identifier:
@@ -264,13 +266,15 @@ the function identifier:
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
 
-Now Plang will throw a compile-time error if you try to return a `String`:
+Now Plang will throw a compile-time error if `add` tries to return a `String`:
 
     > fn Number add(Number a, Number b) "42"; add(3, 4)
      Error: cannot return String from function declared to return Number
 
-This flexible system building from dynamic run-time type-inference to static compile-time
-type-checking is known as Gradual Typing.
+The fully-typed `add` function:
+
+    > fn Number add(Number a, Number b) a + b; add(3, 4)
+     7
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
