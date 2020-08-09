@@ -219,8 +219,8 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-Plang's type system allows a mixture of dynamic run-time type checking and static compile-time
-type checking. You can choose which parts of your program are dynamically or statically type
+Plang's type system allows a mixture of dynamic run-time and static compile-time type
+checking. You can choose which parts of your program are dynamically or statically type
 checked by omitting or adding type annotations. This is called gradual typing.
 
 Here is a brief demonstration of the concept. Let's consider a simple `add` function. With
