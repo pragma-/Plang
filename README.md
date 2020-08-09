@@ -230,8 +230,8 @@ default to the `Any` type:
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-Plang will infer, at run-time, the types of its parameters and return value from the types
-of the arguments passed to it and the value returned.
+This tells Plang to infer the types of its parameters from the types of the arguments passed,
+and the type of its return value from the type of the value being returned.
 
     > fn add(a, b) a + b; add(3, 4)
      7
