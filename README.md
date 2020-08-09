@@ -219,21 +219,19 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Type-checking
-Plang has a flexible type system that allows a mixture of dynamic run-time type inference
-and static compile-time type checking, known as gradual typing.
+Plang's type system allows a mixture of dynamic run-time type checking and static compile-time
+type checking. You can choose which parts of your program are dynamically or statically type
+checked by omitting or adding type annotations. This is called gradual typing.
 
-Type inference is useful for writing short concise code for embedding or prototyping,
-but runs the risk of run-time errors. Static typing is slightly more verbose, but gives
-you the safety of compile-time type checking. You can use a blend of both worlds in Plang.
-
-Let's consider a simple `add` function. With no explicit type-specifiers, the
-function's return type and types of its parameters will default to the `Any` type:
+Here is a brief demonstration of the concept. Let's consider a simple `add` function. With
+no explicit type annotations, the function's return type and types of its parameters will
+default to the `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-Plang will infer, at run-time, the types of its parameters and return value
-from the types of the arguments passed to it and the value returned.
+Plang will infer, at run-time, the types of its parameters and return value from the types
+of the arguments passed to it and the value returned.
 
     > fn add(a, b) a + b; add(3, 4)
      7
@@ -251,8 +249,8 @@ any arguments that can be converted to `Number`:
     > fn add(a, b) Number(a) + Number(b); add(3, "4")
      7
 
-On the other hand, if you desire explicit type checking on the parameters you can add
-type-specifiers before each parameter identifier:
+On the other hand, if you desire explicit type checking on the parameters you can add a
+type annotation before each parameter identifier:
 
     > fn add(Number a, Number b) a + b; print(type(add));
       Function (Number, Number) -> Any
@@ -263,33 +261,32 @@ types specified for the parameters:
     > fn add(Number a, Number b) a + b; add(3, "4")
      Error: In function call for `add`, expected Number for parameter `b` but got String
 
-This version of `add` returns `Any` and its return type will be dynamically inferred at
-run-time from the value being returned.
+This version of `add` returns `Any` and its return type will be inferred at run-time from
+the value being returned.
 
 Let's delve a bit into return type inference by considering the `filter` built-in function:
 
     > print(type(filter))
      Builtin (Function (Any) -> Boolean, Array) -> Array
 
-It has two parameters and returns an `Array`. The first parameter is a `Function`
-that takes one `Any` argument and returns a `Boolean` value. The second parameter
-is an `Array`.
+It has two parameters and returns an `Array`. The first parameter is a `Function` that takes
+one `Any` argument and returns a `Boolean` value. The second parameter is an `Array`.
 
-With dynamic type inference, a simple anonymous function can be passed as the first
-argument:
+Thanks to type inference, a concise anonymous function without type annotations can be passed
+as the first argument:
 
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
-If we pass a function dynamically inferred to return a `Number`, for example, Plang
-will throw a compile-time error:
+Because the `filter` function is statically typed to return a `Boolean`, Plang can perform
+compile-time type checking. For example, if we pass it a function inferred to return a `Number`:
 
     > filter(fn(a) 4, [1, 2, 3, 4, 5])
      Error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Number
 
-Let's return to the `add` function. To enable compile-time type checking of the return
-value, you can place its type-specifier before the function identifier:
+Let's return to the `add` function. To enable static type checking of the return value, you
+can place a type annotation before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
      Function (Number, Number) -> Number
