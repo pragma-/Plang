@@ -22,23 +22,9 @@ This README describes what is implemented so far.
 * [The Plang Language (so far)](#the-plang-language-so-far)
   * [Type-checking](#type-checking)
     * [Types](#types)
-      * [Null](#null)
-      * [Boolean](#boolean)
-      * [Number](#number)
-      * [String](#string)
-      * [Array](#array)
-      * [Map](#map)
-      * [Function](#function)
-      * [Builtin](#builtin)
     * [Gradual typing](#gradual-typing)
     * [Type inference](#type-inference)
     * [Type conversion](#type-conversion)
-      * [Null()](#null-1)
-      * [Boolean()](#boolean-1)
-      * [Number()](#number-1)
-      * [String()](#string-1)
-      * [Array()](#array-1)
-      * [Map()](#map-1)
   * [Scoping](#scoping)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
@@ -157,16 +143,16 @@ The currently implemented types are:
 ##### Null
      Null ::= "null"
 
-The `Null` type's value is always `null`, which signifies that there is no value.
+The `Null` type's value is always `null`. It is used to signify that there is no meaningful value.
 
 ##### Boolean
     Boolean ::= "true" | "false"
 
-A `Boolean` is either `true` or `false`.
+A `Boolean` is either `true` or `false`. It is used for conditional expressions and relational operations.
 
 ##### Number
     Number       ::= HexNumber | DoubleNumber
-    HexNumber    ::=
+    HexNumber    ::= "0" ("x" | "X") (Digit | "a" - "f" | "A" - "F")+
     DoubleNumber ::= Digit+
                       (
                         "." Digit* ("e" | "E") ("+" | "-")? Digit+
@@ -190,7 +176,7 @@ The floating-point literals may optionally include an exponent: `6.02e23`
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no significance between the different quotes.
-
+/#
 Strings may contain `\`-escaped characters, which will be expanded as expected. A subset
 of possible escape sequences are:
 
@@ -205,33 +191,29 @@ Escape | Expansion
 ##### Array
     ArrayConstructor ::= "[" (Expression ","?)* "]"
 
-An `Array` is a collection of values. Array elements can be any type.
+An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotations to constrain Array elements to a single type.*
 
 For more details see:
 
 * [Array operations](#array-operations)
 * [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
 
-*TODO: Optional type annotations to constrain Array elements to a single type.*
-
 ##### Map
     MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
-values can be any type.
+values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
 
 For more details see:
 
 * [Map operations](#map-operations)
 * [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
 
-*TODO: Optional interface syntax to ensure that maps contain keys of typed values.*
-
 ##### Function
 The `Function` type identifies a Plang function. See [functions](#functions) for more information.
 
 ##### Builtin
-The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
+The `Builtin` type identifies an internal built-in function. See [built-in functions](#built-in-functions) for more information.
 
 #### Gradual typing
 Plang's type system allows a mixture of dynamic (run-time) and static (compile-time)
@@ -326,7 +308,7 @@ For stricter type-safety, Plang does not allow implicit conversion between types
 You must convert a value explicitly to a desired type.
 
 To convert a value to a different type, pass the value as an argument to the
-function named after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
+function named after the desired type. To convert `x` to a `Boolean`, write `Boolean(x)`.
 
 Wrong:
 
@@ -478,7 +460,11 @@ may be any valid expression.
 The `fn` statement returns a reference to the newly defined function.
 
 #### Optional type annotations
-TODO
+Function definitions may optionally include type annotations to explicitly restrict
+what types the function works with. Without a type annotation the `Any` type is used,
+which tells Plang to infer the actual type from the value being supplied or returned.
+
+See [gradual typing](#gradual-typing) for more information and examples.
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
@@ -519,6 +505,8 @@ default arguments do their job for the rest:
     new_creature(armor = 200, damage = 100)
 
 #### Anonymous functions
+Here are some ways to define an anonymous function:
+
     > var greeter = fn { print("Hello!") }; greeter()
      Hello!
 <!-- -->
@@ -596,6 +584,9 @@ The value of the `while` statement is `null`.
 The `next` keyword can be used to immediately jump to the next iteration of the loop.
 
 The `last` keyword can be used to immediately exit the loop.
+
+    > var i = 0; while (++i <= 5) print(i, end=" "); print("");
+     1 2 3 4 5
 
 ### Expressions
 Expressions perform arithmetic, logical or assignment operations.
@@ -819,7 +810,7 @@ addition of function parameter identifiers and function default arguments.
     > whatis(print)
      "Builtin (Any expr, String end = \"\\n\") -> Null"
 
-    > print(whatis(print)) # print it to avoid the string escaping
+    > print(whatis(print)) # use `print` to avoid string escaping
      Builtin (Any expr, String end = "\n") -> Null
 
     > whatis(filter)
@@ -874,24 +865,30 @@ In other words, it takes two parameters and returns an `Array`. The first parame
 
 #### Null
 The `Null` function attempts to convert a value to type `Null`.
-See [Null](#null-1) under [type conversion](#type-conversion).
+
+See [Null](#null-1) for more information.
 
 #### Boolean
 The `Boolean` function attempts to convert a value to type `Boolean`.
-See [Boolean](#boolean-1) under [type conversion](#type-conversion).
+
+See [Boolean](#boolean-1) for more information.
 
 #### Number
 The `Number` function attempts to convert a value to type `Number`.
-See [Number](#number-1) under [type conversion](#type-conversion).
+
+See [Number](#number-1) for more information.
 
 #### String
 The `String` function attempts to convert a value to type `String`.
-See [String](#string-1) under [type conversion](#type-conversion).
+
+See [String](#string-1) for more information.
 
 #### Array
 The `Array` function attempts to convert a value to type `Array`.
-See [Array](#array-1) under [type conversion](#type-conversion).
+
+See [Array](#array-1) for more information.
 
 #### Map
 The `Map` function attempts to convert a value to type `Map`.
-See [Map](#map-1) under [type conversion](#type-conversion).
+
+See [Map](#map-1) for more information.
