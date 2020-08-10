@@ -138,7 +138,7 @@ See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/jso
 ## The Plang Language (so far)
 ### Type-checking
 #### Types
-The currently implemented types are:
+The currently implemented types are Null, Boolean, Number, String, Array, Map, Function and Builtin.
 
 ##### Null
      Null ::= "null"
@@ -176,9 +176,9 @@ The floating-point literals may optionally include an exponent: `6.02e23`
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no significance between the different quotes.
-/#
-Strings may contain `\`-escaped characters, which will be expanded as expected. A subset
-of possible escape sequences are:
+
+Strings may contain `\`-escaped characters, which will be expanded as expected. For example,
+some such escape sequences and their expansion are:
 
 Escape | Expansion
 -- | --
@@ -441,13 +441,13 @@ Variables that have not yet been assigned a value will produce an error.
     Type ::= "Any" | "Null" | "Boolean" | "Number" | "String" | "Array" | "Map" | "Function" | "Builtin"
 
 A function definition is created by using the `fn` keyword followed by:
- * a type specifier (which may be omitted to specifiy the `Any` type)
+ * a type annotation (which may be omitted to specifiy the `Any` type)
  * an identifer (which may be omitted to create an anonymous function)
  * an identifier list (which may be omitted if there are no parameters desired)
  * and finally either a group of statements or a single statement
 
 An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
-a comma and/or whitespace. Each identifier optionally may be prefixed with a type specifier.
+a comma and/or whitespace. Each identifier optionally may be prefixed with a type annotation.
 Each identifier may optionally be followed by an initializer to create a default value.
 
 Plang functions automatically return the value of the last statement or statement group.
@@ -760,7 +760,7 @@ the empty map.
      { "a": 1 }
 
 ### Built-in functions
-These are the built-in functions. You can add additional builtin-in functions
+These are the built-in functions. You can add additional built-in functions
 through Plang's embedding API.
 
 #### print
