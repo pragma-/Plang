@@ -299,7 +299,7 @@ The types of variables are inferred from the type of their value. All variables 
 simply declared with `var` and no type annotation.
 
 Function signatures may be defined with or without type annotations for any parameter
-or the return value. If type annotations are omitted for any part that part will
+or the return value. If type annotations are omitted for any part then that part will
 be declared as if it had type `Any`, which tells Plang to infer its type from
 its value.
 
@@ -727,15 +727,15 @@ Creating a map and accessing a key:
 
 Creating an empty map and then assigning a value to a key:
 
-    > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
+    > var m = {}; m["color"] = "blue"; $"The color is {m['color']}!"
      "The color is blue!"
 
 Nested maps:
 
-    > var a = {"x": {"y": 42}}; a["x"]["y"]
+    > var m = {"x": {"y": 42}}; m["x"]["y"]
      42
 
-    > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
+    > var m = {}; a["x"] = {"y": 42}; m["x"]["y"]
      42
 
 #### exists
@@ -743,7 +743,7 @@ To check for existence of a map key, use the `exists` keyword. If the key exists
 `true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
 delete the key. See the [`delete`](#delete) keyword.
 
-    > var map = { "a": 1, "b": 2 }; exists map["a"]
+    > var m = { "a": 1, "b": 2 }; exists m["a"]
      true
 
 #### delete
@@ -756,8 +756,11 @@ When used on a Map key, the `delete` keyword deletes the key and returns its val
 When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
 the empty map.
 
-    > var map = { "a": 1, "b": 2 }; delete map["b"]; map
+    > var m = { "a": 1, "b": 2 }; delete m["b"]; m
      { "a": 1 }
+
+    > var m = { "a": 1, "b": 2 }; delete m; m
+     {}
 
 ### Built-in functions
 These are the built-in functions. You can add additional built-in functions
@@ -768,9 +771,10 @@ The `print` function sends text to the standard output stream.
 
 Its [`whatis`](#whatis) is: `Builtin (Any expr, String end = "\n") -> Null`
 
-In other words, it takes two parameters and returns a `Null` value. The first parameter
-is an expression of `Any` type. The second parameter is a `String` with a default
-argument of `"\n"`.
+In other words, it takes two parameters and returns a `Null` value. The first parameter,
+`expr`, is an expression of `Any` type, signifying what is to be printed. The second
+parameter, `end`, a `String` with a default argument of `"\n"`, is always appended
+to the output.
 
     > print("hello!"); print("good-bye!")
      hello!
@@ -860,8 +864,11 @@ In other words, it takes two parameters and returns an `Array`. The first parame
 `func`, is a `Function` that takes `Any` and returns a `Boolean`. The second parameter,
 `list`, is an `Array`.
 
-    > filter(fn(x) x<6, [1,2,3,4,5,6,7,8,9,10])
-     [1,2,3,4,5]
+    > filter(fn(x) x < 4, [1,2,3,4,5])
+     [1,2,3]
+
+    > filter(fn(x) x['type'] == 'dog', [{'type': 'dog', 'name': 'Woofers'}, {'type': 'cat', 'name': 'Whiskers'}])
+     [{'type': 'dog', 'name': 'Woofers'}]
 
 #### Null
 The `Null` function attempts to convert a value to type `Null`.
