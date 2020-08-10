@@ -20,32 +20,18 @@ This README describes what is implemented so far.
 * [Example Plang scripts](#example-plang-scripts)
 * [JSON compatibility/serialization](#json-compatibilityserialization)
 * [The Plang Language (so far)](#the-plang-language-so-far)
-  * [Identifiers](#identifiers)
-    * [Keywords](#keywords)
-  * [Scoping](#scoping)
-  * [Variables](#variables)
-  * [Functions](#functions)
-    * [Type-checking](#type-checking)
-    * [Default arguments](#default-arguments)
-    * [Named arguments](#named-arguments)
-    * [Anonymous functions](#anonymous-functions)
-    * [Closures](#closures)
-    * [Currying](#currying)
-    * [Lazy evaluation](#lazy-evaluation)
-    * [Built-in functions](#built-in-functions)
-  * [Types](#types)
-    * [Null](#null)
-    * [Boolean](#boolean)
-    * [Number](#number)
-    * [String](#string)
-    * [Array](#array)
-      * [Creating and accessing arrays](#creating-and-accessing-arrays)
-    * [Map](#map)
-      * [Creating and accessing maps](#creating-and-accessing-maps)
-      * [Exists](#exists)
-      * [Delete](#delete)
+  * [Type-checking](#type-checking)
+    * [Types](#types)
+      * [Null](#null)
+      * [Boolean](#boolean)
+      * [Number](#number)
+      * [String](#string)
+      * [Array](#array)
+      * [Map](#map)
       * [Function](#function)
       * [Builtin](#builtin)
+    * [Gradual typing](#gradual-typing)
+    * [Type inference](#type-inference)
     * [Type conversion](#type-conversion)
       * [Null()](#null-1)
       * [Boolean()](#boolean-1)
@@ -53,8 +39,18 @@ This README describes what is implemented so far.
       * [String()](#string-1)
       * [Array()](#array-1)
       * [Map()](#map-1)
-      * [Function()](#function-1)
-      * [Builtin()](#builtin-1)
+  * [Scoping](#scoping)
+  * [Identifiers](#identifiers)
+    * [Keywords](#keywords)
+  * [Variables](#variables)
+  * [Functions](#functions)
+    * [Optional type annotations](#optional-type-annotations)
+    * [Default arguments](#default-arguments)
+    * [Named arguments](#named-arguments)
+    * [Anonymous functions](#anonymous-functions)
+    * [Closures](#closures)
+    * [Currying](#currying)
+    * [Lazy evaluation](#lazy-evaluation)
   * [Statements and StatementGroups](#statements-and-statementgroups)
     * [if/then/else](#ifthenelse)
     * [while/next/last](#whilenextlast)
@@ -69,6 +65,27 @@ This README describes what is implemented so far.
     * [Indexing](#indexing)
     * [Substring](#substring)
     * [Regular expressions](#regular-expressions)
+  * [Array operations](#array-operations)
+    * [Creating and accessing arrays](#creating-and-accessing-arrays)
+    * [map](#map-2)
+    * [filter](#filter)
+  * [Map operations](#map-operations)
+    * [Creating and accessing maps](#creating-and-accessing-maps)
+    * [exists](#exists)
+    * [delete](#delete)
+  * [Built-in functions](#built-in-functions)
+    * [print](#print)
+    * [type](#type)
+    * [whatis](#whatis)
+    * [length](#length)
+    * [map](#map-3)
+    * [filter](#filter-1)
+    * [Null](#null-2)
+    * [Boolean](#boolean-2)
+    * [Number](#number-2)
+    * [String](#string-2)
+    * [Array](#array-2)
+    * [Map](#map-4)
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
@@ -133,98 +150,96 @@ an Array constructor or a Map constructor back to an Array or a Map object.
 See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/json.pl](examples/json.pl) for more details.
 
 ## The Plang Language (so far)
-### Identifiers
-    Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
-    Letter     ::=  "a" - "z" | "A" - "Z"
-    Digit      ::=  "0" - "9"
+### Type-checking
+#### Types
+The currently implemented types are:
 
-An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
-by additional underscores, letters or digits.
+##### Null
+     Null ::= "null"
 
-#### Keywords
-Keywords are reserved identifiers that have a special meaning to Plang.
+The `Null` type's value is always `null`, which signifies that there is no value.
 
-Keyword | Description
---- | ---
-var | variable declaration
-fn | function definition
-return | return value from function
-true | a Boolean with a true value
-false | a Boolean with a false value
-null | a Null with a null value
-if | conditional if statement
-then | then branch of a conditional if statement
-else | else branch of a conditional if statement
-while | loop while a condition is true
-last | break out of the loop
-next | jump to the next iteration of the loop
-exists | test if a key exists in a Map
-delete | deletes a key from a Map
+##### Boolean
+    Boolean ::= "true" | "false"
 
-### Scoping
-Variables and functions are lexically scoped. Statement groups introduce a new lexical scope.
+A `Boolean` is either `true` or `false`.
 
-### Variables
-    VariableDeclaration ::= "var" Identifier Initializer?
-    Initializer         ::= "=" Statement
+##### Number
+    Number       ::= HexNumber | DoubleNumber
+    HexNumber    ::=
+    DoubleNumber ::= Digit+
+                      (
+                        "." Digit* ("e" | "E") ("+" | "-")? Digit+
+                       | "." Digit+
+                       | ("e" | "E") ("+" | "-")? Digit+
+                      )?
 
-Variables are explicitly declared with the `var` keyword, followed by an identifier. Variables declarations
-may optionally have an initializer that assigns a default value. Without an initializer, the value of
-variables will default to `null`, which has type `Null`.
+A `Number` holds a double-precision floating-point value.
 
-Types of variables are inferred from the type of their value. All variables are simply declared with `var`
-and no type specifier. However, there is no implicit conversion between types. You must [explicitly convert](#type-conversion) a
-value to change its type.
+`Number` literals can be represented as:
 
-The `var` statement returns the value of the variable.
+* hexadecimal: `0x4a`
+* integer: `42`
+* floating-point: `3.1459`
 
-    > var a = 5
-     5
+The floating-point literals may optionally include an exponent: `6.02e23`
 
-    > var a = "hello"
-     "hello"
+##### String
+    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
+    StringContents ::= TODO
 
-Attempting to use a variable that has not been declared will produce an error.
+A `String` is a sequence of characters enclosed in double or single quotes. There is
+no significance between the different quotes.
 
-    > var a = 5; a + b
-     Error: `b` not declared.
+Strings may contain `\`-escaped characters, which will be expanded as expected. A subset
+of possible escape sequences are:
 
-Variables that have not yet been assigned a value will produce an error.
+Escape | Expansion
+-- | --
+`\n` | newline
+`\r` | carriage return
+`\t` | horizontal tab
+`\"` | literal `"`
+`\'` | literal `'`
 
-    > var a = 5; var b; a + b
-     Error: `b` not defined.
+##### Array
+    ArrayConstructor ::= "[" (Expression ","?)* "]"
 
-### Functions
-    FunctionDefinition  ::= "fn" Type? Identifier? IdentifierList? Statement
-    IdentifierList      ::= "(" (Type? Identifier Initializer? ","?)* ")"
-    Type ::= "Any" | "Null" | "Boolean" | "Number" | "String" | "Array" | "Map" | "Function" | "Builtin"
+An `Array` is a collection of values. Array elements can be any type.
 
-A function definition is created by using the `fn` keyword followed by:
- * a type specifier (which may be omitted to specifiy the `Any` type)
- * an identifer (which may be omitted to create an anonymous function)
- * an identifier list (which may be omitted if there are no parameters desired)
- * and finally either a group of statements or a single statement
+For more details see:
 
-An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
-a comma and/or whitespace. Each identifier optionally may be prefixed with a type specifier.
-Each identifier may optionally be followed by an initializer to create a default value.
+* [Array operations](#array-operations)
+* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
 
-Plang functions automatically return the value of the last statement or statement group.
-You may use the `return` keyword to return the value of an ealier statement.
+*TODO: Optional type annotations to constrain Array elements to a single type.*
 
-To call a function, write its identifier followed by a list of arguments enclosed in
-parentheses. The argument list is separated the same way as the identifier list. Arguments
-may be any valid expression.
+##### Map
+    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
 
-The `fn` statement returns a reference to the newly defined function.
+A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
+values can be any type.
 
-#### Type-checking
-Plang's type system allows a mixture of dynamic (run-time) and static (compile-time) type checking.
-You can choose which parts of your program are dynamically or statically type
-checked by omitting or adding type annotations. This is called gradual typing.
+For more details see:
+
+* [Map operations](#map-operations)
+* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
+
+*TODO: Optional interface syntax to ensure that maps contain keys of typed values.*
+
+##### Function
+The `Function` type identifies a Plang function. See [functions](#functions) for more information.
+
+##### Builtin
+The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
+
+#### Gradual typing
+Plang's type system allows a mixture of dynamic (run-time) and static (compile-time)
+type checking. You can choose which parts of your program are dynamically or statically
+type checked by omitting or adding type annotations. This is called gradual typing.
 
 Here is a brief demonstration of the concept. Let's consider a simple `add` function. With
-no explicit type annotations, the function's return type and types of its parameters will
+no explicit type annotations, the function's return type and the types of its parameters will
 default to the `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
@@ -297,6 +312,174 @@ is not a `Number`:
     > fn Number add(Number a, Number b) "42"; add(3, 4)
      Error: cannot return String from function declared to return Number
 
+#### Type inference
+The types of variables are inferred from the type of their value. All variables are
+simply declared with `var` and no type annotation.
+
+Function signatures may be defined with or without type annotations for any parameter
+or the return value. If type annotations are omitted for any part that part will
+be declared as if it had type `Any`, which tells Plang to infer its type from
+its value.
+
+#### Type conversion
+For stricter type-safety, Plang does not allow implicit conversion between types.
+You must convert a value explicitly to a desired type.
+
+To convert a value to a different type, pass the value as an argument to the
+function named after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
+
+Wrong:
+
+    > var a = "45"; a + 1
+     Error: cannot apply binary operator ADD (have types String and Number)
+
+Right:
+
+    > var a = "45"; Number(a) + 1
+     46
+
+The following type conversion functions may be used to convert to and from the types
+listed in their respective tables. If a type is not listed in a table, it is an error
+to perform the conversion.
+
+##### Null()
+From Type | With Value | Resulting Null Value
+--- | --- | ---
+Null | `null` | `null`
+Boolean | any value | `null`
+Number | any value | `null`
+String | any value | `null`
+Array | any value | `null`
+Map | any value | `null`
+
+##### Boolean()
+From Type | With Value | Resulting Boolean Value
+--- | --- | ---
+Null | `null` | `false`
+Boolean | any value | that value
+Number | `0` | `false`
+Number | not `0` | `true`
+String | `""` | `false`
+String | not `""` | `true`
+
+##### Number()
+From Type | With Value | Resulting Number Value
+--- | --- | ---
+Null | `null` | `0`
+Boolean | `true` | `1`
+Boolean | `false` | `0`
+Number | any value | that value
+String | `""` | `0`
+String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+
+##### String()
+From Type | With Value | Resulting String Value
+--- | --- | ---
+Null | null | `""`
+Boolean | `true` | `"true"`
+Boolean | `false` | `"false"`
+Number | any value | that value as a String
+String | any value | that value
+Array | any value | A String containing a constructor of that Array
+Map | any value | A String containing a constructor of that Map
+
+##### Array()
+From Type | With Value | Resulting Array Value
+--- | --- | ---
+String | A String containing an [Array constructor](#array) | the constructed Array
+Array | any value | that value
+
+##### Map()
+From Type | With Value | Resulting Map Value
+--- | --- | ---
+String | A String containing a [Map constructor](#map) | the constructed Map
+Map | any value | that value
+
+### Scoping
+Variables and functions are lexically scoped. Statement groups introduce a new lexical scope.
+
+### Identifiers
+    Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
+    Letter     ::=  "a" - "z" | "A" - "Z"
+    Digit      ::=  "0" - "9"
+
+An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
+by additional underscores, letters or digits.
+
+#### Keywords
+Keywords are reserved identifiers that have a special meaning to Plang.
+
+Keyword | Description
+--- | ---
+var | variable declaration
+fn | function definition
+return | return value from function
+true | a Boolean with a true value
+false | a Boolean with a false value
+null | a Null with a null value
+if | conditional if statement
+then | then branch of a conditional if statement
+else | else branch of a conditional if statement
+while | loop while a condition is true
+last | break out of the loop
+next | jump to the next iteration of the loop
+exists | test if a key exists in a Map
+delete | deletes a key from a Map
+
+### Variables
+    VariableDeclaration ::= "var" Identifier Initializer?
+    Initializer         ::= "=" Statement
+
+Variables are explicitly declared with the `var` keyword, followed by an identifier.
+Variables declarations may optionally have an initializer that assigns a default
+value. Without an initializer, the value of variables will default to `null`, which
+has type `Null`.
+
+The `var` statement returns the value of the variable.
+
+    > var a = 5
+     5
+
+    > var a = "hello"
+     "hello"
+
+Attempting to use a variable that has not been declared will produce an error.
+
+    > var a = 5; a + b
+     Error: `b` not declared.
+
+Variables that have not yet been assigned a value will produce an error.
+
+    > var a = 5; var b; a + b
+     Error: `b` not defined.
+
+### Functions
+    FunctionDefinition  ::= "fn" Type? Identifier? IdentifierList? Statement
+    IdentifierList      ::= "(" (Type? Identifier Initializer? ","?)* ")"
+    Type ::= "Any" | "Null" | "Boolean" | "Number" | "String" | "Array" | "Map" | "Function" | "Builtin"
+
+A function definition is created by using the `fn` keyword followed by:
+ * a type specifier (which may be omitted to specifiy the `Any` type)
+ * an identifer (which may be omitted to create an anonymous function)
+ * an identifier list (which may be omitted if there are no parameters desired)
+ * and finally either a group of statements or a single statement
+
+An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
+a comma and/or whitespace. Each identifier optionally may be prefixed with a type specifier.
+Each identifier may optionally be followed by an initializer to create a default value.
+
+Plang functions automatically return the value of the last statement or statement group.
+You may use the `return` keyword to return the value of an earlier statement.
+
+To call a function, write its identifier followed by a list of arguments enclosed in
+parentheses. The argument list is separated the same way as the identifier list. Arguments
+may be any valid expression.
+
+The `fn` statement returns a reference to the newly defined function.
+
+#### Optional type annotations
+TODO
+
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
 called a default argument. Parameters that have a default argument may be omitted from the
@@ -367,194 +550,6 @@ produces the output:
 #### Lazy evaluation
     > fn force(f) f(); var lazy = fn 1 + 1; force(lazy)
      2
-
-#### Built-in functions
-Function | Parameters | Description
---- | --- | ---
-print | `expr`, `end` = `"\n"` | Prints expression `expr` to standard output. The optional `end` parameter defaults to `"\n"`.
-type | `expr` | Returns the type of an expression, as a string.
-Null | `expr` | Converts the value of `expr` to a value of type `Null`
-Boolean | `expr` | Converts the value of `expr` to a value of type `Boolean`
-Number | `expr` | Converts the value of `expr` to a value of type `Number`
-String | `expr` | Converts the value of `expr` to a value of type `String`
-Array | `expr` | Converts the value of `expr` to a value of type `Array`
-Map | `expr` | Converts the value of `expr` to a value of type `Map`
-Function | `expr` | Converts the value of `expr` to a value of type `Function`
-Builtin | `expr` | Converts the value of `expr` to a value of type `Builtin`
-
-### Types
-Currently implemented types are:
-
-#### Null
-     Null ::= "null"
-
-The `Null` type signifies that there is no value.
-
-#### Boolean
-    Boolean ::= "true" | "false"
-
-A `Boolean` is either true or false.
-
-#### Number
-    Number ::= ("-" | "+")? ("0" - "9")* "."? ("0" - "9")+
-
-`Number`s are things like `-100`, `+4.20`, `2001`, `1e1`, `0x4a`, etc.
-
-In Plang, the `Number` type is equivalent to a double-precision type.
-
-#### String
-    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
-    StringContents ::= TODO
-
-A `String` is a sequence of characters enclosed in double or single quotes. There is
-no difference between the quotes.
-
-#### Array
-    ArrayConstructor ::= "[" (Expression ","?)* "]"
-
-An `Array` is a collection of values. Array elements can be any type.
-
-See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
-
-##### Creating and accessing arrays
-Creating an array and accessing an element:
-
-    > var array = ["red, "green", 3, 4]; array[1]
-     "green"
-
-#### Map
-    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
-
-A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
-values can be any type.
-
-See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) for more details.
-
-##### Creating and accessing maps
-Creating a map and accessing a key:
-
-    > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
-     75
-
-Creating an empty map and then assigning a value to a key:
-
-    > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
-     "The color is blue!"
-
-Nested maps:
-
-    > var a = {"x": {"y": 42}}; a["x"]["y"]
-     42
-
-    > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
-     42
-
-##### Exists
-To check for existence of a map key, use the `exists` keyword. If the key exists then
-`true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
-delete the key. See the [`delete`](#delete) keyword.
-
-    > var map = { "a": 1, "b": 2 }; exists map["a"]
-     true
-
-##### Delete
-To delete keys from a map, use the `delete` keyword. Setting a key to `null` does not
-delete the key.
-
-When used on a Map key, the `delete` keyword deletes the key and returns its value, or
-`null` if no such key exists.
-
-When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
-the empty map.
-
-    > var map = { "a": 1, "b": 2 }; delete map["b"]; map
-     { "a": 1 }
-
-##### Function
-The `Function` type identifies a Plang function. See [functions](#functions) for more information.
-
-##### Builtin
-The `Builtin` type identifies an internal built-in function. See [builtin-in functions](#built-in-functions) for more information.
-
-#### Type conversion
-Plang does not allow implicit conversion between types. You must convert a value explicitly
-to a desired type.
-
-To convert a value to a different type, pass the value as an argument to the function named
-after the desired type. To cast `x` to a `Boolean`, write `Boolean(x)`.
-
-Wrong:
-
-    > var a = "45"; a + 1
-     Error: cannot apply binary operator ADD (have types String and Number)
-
-Right:
-
-    > var a = "45"; Number(a) + 1
-     46
-
-The following type conversion functions may be used to convert to and from the types
-listed in their respective tables. If a type is not listed in a table, it is an error
-to perform the conversion.
-
-##### Null()
-From Type | With Value | Resulting Null Value
---- | --- | ---
-Null | `null` | `null`
-Boolean | any value | `null`
-Number | any value | `null`
-String | any value | `null`
-Array | any value | `null`
-Map | any value | `null`
-
-##### Boolean()
-From Type | With Value | Resulting Boolean Value
---- | --- | ---
-Null | `null` | `false`
-Boolean | any value | that value
-Number | `0` | `false`
-Number | not `0` | `true`
-String | `""` | `false`
-String | not `""` | `true`
-
-##### Number()
-From Type | With Value | Resulting Number Value
---- | --- | ---
-Null | `null` | `0`
-Boolean | `true` | `1`
-Boolean | `false` | `0`
-Number | any value | that value
-String | `""` | `0`
-String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
-
-##### String()
-From Type | With Value | Resulting String Value
---- | --- | ---
-Null | null | `""`
-Boolean | `true` | `"true"`
-Boolean | `false` | `"false"`
-Number | any value | that value as a String
-String | any value | that value
-Array | any value | A String containing a constructor of that Array
-Map | any value | A String containing a constructor of that Map
-
-##### Array()
-From Type | With Value | Resulting Array Value
---- | --- | ---
-String | A String containing an [Array constructor](#array) | the constructed Array
-Array | any value | that value
-
-##### Map()
-From Type | With Value | Resulting Map Value
---- | --- | ---
-String | A String containing a [Map constructor](#map) | the constructed Map
-Map | any value | that value
-
-##### Function()
-It is an error to convert anything to or from `Function`.
-
-##### Builtin()
-It is an error to convert anything to or from `Builtin`.
 
 ### Statements and StatementGroups
     Statement      ::=  StatementGroup
@@ -719,3 +714,184 @@ You can assign to the above notation to replace the substring instead.
 #### Regular expressions
 You may use regular expressions on strings with the `~=` operator.
 
+### Array operations
+#### Creating and accessing arrays
+Creating an array and accessing an element:
+
+    > var array = ["red, "green", 3, 4]; array[1]
+     "green"
+
+#### map
+See the documentation for the builtin [map](#map-3) function.
+
+#### filter
+See the documentation for the builtin [filter](#filter-1) function.
+
+### Map operations
+#### Creating and accessing maps
+Creating a map and accessing a key:
+
+    > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
+     75
+
+Creating an empty map and then assigning a value to a key:
+
+    > var map = {}; map["color"] = "blue"; $"The color is {map['color']}!"
+     "The color is blue!"
+
+Nested maps:
+
+    > var a = {"x": {"y": 42}}; a["x"]["y"]
+     42
+
+    > var a = {}; a["x"] = {"y": 42}; a["x"]["y"]
+     42
+
+#### exists
+To check for existence of a map key, use the `exists` keyword. If the key exists then
+`true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
+delete the key. See the [`delete`](#delete) keyword.
+
+    > var map = { "a": 1, "b": 2 }; exists map["a"]
+     true
+
+#### delete
+To delete keys from a map, use the `delete` keyword. Setting a key to `null` does not
+delete the key.
+
+When used on a Map key, the `delete` keyword deletes the key and returns its value, or
+`null` if no such key exists.
+
+When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
+the empty map.
+
+    > var map = { "a": 1, "b": 2 }; delete map["b"]; map
+     { "a": 1 }
+
+### Built-in functions
+These are the built-in functions. You can add additional builtin-in functions
+through Plang's embedding API.
+
+#### print
+The `print` function sends text to the standard output stream.
+
+Its [`whatis`](#whatis) is: `Builtin (Any expr, String end = "\n") -> Null`
+
+In other words, it takes two parameters and returns a `Null` value. The first parameter
+is an expression of `Any` type. The second parameter is a `String` with a default
+argument of `"\n"`.
+
+    > print("hello!"); print("good-bye!")
+     hello!
+     good-bye!
+
+    > print("hello!", " "); print("good", ""); print("-bye!");
+     hello! good-bye!
+
+Optionally, you can use [named arguments](#named-arguments) for clarity:
+
+    > print("hello!", end=" "); print("good", end=""); print("-bye!");
+     hello! good-bye!
+
+#### type
+The `type` function returns the type of an expression, as a string. For functions,
+it returns strictly the type signature. If you're interested in function parameter
+identifiers and default arguments, see the [`whatis`](#whatis) builtin function.
+
+Its [`whatis`](#whatis) is: `Builtin (Any expr) -> String`
+
+    > type(3.14)
+     "Number"
+
+    > var a = "hello"; type(a)
+     "String"
+
+    > type(print)
+     "Builtin (Any, String) -> Null"
+
+    > type(filter)
+     "Builtin (Function (Any) -> Boolean, Array) -> Array"
+
+#### whatis
+The `whatis` function is identical to the [`type`](#type) function, but with the
+addition of function parameter identifiers and function default arguments.
+
+    > whatis(print)
+     "Builtin (Any expr, String end = \"\\n\") -> Null"
+
+    > print(whatis(print)) # print it to avoid the string escaping
+     Builtin (Any expr, String end = "\n") -> Null
+
+    > whatis(filter)
+     "Builtin (Function (Any) -> Boolean func, Array list) -> Array"
+
+#### length
+The `length` function returns the count of elements within an expression of type
+`String`, `Array` or `Map`.
+
+For `String` it returns the count of characters. For `Array` it returns the count
+of elements. For `Map` it returns the count of keys.
+
+Its [`whatis`](#whatis) is: `Builtin (Any expr) -> Number`
+
+*TODO: Support list-style type annotation so the whatis can be `Builtin ([String Array Map] expr) -> Number` instead.*
+
+    > length("Hello!")
+     6
+
+    > length([10,20,30,40])
+     4
+
+    > length({"a": 1, "b": 2, "c": 3})
+     3
+
+#### map
+The `map` function applies a function to each element of an array, updating that
+element in-place with the result of the applied function. The parameter of the
+applicative function is the current element it is being applied upon.
+
+Its [`whatis`](#whatis) is: `Builtin (Function (Any) -> Any func, Array list) -> Array`
+
+In other words, it takes two parameters and returns an `Array`. The first parameter,
+`func`, is a `Function` that takes `Any` and returns `Any`. The second parameter,
+`list`, is an `Array`.
+
+    > map(fn(x) x*10, [1,2,3,4,5])
+     [10,20,30,40,50]
+
+#### filter
+The `filter` function applies a function over an array's elements and constructs
+a new array whose elements meet the criteria of the applied function.
+
+Its [`whatis`](#whatis) is: `Builtin (Function (Any) -> Boolean func, Array list) -> Array`
+
+In other words, it takes two parameters and returns an `Array`. The first parameter,
+`func`, is a `Function` that takes `Any` and returns a `Boolean`. The second parameter,
+`list`, is an `Array`.
+
+    > filter(fn(x) x<6, [1,2,3,4,5,6,7,8,9,10])
+     [1,2,3,4,5]
+
+#### Null
+The `Null` function attempts to convert a value to type `Null`.
+See [Null](#null-1) under [type conversion](#type-conversion).
+
+#### Boolean
+The `Boolean` function attempts to convert a value to type `Boolean`.
+See [Boolean](#boolean-1) under [type conversion](#type-conversion).
+
+#### Number
+The `Number` function attempts to convert a value to type `Number`.
+See [Number](#number-1) under [type conversion](#type-conversion).
+
+#### String
+The `String` function attempts to convert a value to type `String`.
+See [String](#string-1) under [type conversion](#type-conversion).
+
+#### Array
+The `Array` function attempts to convert a value to type `Array`.
+See [Array](#array-1) under [type conversion](#type-conversion).
+
+#### Map
+The `Map` function attempts to convert a value to type `Map`.
+See [Map](#map-1) under [type conversion](#type-conversion).
