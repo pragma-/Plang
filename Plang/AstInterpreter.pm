@@ -46,36 +46,38 @@ sub initialize {
 
     $self->{repl_context}   = undef; # persistent repl context
 
-    $self->{eval_unary_op_NUM} = {
-        'NOT' => sub { ['BOOL', int ! $_[0]] },
-        'NEG' => sub { ['NUM',      - $_[0]] },
-        'POS' => sub { ['NUM',      + $_[0]] },
+    $self->{eval_unary_op_Number} = {
+        'NOT' => sub { [['TYPE', 'Boolean'], int ! $_[0]] },
+        'NEG' => sub { [['TYPE', 'Number'],      - $_[0]] },
+        'POS' => sub { [['TYPE', 'Number'],      + $_[0]] },
     };
 
-    $self->{eval_binary_op_NUM} = {
-        'POW' => sub { ['NUM',  $_[0] ** $_[1]] },
-        'REM' => sub { ['NUM',  $_[0]  % $_[1]] },
-        'MUL' => sub { ['NUM',  $_[0]  * $_[1]] },
-        'DIV' => sub { ['NUM',  $_[0]  / $_[1]] },
-        'ADD' => sub { ['NUM',  $_[0]  + $_[1]] },
-        'SUB' => sub { ['NUM',  $_[0]  - $_[1]] },
-        'GTE' => sub { ['BOOL', $_[0] >= $_[1]] },
-        'LTE' => sub { ['BOOL', $_[0] <= $_[1]] },
-        'GT'  => sub { ['BOOL', $_[0]  > $_[1]] },
-        'LT'  => sub { ['BOOL', $_[0]  < $_[1]] },
-        'EQ'  => sub { ['BOOL', $_[0] == $_[1]] },
-        'NEQ' => sub { ['BOOL', $_[0] != $_[1]] },
+    $self->{types} = $conf{types} // die 'Missing types';
+
+    $self->{eval_binary_op_Number} = {
+        'POW' => sub { [['TYPE', 'Number'],  $_[0] ** $_[1]] },
+        'REM' => sub { [['TYPE', 'Number'],  $_[0]  % $_[1]] },
+        'MUL' => sub { [['TYPE', 'Number'],  $_[0]  * $_[1]] },
+        'DIV' => sub { [['TYPE', 'Number'],  $_[0]  / $_[1]] },
+        'ADD' => sub { [['TYPE', 'Number'],  $_[0]  + $_[1]] },
+        'SUB' => sub { [['TYPE', 'Number'],  $_[0]  - $_[1]] },
+        'GTE' => sub { [['TYPE', 'Boolean'], $_[0] >= $_[1]] },
+        'LTE' => sub { [['TYPE', 'Boolean'], $_[0] <= $_[1]] },
+        'GT'  => sub { [['TYPE', 'Boolean'], $_[0]  > $_[1]] },
+        'LT'  => sub { [['TYPE', 'Boolean'], $_[0]  < $_[1]] },
+        'EQ'  => sub { [['TYPE', 'Boolean'], $_[0] == $_[1]] },
+        'NEQ' => sub { [['TYPE', 'Boolean'], $_[0] != $_[1]] },
     };
 
-    $self->{eval_binary_op_STRING} = {
-        'EQ'     => sub { ['BOOL',    $_[0]  eq $_[1]] },
-        'NEQ'    => sub { ['BOOL',    $_[0]  ne $_[1]] },
-        'LT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) == -1] },
-        'GT'     => sub { ['BOOL',   ($_[0] cmp $_[1]) ==  1] },
-        'LTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) <=  0] },
-        'GTE'    => sub { ['BOOL',   ($_[0] cmp $_[1]) >=  0] },
-        'STRCAT' => sub { ['STRING',  $_[0]   . $_[1]] },
-        'STRIDX' => sub { ['NUM', index $_[0], $_[1]] },
+    $self->{eval_binary_op_String} = {
+        'EQ'     => sub { [['TYPE', 'Boolean'],  $_[0]  eq $_[1]] },
+        'NEQ'    => sub { [['TYPE', 'Boolean'],  $_[0]  ne $_[1]] },
+        'LT'     => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) == -1] },
+        'GT'     => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) ==  1] },
+        'LTE'    => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) <=  0] },
+        'GTE'    => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) >=  0] },
+        'STRCAT' => sub { [['TYPE', 'String'],   $_[0]   . $_[1]] },
+        'STRIDX' => sub { [['TYPE', 'Integer'], index $_[0], $_[1]] },
     };
 }
 
@@ -93,6 +95,13 @@ sub new_context {
         locals => {},
         parent => $parent,
     };
+}
+
+sub declare_variable {
+    my ($self, $context, $type, $name, $value) = @_;
+    $context->{guards}->{$name} = $type;
+    $context->{locals}->{$name} = $value;
+    $self->{dprint}->('VARS', "declare_variable $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
 }
 
 sub set_variable {
@@ -132,7 +141,13 @@ sub unary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
-        return $self->{eval_unary_op_NUM}->{$op}->($value->[1]);
+        my $result = $self->{eval_unary_op_Number}->{$op}->($value->[1]);
+
+        if ($self->{types}->is_subtype($value->[0], $result->[0])) {
+            $result->[0] = $value->[0];
+        }
+
+        return $result;
     }
 
     return;
@@ -151,14 +166,20 @@ sub binary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
-        if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
-            return $self->{eval_binary_op_NUM}->{$op}->($left_value->[1], $right_value->[1]);
+        if ($self->{types}->is_arithmetic($left_value->[0]) and $self->{types}->is_arithmetic($right_value->[0])) {
+            my $result = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
+
+            if ($self->{types}->is_subtype($left_value->[0], $result->[0])) {
+                $result->[0] = $left_value->[0];
+            }
+
+            return $result;
         }
 
-        if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
-            $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
-            $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
-            return $self->{eval_binary_op_STRING}->{$op}->($left_value->[1], $right_value->[1]);
+        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
+            $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
+            $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
+            return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
         }
     }
 
@@ -168,162 +189,107 @@ sub binary_op {
 # builtin functions
 my %function_builtins = (
     'print'   => {
-        # [['param1 type', 'param1 name', default value], ['param2 type', 'param2 name', default value], [...]]
-        params => [['Any', 'expr', undef], ['String', 'end', ['STRING', "\n"]]],
-        ret    => 'Null',
+        # [[[param type], 'param name', [default value]], ...]
+        params => [[['TYPE',    'Any'], 'expr', undef],
+                   [['TYPE', 'String'], 'end',  [['TYPE', 'String'], "\n"]]],
+        ret    => ['TYPE', 'Null'],
         subref => \&function_builtin_print,
     },
     'type' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'String',
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'String'],
         subref => \&function_builtin_type,
     },
     'whatis' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'String',
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'String'],
         subref => \&function_builtin_whatis,
     },
     'length' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Number',
+        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
+        ret    => ['TYPE', 'Integer'],
         subref => \&function_builtin_length,
     },
     'map' => {
-        params => [['Function (Any) -> Any', 'func', undef], ['Array', 'list', undef]],
-        ret    => 'Array',
+        params => [[['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
+                   [['TYPE', 'Array'], 'list', undef]],
+        ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_map,
     },
     'filter' => {
-        params => [['Function (Any) -> Boolean', 'func', undef], ['Array', 'list', undef]],
-        ret    => 'Array',
+        params => [[['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
+                   [['TYPE', 'Array'], 'list', undef]],
+        ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_filter,
     },
+    'Null' => {
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'Null'],
+        subref => \&function_builtin_Null,
+    },
     'Number' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Number',
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'Number'],
         subref => \&function_builtin_Number,
     },
+    'Integer' => {
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'Integer'],
+        subref => \&function_builtin_Integer,
+    },
+    'Real' => {
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'Real'],
+        subref => \&function_builtin_Real,
+    },
     'String' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'String',
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'String'],
         subref => \&function_builtin_String,
     },
     'Boolean' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Boolean',
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'Boolean'],
         subref => \&function_builtin_Boolean,
     },
-    'Null' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Null',
-        subref => \&function_builtin_Null,
-    },
-    'Function' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Null',
-        subref => \&function_builtin_CannotConvert,
-    },
-    'Builtin' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Null',
-        subref => \&function_builtin_CannotConvert,
-    },
-    'Map' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Map',
-        subref => \&function_builtin_Map,
-    },
     'Array' => {
-        params => [['Any', 'expr', undef]],
-        ret    => 'Array',
+        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Array']]], 'expr', undef]],
+        ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_Array,
     },
+    'Map' => {
+        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map']]], 'expr', undef]],
+        ret    => ['TYPE', 'Map'],
+        subref => \&function_builtin_Map,
+    },
 );
 
-my %pretty_types = (
-    'NULL'    => 'Null',
-    'NUM'     => 'Number',
-    'STRING'  => 'String',
-    'BOOL'    => 'Boolean',
-    'FUNC'    => 'Function',
-    'BUILTIN' => 'Builtin',
-    'MAP'     => 'Map',
-    'ARRAY'   => 'Array',
-);
-
+# just like type() except include function parameter identifiers and default values
 sub introspect {
-    my ($self, $value) = @_;
-    my $type = $pretty_types{$value->[0]};
-    return $value->[0] if not defined $type;
+    my ($self, $data) = @_;
 
-    if ($type eq 'Function') {
-        my $ret_type = $value->[1]->[1];
+    my $type  = $data->[0];
+    my $value = $data->[1];
+
+    if ($type->[0] eq 'TYPEFUNC') {
+        my $ret_type = $self->{types}->to_string($value->[1]);
+
         my @params;
-        foreach my $param (@{$value->[1]->[2]}) {
+        foreach my $param (@{$value->[2]}) {
+            my $param_type = $self->{types}->to_string($param->[0]);
             if (defined $param->[2]) {
                 my $default_value = $self->statement($self->new_context, $param->[2]);
-                push @params, "$param->[0] $param->[1] = " . $self->output_value($default_value, literal => 1);
+                push @params, "$param_type $param->[1] = " . $self->output_value($default_value, literal => 1);
             } else {
-                push @params, "$param->[0] $param->[1]";
+                push @params, "$param_type $param->[1]";
             }
         }
 
         $type = "Function ";
-        $type .= '(' . join(', ', @params) . ') ' if @params;
+        $type .= '(' . join(', ', @params) . ') ';
         $type .= "-> $ret_type";
-    }
-
-    elsif ($type eq 'Builtin') {
-        my $builtin = $function_builtins{$value->[1]};
-
-        my $ret_type = $builtin->{ret};
-        my @params;
-        foreach my $param (@{$builtin->{params}}) {
-            if (defined $param->[2]) {
-                my $default_value = $self->statement($self->new_context, $param->[2]);
-                push @params, "$param->[0] $param->[1] = " . $self->output_value($default_value, literal => 1);
-            } else {
-                push @params, "$param->[0] $param->[1]";
-            }
-        }
-
-        $type = "Builtin ";
-        $type .= '(' . join(', ', @params) . ') ' if @params;
-        $type .= "-> $ret_type";
-    }
-
-    return $type;
-}
-
-sub pretty_type {
-    my ($self, $value) = @_;
-    my $type = $pretty_types{$value->[0]};
-    return $value->[0] if not defined $type;
-
-    if ($type eq 'Function') {
-        my $ret_type = $value->[1]->[1];
-        my @params;
-        foreach my $param (@{$value->[1]->[2]}) {
-            push @params, $param->[0];
-        }
-
-        $type = "Function ";
-        $type .= '(' . join(', ', @params) . ') ' if @params;
-        $type .= "-> $ret_type";
-    }
-
-    elsif ($type eq 'Builtin') {
-        my $builtin = $function_builtins{$value->[1]};
-
-        my $ret_type = $builtin->{ret};
-        my @params;
-        foreach my $param (@{$builtin->{params}}) {
-            push @params, $param->[0];
-        }
-
-        $type = "Builtin ";
-        $type .= '(' . join(', ', @params) . ') ' if @params;
-        $type .= "-> $ret_type";
+    } else {
+        $type = $self->{types}->to_string($type);
     }
 
     return $type;
@@ -334,21 +300,21 @@ sub function_builtin_print {
     my ($self, $context, $name, $arguments) = @_;
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 # builtin type
 sub function_builtin_type {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['STRING', $self->pretty_type($expr)];
+    return [['TYPE', 'String'], $self->{types}->to_string($expr->[0])];
 }
 
 # builtin whatis
 sub function_builtin_whatis {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['STRING', $self->introspect($expr)];
+    return [['TYPE', 'String'], $self->introspect($expr)];
 }
 
 # builtin length
@@ -356,16 +322,16 @@ sub function_builtin_length {
     my ($self, $context, $name, $arguments) = @_;
     my ($val) = ($arguments->[0]);
 
-    if ($val->[0] eq 'STRING') {
-        return ['NUM', length $val->[1]];
+    if ($self->{types}->check(['TYPE', 'String'], $val->[0])) {
+        return [['TYPE', 'Integer'], length $val->[1]];
     }
 
-    if ($val->[0] eq 'ARRAY') {
-        return ['NUM', scalar @{$val->[1]}];
+    if ($self->{types}->check(['TYPE', 'Array'], $val->[0])) {
+        return [['TYPE', 'Integer'], scalar @{$val->[1]}];
     }
 
-    if ($val->[0] eq 'MAP') {
-        return ['NUM', scalar %{$val->[1]}];
+    if ($self->{types}->check(['TYPE', 'Map'], $val->[0])) {
+        return [['TYPE', 'Integer'], scalar %{$val->[1]}];
     }
 }
 
@@ -402,7 +368,7 @@ sub function_builtin_filter {
         }
     }
 
-    return ['ARRAY', $new_list];
+    return [['TYPE', 'Array'], $new_list];
 }
 
 # cast functions
@@ -410,98 +376,144 @@ sub function_builtin_Number {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NULL') {
-        return ['NUM', 0];
+    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
+        return [['TYPE', 'Number'], 0];
     }
 
-    if ($expr->[0] eq 'NUM') {
-        return $expr;
+    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
+        return [['TYPE', 'Number'], $expr->[1]];
     }
 
-    if ($expr->[0] eq 'STRING') {
-        return ['NUM', $expr->[1] + 0];
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
+        return [['TYPE', 'Number'], $expr->[1] + 0];
     }
 
-    if ($expr->[0] eq 'BOOL') {
-        return ['NUM', !!$expr->[1]];
+    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
+        return [['TYPE', 'Number'], $expr->[1]];
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Number");
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Number");
+}
+
+sub function_builtin_Integer {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
+        return [['TYPE', 'Integer'], 0];
+    }
+
+    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
+        return [['TYPE', 'Integer'], int $expr->[1]];
+    }
+
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
+        return [['TYPE', 'Integer'], int ($expr->[1] + 0)];
+    }
+
+    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
+        return [['TYPE', 'Integer'], $expr->[1]];
+    }
+
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Integer");
+}
+
+sub function_builtin_Real {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
+        return [['TYPE', 'Real'], 0];
+    }
+
+    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
+        return [['TYPE', 'Real'], $expr->[1]];
+    }
+
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
+        return [['TYPE', 'Real'], $expr->[1]];
+    }
+
+    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
+        return [['TYPE', 'Real'], $expr->[1]];
+    }
+
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Real");
 }
 
 sub function_builtin_String {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NULL') {
-        return ['STRING', ''];
+    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
+        return [['TYPE', 'String'], ''];
     }
 
-    if ($expr->[0] eq 'NUM') {
-        return ['STRING', $expr->[1]];
+    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
+        return [['TYPE', 'String'], $expr->[1]];
     }
 
-    if ($expr->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         return $expr;
     }
 
-    if ($expr->[0] eq 'BOOL') {
-        return ['STRING', $self->output_value($expr)];
+    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
+        return [['TYPE', 'String'], $self->output_value($expr)];
     }
 
-    if ($expr->[0] eq 'MAP') {
-        return ['STRING', $self->map_to_string($expr)];
+    if ($self->{types}->check(['TYPE', 'Map'], $expr->[0])) {
+        return [['TYPE', 'String'], $self->map_to_string($expr)];
     }
 
-    if ($expr->[0] eq 'ARRAY') {
-        return ['STRING', $self->array_to_string($expr)];
+    if ($self->{types}->check(['TYPE', 'Array'], $expr->[0])) {
+        return [['TYPE', 'String'], $self->array_to_string($expr)];
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to String");
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to String");
 }
 
 sub function_builtin_Boolean {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'NULL') {
-        return ['BOOL', 0];
+    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
+        return [['TYPE', 'Boolean'], 0];
     }
 
-    if ($expr->[0] eq 'NUM') {
+    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
         if ($self->is_truthy($context, $expr)) {
-            return ['BOOL', 1];
+            return [['TYPE', 'Boolean'], 1];
         } else {
-            return ['BOOL', 0];
+            return [['TYPE', 'Boolean'], 0];
         }
     }
 
-    if ($expr->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         if (not $self->is_truthy($context, $expr)) {
-            return ['BOOL', 0];
+            return [['TYPE', 'Boolean'], 0];
         } else {
-            return ['BOOL', 1];
+            return [['TYPE', 'Boolean'], 1];
         }
     }
 
-    if ($expr->[0] eq 'BOOL') {
+    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
         return $expr;
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Boolean");
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Boolean");
 }
 
 sub function_builtin_Null {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 sub function_builtin_Map {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
 
         if ($mapinit->[0] ne 'MAPINIT') {
@@ -511,14 +523,14 @@ sub function_builtin_Map {
         return $self->statement($context, $mapinit);
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Map");
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Map");
 }
 
 sub function_builtin_Array {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
 
-    if ($expr->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
 
         if ($mapinit->[0] ne 'ARRAYINIT') {
@@ -528,13 +540,7 @@ sub function_builtin_Array {
         return $self->statement($context, $mapinit);
     }
 
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to Array");
-}
-
-sub function_builtin_CannotConvert {
-    my ($self, $context, $name, $arguments) = @_;
-    my ($expr) = ($arguments->[0]);
-    $self->error($context, "cannot convert type " . $self->pretty_type($expr) . " to $name");
+    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
 }
 
 sub add_builtin_function {
@@ -549,13 +555,10 @@ sub get_builtin_function {
 
 sub call_builtin_function {
     my ($self, $context, $data, $name) = @_;
-
-    my $parameters = $function_builtins{$name}->{params};
-    my $func       = $function_builtins{$name}->{subref};
-    my $arguments  = $data->[2];
-
+    my $parameters  = $function_builtins{$name}->{params};
+    my $func        = $function_builtins{$name}->{subref};
+    my $arguments   = $data->[2];
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
-
     return $func->($self, $context, $name, $evaled_args);
 }
 
@@ -588,7 +591,13 @@ sub function_definition {
     my $parameters = $data->[3];
     my $statements = $data->[4];
 
-    my $func = ['FUNC', [$context, $ret_type, $parameters, $statements]];
+    my $param_types = [];
+
+    foreach my $param (@$parameters) {
+        push @$param_types, $param->[0];
+    }
+
+    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $statements]];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
@@ -611,14 +620,15 @@ sub function_call {
         $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
 
-        if (defined $func and $func->[0] eq 'BUILTIN') {
+        if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
             # builtin function
             return $self->call_builtin_function($context, $data, $target->[1]);
         }
-    } elsif ($target->[0] eq 'FUNC') {
+    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
+        $self->{dprint}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
     } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{dprint}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);
     }
 
@@ -644,7 +654,7 @@ sub function_call {
     $self->{recursion}--;
 
     # update inferred return type
-    $func->[1]->[1] = $self->pretty_type($result);
+    $func->[1]->[1] = $self->{types}->to_string($result->[0]);
 
     return $result;
 }
@@ -654,25 +664,19 @@ sub is_truthy {
 
     my $result = $self->statement($context, $expr);
 
-    if ($result->[0] eq 'NUM') {
+    if ($self->{types}->check(['TYPE', 'Number'], $result->[0])) {
         return $result->[1] != 0;
     }
 
-    if ($result->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $result->[0])) {
         return $result->[1] ne "";
     }
 
-    if ($result->[0] eq 'BOOL') {
+    if ($self->{types}->check(['TYPE', 'Boolean'], $result->[0])) {
         return $result->[1] != 0;
     }
 
     return;
-}
-
-sub is_arithmetic_type {
-    my ($self, $value) = @_;
-    return 1 if $value->[0] eq 'NUM' or $value->[0] eq 'BOOL';
-    return 0;
 }
 
 # TODO: do this much more efficiently
@@ -712,16 +716,18 @@ sub statement_group {
 sub variable_declaration {
     my ($self, $context, $data) = @_;
 
-    my $initializer = $data->[2];
+    my $type        = $data->[1];
+    my $name        = $data->[2];
+    my $initializer = $data->[3];
     my $right_value = undef;
 
     if ($initializer) {
         $right_value = $self->statement($context, $initializer);
     } else {
-        $right_value = ['NULL', undef];
+        $right_value = [['TYPE', 'Null'], undef];
     }
 
-    $self->set_variable($context, $data->[1], $right_value);
+    $self->declare_variable($context, $type, $name, $right_value);
     return $right_value;
 }
 
@@ -738,13 +744,13 @@ sub map_constructor {
             next;
         }
 
-        if ($entry->[0]->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
             $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
             next;
         }
     }
 
-    return ['MAP', $hashref];
+    return [['TYPE', 'Map'], $hashref];
 }
 
 sub array_constructor {
@@ -757,7 +763,7 @@ sub array_constructor {
         push @$arrayref, $self->statement($context, $entry);
     }
 
-    return ['ARRAY', $arrayref];
+    return [['TYPE', 'Array'], $arrayref];
 }
 
 sub keyword_exists {
@@ -767,9 +773,9 @@ sub keyword_exists {
     my $key = $self->statement($context, $data->[1]->[2]);
 
     if (exists $var->[1]->{$key->[1]}) {
-        return ['BOOL', 1];
+        return [['TYPE', 'Boolean'], 1];
     } else {
-        return ['BOOL', 0];
+        return [['TYPE', 'Boolean'], 0];
     }
 }
 
@@ -777,12 +783,12 @@ sub keyword_delete {
     my ($self, $context, $data) = @_;
 
     # delete one key in map
-    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+    if ($data->[1]->[0] eq 'ACCESS') {
         my $var = $self->statement($context, $data->[1]->[1]);
         my $key = $self->statement($context, $data->[1]->[2]);
 
         my $val = delete $var->[1]->{$key->[1]};
-        return ['NULL', undef] if not defined $val;
+        return [['TYPE', 'Null'], undef] if not defined $val;
         return $val;
     }
 
@@ -831,10 +837,10 @@ sub keyword_while {
 
         next if $result->[0] eq 'NEXT';
         last if $result->[0] eq 'LAST';
-        return $result if $result->[0] eq 'ERROR';
+        return $result if $result->[0] eq 'ERROR'; # TODO: do we need this?
     }
 
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 sub keyword_if {
@@ -896,10 +902,9 @@ sub identifier {
 
 sub stmt_literal {
     my ($self, $context, $data) = @_;
-    return ['NUM',    $data->[1]] if $data->[0] eq 'NUM';
-    return ['STRING', $data->[1]] if $data->[0] eq 'STRING';
-    return ['BOOL',   $data->[1]] if $data->[0] eq 'BOOL';
-    return undef;
+    my $type  = $data->[1];
+    my $value = $data->[2];
+    return [$type, $value];
 }
 
 sub prefix_increment {
@@ -971,51 +976,51 @@ sub assignment {
         return $right_value;
     }
 
-    # lvalue array index
-    if ($left_value->[0] eq 'ARRAY_INDEX') {
+    # lvalue array/map access
+    if ($left_value->[0] eq 'ACCESS') {
         my $var = $self->statement($context, $left_value->[1]);
 
-        if ($var->[0] eq 'MAP') {
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->statement($context, $left_value->[2]);
             my $val = $self->statement($context, $right_value);
             $var->[1]->{$key->[1]} = $val;
             return $val;
         }
 
-        if ($var->[0] eq 'ARRAY') {
+        if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
             my $index = $self->statement($context, $left_value->[2]);
             my $val = $self->statement($context, $right_value);
             $var->[1]->[$index->[1]] = $val;
             return $val;
         }
 
-        if ($var->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
             my $value = $self->statement($context, $left_value->[2]->[1]);
 
             if ($value->[0] eq 'RANGE') {
                 my $from = $value->[1];
                 my $to   = $value->[2];
 
-                if ($right_value->[0] eq 'STRING') {
+                if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
                     substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
-                    return ['STRING', $var->[1]];
+                    return [['TYPE', 'String'], $var->[1]];
                 }
 
-                if ($right_value->[0] eq 'NUM') {
+                if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
                     substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
-                    return ['STRING', $var->[1]];
+                    return [['TYPE', 'String'], $var->[1]];
                 }
             }
 
             my $index = $value->[1];
-            if ($right_value->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
                 substr ($var->[1], $index, 1) = $right_value->[1];
-                return ['STRING', $var->[1]];
+                return [['TYPE', 'String'], $var->[1]];
             }
 
-            if ($right_value->[0] eq 'NUM') {
+            if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
                 substr ($var->[1], $index, 1) = chr $right_value->[1];
-                return ['STRING', $var->[1]];
+                return [['TYPE', 'String'], $var->[1]];
             }
         }
     }
@@ -1027,20 +1032,20 @@ sub array_index_notation {
     my $var = $self->statement($context, $data->[1]);
 
     # map index
-    if ($var->[0] eq 'MAP') {
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
         my $key = $self->statement($context, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
-        return ['NULL', undef] if not defined $val;
+        return [['TYPE', 'Null'], undef] if not defined $val;
         return $val;
     }
 
     # array index
-    if ($var->[0] eq 'ARRAY') {
+    if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
         my $index = $self->statement($context, $data->[2]);
 
-        if ($index->[0] eq 'NUM') {
+        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
-            return ['NULL', undef] if not defined $val;
+            return [['TYPE', 'Null'], undef] if not defined $val;
             return $val;
         }
 
@@ -1048,18 +1053,18 @@ sub array_index_notation {
     }
 
     # string index
-    if ($var->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
         my $value = $self->statement($context, $data->[2]->[1]);
 
         if ($value->[0] eq 'RANGE') {
             my $from = $value->[1];
             my $to = $value->[2];
-            return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+            return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
         }
 
-        if ($value->[0] eq 'NUM') {
+        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
             my $index = $value->[1];
-            return ['STRING', substr($var->[1], $index, 1) // ""];
+            return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
         }
     }
 }
@@ -1072,13 +1077,9 @@ sub statement {
     $Data::Dumper::Indent = 0;
     $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n") if $self->{debug};
 
-    # literals
-    if (defined (my $literal = $self->stmt_literal($context, $data))) {
-        return $literal;
-    }
-
     return $self->statement($context, $data->[1])       if $ins eq 'STMT';
     return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
+    return $self->stmt_literal($context, $data)         if $ins eq 'LITERAL';
     return $self->variable_declaration($context, $data) if $ins eq 'VAR';
     return $self->map_constructor($context, $data)      if $ins eq 'MAPINIT';
     return $self->array_constructor($context, $data)    if $ins eq 'ARRAYINIT';
@@ -1106,9 +1107,9 @@ sub statement {
     return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
     return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
     return $self->range_operator($context, $data)       if $ins eq 'RANGE';
-    return $self->array_index_notation($context, $data) if $ins eq 'ARRAY_INDEX';
+    return $self->array_index_notation($context, $data) if $ins eq 'ACCESS';
 
-    return ['STRING', $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
+    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
 
     # unary operators
     my $value;
@@ -1137,7 +1138,7 @@ sub statement {
 }
 
 # converts a map to a string
-# note: trusts $var to be MAP type
+# note: trusts $var to be Map type
 sub map_to_string {
     my ($self, $var) = @_;
 
@@ -1158,7 +1159,7 @@ sub map_to_string {
 }
 
 # converts an array to a string
-# note: trusts $var to be ARRAY type
+# note: trusts $var to be Array type
 sub array_to_string {
     my ($self, $var) = @_;
 
@@ -1193,11 +1194,11 @@ sub output_value {
     my $result = "";
 
     if ($self->{repl}) {
-        $result .= "[" . $self->pretty_type($value) . "] ";
+        $result .= "[" . $self->{types}->to_string($value->[0]) . "] ";
     }
 
     # booleans
-    if ($value->[0] eq 'BOOL') {
+    if ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
         if ($value->[1] == 0) {
             $result .= 'false';
         } else {
@@ -1206,27 +1207,27 @@ sub output_value {
     }
 
     # functions
-    elsif ($value->[0] eq 'FUNC') {
-        $result .= 'Function';
+    elsif ($self->{types}->name_is($value->[0], 'TYPEFUNC')) {
+        $result .= $self->{types}->to_string($value->[0]);
     }
 
     # maps
-    elsif ($value->[0] eq 'MAP') {
+    elsif ($self->{types}->check(['TYPE', 'Map'], $value->[0])) {
         $result .= $self->map_to_string($value);
     }
 
     # arrays
-    elsif ($value->[0] eq 'ARRAY') {
+    elsif ($self->{types}->check(['TYPE', 'Array'], $value->[0])) {
         $result .= $self->array_to_string($value);
     }
 
-    # STRING and NUM
+    # String and Number
     else {
         if ($opts{literal}) {
             # output literals
-            if ($value->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $value->[0])) {
                 $result .= $self->output_string_literal($value->[1]);
-            } elsif ($value->[0] eq 'NULL') {
+            } elsif ($self->{types}->check(['TYPE', 'Null'], $value->[0])) {
                 $result .= 'null';
             } else {
                 $result .= $value->[1];
@@ -1255,18 +1256,20 @@ sub run {
     if (not $opt{typecheck}) {
         # restore builtins overridden for typechecking
         $self->add_builtin_function('length',
-            [['Any', 'expr']],
-            'Number',
+            [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
+            ['TYPE', 'Integer'],
             \&function_builtin_length);
 
         $self->add_builtin_function('map',
-            [['Function (Any) -> Any', 'func', undef], ['Array', 'list', undef]],
-            'Array',
+            [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
+                [['TYPE', 'Array'], 'list', undef]],
+            ['TYPE', 'Array'],
             \&function_builtin_map);
 
         $self->add_builtin_function('filter',
-            [['Function (Any) -> Boolean', 'func', undef], ['Array', 'list', undef]],
-            'Array',
+            [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
+                [['TYPE', 'Array'], 'list', undef]],
+            ['TYPE', 'Array'],
             \&function_builtin_filter);
     }
 
@@ -1284,7 +1287,17 @@ sub run {
 
     # add built-in functions to global enviornment
     foreach my $builtin (keys %function_builtins) {
-        $self->set_variable($context, $builtin, ['BUILTIN', $builtin]);
+        my $ret_type = $function_builtins{$builtin}{ret};
+        my $param_types  = [];
+        my $param_whatis = [];
+        foreach my $param (@{$function_builtins{$builtin}{params}}) {
+            push @$param_types, $param->[0];
+            push @$param_whatis, $param;
+        }
+
+        my $type = ['TYPEFUNC', 'Builtin', $param_types, $ret_type];
+        my $data = [$context, $ret_type, $param_whatis, undef];
+        $self->set_variable($context, $builtin, [$type, $data]);
     }
 
     # grab our program's statements
@@ -1322,10 +1335,10 @@ sub interpret_ast {
                 $result = $self->handle_statement_result($result) if defined $result;
 
                 if (defined $result) {
-                    $self->{dprint}->('AST', "Statement result: " . (defined $result->[1] ? $result->[1] : 'undef') . " ($result->[0])\n") if $self->{debug};
+                    $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
                     return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
                     return $result->[1] if $result->[0] eq 'RETURN';
-                    return $result if $result->[0] eq 'ERROR';
+                    return $result if $result->[0] eq 'ERROR'; # TODO: do we need this
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }
@@ -1359,7 +1372,7 @@ sub handle_statement_result {
 
     # print the result if possible and then consume it
     if (defined $result->[1]) {
-        if ($result->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $result->[0])) {
             print $self->output_string_literal($result->[1]), "\n";;
         } else {
             print $self->output_value($result), "\n";

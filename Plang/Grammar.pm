@@ -239,7 +239,7 @@ sub StatementGroup {
     $parser->backtrack;
 }
 
-# Grammar: VariableDeclaration ::= KEYWORD_var IDENT Initializer?
+# Grammar: VariableDeclaration ::= KEYWORD_var Type? IDENT Initializer?
 sub VariableDeclaration {
     my ($parser) = @_;
 
@@ -247,6 +247,13 @@ sub VariableDeclaration {
 
     {
         if ($parser->consume('KEYWORD_var')) {
+            my $type = Type($parser);
+            return if $parser->errored;
+
+            if (not $type) {
+                $type = ['TYPE', 'Any'];
+            }
+
             my $token = $parser->consume('IDENT');
             return expected($parser, 'identifier for variable name') if not $token;
 
@@ -256,7 +263,7 @@ sub VariableDeclaration {
             return if $parser->errored;
 
             $parser->advance;
-            return ['VAR', $name, $initializer];
+            return ['VAR', $type, $name, $initializer];
         }
     }
 
@@ -274,18 +281,25 @@ sub MapConstructor {
         if ($parser->consume('L_BRACE')) {
             my @map;
             while (1) {
-                my $key = $parser->consume('DQUOTE_STRING')
+                my $parsedkey = $parser->consume('DQUOTE_STRING')
                                || $parser->consume('SQUOTE_STRING')
                                || $parser->consume('STRING')
                                || $parser->consume('IDENT');
 
-                if ($key) {
-                    if ($key->[0] eq 'DQUOTE_STRING') {
-                        $key->[1] =~ s/^\"|\"$//g;
-                        $key->[0] = 'STRING';
-                    } elsif ($key->[0] eq 'SQUOTE_STRING') {
-                        $key->[1] =~ s/^\'|\'$//g;
-                        $key->[0] = 'STRING';
+
+                if ($parsedkey) {
+                    my $mapkey;
+
+                    if ($parsedkey->[0] eq 'DQUOTE_STRING') {
+                        $parsedkey->[1] =~ s/^"|"$//g;
+                        $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
+                    } elsif ($parsedkey->[0] eq 'SQUOTE_STRING') {
+                        $parsedkey->[1] =~ s/^'|'$//g;
+                        $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
+                    } elsif ($parsedkey->[0] eq 'STRING') {
+                        $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
+                    } else {
+                        $mapkey = $parsedkey;
                     }
 
                     if (not $parser->consume('COLON')) {
@@ -301,7 +315,7 @@ sub MapConstructor {
 
                     $parser->consume('COMMA');
 
-                    push @map, [$key, $expr];
+                    push @map, [$mapkey, $expr];
                     next;
                 }
 
@@ -372,7 +386,130 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn TYPE? IDENT? IdentifierList? (StatementGroup | Statement)
+# Grammar: Type         ::= "[" (TypeLiteral ,?)+ "]" | TypeLiteral
+#          TypeLiteral  ::= TypeFunction | TYPE
+#          TypeFunction ::= (TYPE_Function | TYPE_Builtin) TypeFunctionParams? TypeFunctionReturn?
+#          TypeFunctionParams ::= "(" (Type ","?)* ")"
+#          TypeFunctionReturn ::= "->" Type
+sub Type {
+    my ($parser) = @_;
+
+    $parser->try('Type');
+
+    {
+        if ($parser->consume('L_BRACKET')) {
+            my $types = [];
+
+            while (1) {
+                my $type = TypeLiteral($parser);
+                return if $parser->errored;
+
+                if (not $type) {
+                    return expected($parser, 'type name inside [] type list');
+                }
+
+                push @$types, $type;
+
+                $parser->consume('COMMA');
+
+                last if $parser->consume('R_BRACKET');
+            }
+
+            return ['TYPELIST', $types];
+        }
+
+        my $type = TypeLiteral($parser);
+        return if $parser->errored;
+        return $type if $type;
+    }
+
+    $parser->backtrack;
+};
+
+sub TypeLiteral {
+    my ($parser) = @_;
+
+    my $type = TypeFunction($parser);
+    return if $parser->errored;
+    return $type if $type;
+
+    my $token = $parser->next_token('peek');
+
+    if ($token->[0] =~ /^TYPE_(.*)/) {
+        my $type = $1;
+        $parser->consume;
+        return ['TYPE', $type];
+    }
+
+    return;
+}
+
+sub TypeFunction {
+    my ($parser) = @_;
+
+    my $token = $parser->next_token('peek');
+    return if not $token;
+
+    my ($type) = $token->[0] =~ /^TYPE_(.*)/;
+
+    if (defined $type and ($type eq 'Function' or  $type eq 'Builtin')) {
+        $parser->consume;
+
+        my $params = TypeFunctionParams($parser) // [];
+        return if $parser->errored;
+
+        my $return = TypeFunctionReturn($parser) // 'ANY';
+        return if $parser->errored;
+
+        return ['TYPEFUNC', $type, $params, $return];
+    }
+
+    return;
+}
+
+sub TypeFunctionParams {
+    my ($parser) = @_;
+
+    if ($parser->consume('L_PAREN')) {
+        my $types = [];
+        while (1) {
+            my $type = TypeLiteral($parser);
+            return if $parser->errored;
+
+            push @$types, $type if $type;
+
+            $parser->consume('COMMA');
+            last if $parser->consume('R_PAREN');
+            return expected($parser, 'type name or ")"');
+        }
+
+        return $types;
+    }
+
+    return;
+}
+
+sub TypeFunctionReturn {
+    my ($parser) = @_;
+
+    my $token = $parser->next_token('peek');
+
+    if ($token->[0] eq 'R_ARROW') {
+        $parser->consume;
+        my $type = TypeLiteral($parser);
+        return if $parser->errored;
+
+        if (not $type) {
+            return expected($parser, 'function return type name');
+        }
+
+        return $type;
+    }
+
+    return;
+}
+
+# Grammar: FunctionDefinition ::= KEYWORD_fn Type? IDENT? IdentifierList? (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -380,23 +517,13 @@ sub FunctionDefinition {
 
     {
         if ($parser->consume('KEYWORD_fn')) {
-            my $token = $parser->next_token('peek');
+            my $return_type = Type($parser);
+            return if $parser->errored;
 
-            my $return_type = 'Any';
-            if ($token->[0] =~ /^TYPE_(.*)/) {
-                $return_type = $1;
-                $parser->consume;
-            }
+            $return_type = ['TYPE', 'Any'] if not defined $return_type;
 
-            $token = $parser->consume('IDENT');
-
-            my $name;
-
-            if ($token) {
-                $name = $token->[1];
-            } else {
-                $name = "#anonymous";
-            }
+            my $token = $parser->consume('IDENT');
+            my $name  = $token ? $token->[1] : '#anonymous';
 
             my $identlist = IdentifierList($parser);
             return if $parser->errored;
@@ -435,9 +562,7 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList      ::= L_PAREN (TypeAndOrIdentifier Initializer? COMMA?)* R_PAREN
-#          TypeAndOrIdentifier ::= Type Identifier | Identifier
-#          Type ::= Any | Null | Boolean | Number | String | Array | Map | Function | Builtin
+# Grammar: IdentifierList ::= L_PAREN (Type? Identifier Initializer? COMMA?)* R_PAREN
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -450,19 +575,22 @@ sub IdentifierList {
         while (1) {
             my $token = $parser->next_token('peek');
 
-            my $type = 'Any';
-            if ($token->[0] =~ /^TYPE_(.*)/) {
-                $type = $1;
-                $parser->consume;
-            }
+            my $type = Type($parser);
+            return if $parser->errored;
 
             if ($token = $parser->consume('IDENT')) {
                 my $name = $token->[1];
                 my $initializer = Initializer($parser);
+                $type = ['TYPE', 'Any'] if not $type;
                 push @{$identlist}, [$type, $name, $initializer];
                 $parser->consume('COMMA');
                 next;
             }
+
+            if ($type) {
+                return expected($parser, 'parameter identifier after parameter type');
+            }
+
             last if $parser->consume('R_PAREN');
             goto IDENTLIST_FAIL;
         }
@@ -843,23 +971,31 @@ sub Prefix {
     return $array if $array;
 
     if ($token = $parser->consume('KEYWORD_null')) {
-        return ['NULL', undef];
+        return ['LITERAL', ['TYPE', 'Null'], undef];
     }
 
     if ($token = $parser->consume('KEYWORD_true')) {
-        return ['BOOL', 1];
+        return ['LITERAL', ['TYPE', 'Boolean'], 1];
     }
 
     if ($token = $parser->consume('KEYWORD_false')) {
-        return ['BOOL', 0];
+        return ['LITERAL', ['TYPE', 'Boolean'], 0];
     }
 
-    if ($token = $parser->consume('NUM')) {
-        return ['NUM', $token->[1] + 0];
+    if ($token = $parser->consume('INT')) {
+        if ($token->[1] =~ /^0/) {
+            $token->[1] = oct $token->[1];
+        }
+
+        return ['LITERAL', ['TYPE', 'Integer'], $token->[1] + 0];
+    }
+
+    if ($token = $parser->consume('FLT')) {
+        return ['LITERAL', ['TYPE', 'Real'], $token->[1] + 0];
     }
 
     if ($token = $parser->consume('HEX')) {
-        return ['NUM', hex $token->[1]];
+        return ['LITERAL', ['TYPE', 'Number'], hex $token->[1]];
     }
 
     # special case types as identifiers here
@@ -892,12 +1028,12 @@ sub Prefix {
 
     if ($token = $parser->consume('SQUOTE_STRING')) {
         $token->[1] =~ s/^\'|\'$//g;
-        return ['STRING', expand_escapes($token->[1])];
+        return ['LITERAL', ['TYPE', 'String'], expand_escapes($token->[1])];
     }
 
     if ($token = $parser->consume('DQUOTE_STRING')) {
         $token->[1] =~ s/^\"|\"$//g;
-        return ['STRING', expand_escapes($token->[1])];
+        return ['LITERAL', ['TYPE', 'String'], expand_escapes($token->[1])];
     }
 
     if ($parser->consume('MINUS_MINUS')) {
@@ -1028,7 +1164,7 @@ sub Postfix {
             return expected($parser, 'closing ] bracket');
         }
 
-        return ['ARRAY_INDEX', $left, $stmt];
+        return ['ACCESS', $left, $stmt];
     }
 
     # no postfix

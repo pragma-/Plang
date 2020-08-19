@@ -21,16 +21,28 @@ This README describes what is implemented so far.
 * [JSON compatibility/serialization](#json-compatibilityserialization)
 * [The Plang Language (so far)](#the-plang-language-so-far)
   * [Type-checking](#type-checking)
-    * [Types](#types)
-    * [Gradual typing](#gradual-typing)
-    * [Type inference](#type-inference)
+    * [Optional type annotations](#optional-type-annotations)
+    * [Type narrowing during inference](#type-narrowing-during-inference)
     * [Type conversion](#type-conversion)
+    * [Type lists](#type-lists)
+    * [Types](#types)
+      * [Any](#any)
+      * [Null](#null)
+      * [Boolean](#boolean)
+      * [Number](#number)
+      * [Integer](#integer)
+      * [Real](#real)
+      * [String](#string)
+      * [Array](#array)
+      * [Map](#map)
+      * [Function](#function)
+      * [Builtin](#builtin)
   * [Scoping](#scoping)
   * [Identifiers](#identifiers)
     * [Keywords](#keywords)
   * [Variables](#variables)
   * [Functions](#functions)
-    * [Optional type annotations](#optional-type-annotations)
+    * [Optional type annotations](#optional-type-annotations-1)
     * [Default arguments](#default-arguments)
     * [Named arguments](#named-arguments)
     * [Anonymous functions](#anonymous-functions)
@@ -53,25 +65,23 @@ This README describes what is implemented so far.
     * [Regular expressions](#regular-expressions)
   * [Array operations](#array-operations)
     * [Creating and accessing arrays](#creating-and-accessing-arrays)
-    * [map](#map-2)
+    * [map](#map-1)
     * [filter](#filter)
   * [Map operations](#map-operations)
     * [Creating and accessing maps](#creating-and-accessing-maps)
     * [exists](#exists)
     * [delete](#delete)
   * [Built-in functions](#built-in-functions)
-    * [print](#print)
-    * [type](#type)
-    * [whatis](#whatis)
-    * [length](#length)
-    * [map](#map-3)
-    * [filter](#filter-1)
-    * [Null](#null-2)
-    * [Boolean](#boolean-2)
-    * [Number](#number-2)
-    * [String](#string-2)
-    * [Array](#array-2)
-    * [Map](#map-4)
+    * [Input/Output](#inputoutput)
+      * [print](#print)
+    * [Introspection](#introspection)
+      * [type](#type)
+      * [whatis](#whatis)
+    * [Data and structures](#data-and-structures)
+      * [length](#length)
+      * [map](#map-2)
+      * [filter](#filter-1)
+    * [Type conversion](#type-conversion-1)
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
@@ -124,8 +134,8 @@ An [Array constructor](#array) is something like `["red",2,3.1459,null]`.
 
 A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
 
-It's no coincidence that this syntax is compatible with JSON. This allows easy and
-convenient serialization of Plang data structures for data-exchange and interoperability.
+This syntax is compatible with JSON. This allows easy and convenient serialization of
+Plang data structures for data-exchange and interoperability.
 
 The String() [type conversion function](#type-conversion) can be used to convert or serialize Arrays
 and Maps to Strings for external storage or transmission.
@@ -137,92 +147,16 @@ See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/jso
 
 ## The Plang Language (so far)
 ### Type-checking
-#### Types
-The currently implemented types are Null, Boolean, Number, String, Array, Map, Function and Builtin.
+Plang is statically typed with optional nominal type annotations.
 
-##### Null
-     Null ::= "null"
+#### Optional type annotations
+Plang's type system allows type annotations to be omitted. When type annotations are omitted,
+the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
+value provided. See [Type inference](#type-inference) for more information.
 
-The `Null` type's value is always `null`. It is used to signify that there is no meaningful value.
-
-##### Boolean
-    Boolean ::= "true" | "false"
-
-A `Boolean` is either `true` or `false`. It is used for conditional expressions and relational operations.
-
-##### Number
-    Number       ::= HexNumber | DoubleNumber
-    HexNumber    ::= "0" ("x" | "X") (Digit | "a" - "f" | "A" - "F")+
-    DoubleNumber ::= Digit+
-                      (
-                        "." Digit* ("e" | "E") ("+" | "-")? Digit+
-                       | "." Digit+
-                       | ("e" | "E") ("+" | "-")? Digit+
-                      )?
-
-A `Number` holds a double-precision floating-point value.
-
-`Number` literals can be represented as:
-
-* hexadecimal: `0x4a`
-* integer: `42`
-* floating-point: `3.1459`
-
-The floating-point literals may optionally include an exponent: `6.02e23`
-
-##### String
-    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
-    StringContents ::= TODO
-
-A `String` is a sequence of characters enclosed in double or single quotes. There is
-no significance between the different quotes.
-
-Strings may contain `\`-escaped characters, which will be expanded as expected. For example,
-some such escape sequences and their expansion are:
-
-Escape | Expansion
--- | --
-`\n` | newline
-`\r` | carriage return
-`\t` | horizontal tab
-`\"` | literal `"`
-`\'` | literal `'`
-
-##### Array
-    ArrayConstructor ::= "[" (Expression ","?)* "]"
-
-An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotations to constrain Array elements to a single type.*
-
-For more details see:
-
-* [Array operations](#array-operations)
-* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
-
-##### Map
-    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
-
-A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
-values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
-
-For more details see:
-
-* [Map operations](#map-operations)
-* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
-
-##### Function
-The `Function` type identifies a Plang function. See [functions](#functions) for more information.
-
-##### Builtin
-The `Builtin` type identifies an internal built-in function. See [built-in functions](#built-in-functions) for more information.
-
-#### Gradual typing
-Plang's type system allows a mixture of dynamic (run-time) and static (compile-time)
-type checking. You can choose which parts of your program are dynamically or statically
-type checked by omitting or adding type annotations. This is called gradual typing.
-
-Here is a brief demonstration of the concept. Let's consider a simple `add` function. With
-no explicit type annotations, the function's return type and the types of its parameters will
-default to the `Any` type:
+Here is a brief demonstration of function definitions with optional type annotations. Let's consider
+a simple `add` function. With no explicit type annotations, the function's return type and the types
+of its parameters will default to the `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
@@ -275,14 +209,14 @@ as the first argument:
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
-Because the `filter` function is statically typed to return a `Boolean`, Plang can perform
-compile-time type checking. For example, if we pass it a function inferred to return a `Number`:
+Because the `filter` function is explicitly typed to return a `Boolean`, Plang can perform
+compile-time type checking. For example, if we pass it a function inferred to return an `Integer`:
 
     > filter(fn(a) 4, [1, 2, 3, 4, 5])
      Error: in function call for `filter`, expected Function (Any) -> Boolean
-       for parameter `func` but got Function (Any) -> Number
+       for parameter `func` but got Function (Any) -> Integer
 
-Let's return to the `add` function. To enable static type checking of the return value, you
+Let's return to the `add` function. To specify the type of the return value, you
 can place a type annotation before the function identifier:
 
     > fn Number add(Number a, Number b) a + b; print(type(add))
@@ -294,14 +228,20 @@ is not a `Number`:
     > fn Number add(Number a, Number b) "42"; add(3, 4)
      Error: cannot return String from function declared to return Number
 
-#### Type inference
-The types of variables are inferred from the type of their value. All variables are
-simply declared with `var` and no type annotation.
+#### Type narrowing during inference
+Variables declared as `Any` will be narrowed to the type of the value being assigned.
 
-Function signatures may be defined with or without type annotations for any parameter
-or the return value. If type annotations are omitted for any part then that part will
-be declared as if it had type `Any`, which tells Plang to infer its type from
-its value.
+For example, a variable of type `Any` initialized to `true` will have its type narrowed
+to `Boolean`:
+
+    > var a = true; type(a)
+     "Boolean"
+
+It will then be a type error to assign a value of any other type to it. This is to enforce
+the consistency of values assigned to the variable during its lifetime.
+
+    > var a = true; a = "hello"
+     Error: cannot assign to `a` a value of type String (expected Boolean)
 
 #### Type conversion
 For stricter type-safety, Plang does not allow implicit conversion between types.
@@ -320,11 +260,45 @@ Right:
     > var a = "45"; Number(a) + 1
      46
 
-The following type conversion functions may be used to convert to and from the types
-listed in their respective tables. If a type is not listed in a table, it is an error
-to perform the conversion.
+#### Type lists
+Suppose you want to say that a variable, function parameter or function return will
+be only of types X, Y and Z? You can do this with a type list. To make a type list,
+enclose one or more types in square brackets.
 
-##### Null()
+For example, the signature of the `length()` built-in function is:
+
+    Builtin ([Array, Map, String]) -> Integer
+
+This tells the compiler (and us) that the function is a `Builtin` that takes either
+`Array`, `Map` or `String` and returns an `Integer`.
+
+#### Types
+The currently implemented types and their subtypes are:
+
+Type | Subtypes
+--- | ---
+[Any](#Any) | All types
+[Null](#Null) | -
+[Boolean](#Boolean) | -
+[Number](#Number) | [Integer](#Integer), [Real](#Real)
+[Integer](#Integer) | -
+[Real](#Real) | -
+[String](#String) | -
+[Array](#Array) | -
+[Map](#Map) | -
+[Function](#Function) | [Builtin](#Builtin)
+[Builtin](#Builtin) | -
+
+##### Any
+The `Any` type tells Plang to infer the actual type from the type of the provided value.
+
+##### Null
+     Null ::= "null"
+
+The `Null` type's value is always `null`. It is used to signify that there is no meaningful value.
+
+The `Null()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting Null Value
 --- | --- | ---
 Null | `null` | `null`
@@ -334,7 +308,13 @@ String | any value | `null`
 Array | any value | `null`
 Map | any value | `null`
 
-##### Boolean()
+##### Boolean
+    Boolean ::= "true" | "false"
+
+A value of type `Boolean` is either `true` or `false`. It is used for conditional expressions and relational operations.
+
+The `Boolean()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting Boolean Value
 --- | --- | ---
 Null | `null` | `false`
@@ -344,7 +324,14 @@ Number | not `0` | `true`
 String | `""` | `false`
 String | not `""` | `true`
 
-##### Number()
+##### Number
+    Number ::= HexLiteral | OctalLiteral | IntegerLiteral | RealLiteral
+
+The `Number` type is the supertype of `Integer` and `Real`. Any value typed as `Number`
+can hold a value of `Integer` or `Real`.
+
+The `Number()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting Number Value
 --- | --- | ---
 Null | `null` | `0`
@@ -354,7 +341,78 @@ Number | any value | that value
 String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
 
-##### String()
+##### Integer
+    HexLiteral     ::= "0" ("x" | "X") (Digit | "a" - "f" | "A" - "F")+
+    OctalLiteral   ::= "0" ("0" - "9")+
+    IntegerLiteral ::= ("0" - "9")+
+
+The `Integer` type denotes an integral value. `Integer` is a subtype of `Number`.
+
+`Integer` literals can be represented as:
+
+* hexadecimal: `0x4a`
+* octal: `012`
+* integral: `42`
+
+The `Integer()` type conversion function can be used to convert the following:
+
+From Type | With Value | Resulting Number Value
+--- | --- | ---
+Null | `null` | `0`
+Boolean | `true` | `1`
+Boolean | `false` | `0`
+Number | any value | that value
+String | `""` | `0`
+String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+
+##### Real
+    RealLiteral ::= Digit+
+                      (
+                        "." Digit* ("e" | "E") ("+" | "-")? Digit+
+                       | "." Digit+
+                       | ("e" | "E") ("+" | "-")? Digit+
+                      )?
+
+The `Real` type denotes a floating-point value. `Real` is a subtype of `Number`.
+
+`Real` literals can be represented as:
+
+* floating-point: `3.1459`
+* exponential: `6.02e23`
+
+The `Real()` type conversion function can be used to convert the following:
+
+From Type | With Value | Resulting Number Value
+--- | --- | ---
+Null | `null` | `0`
+Boolean | `true` | `1`
+Boolean | `false` | `0`
+Number | any value | that value
+String | `""` | `0`
+String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+
+##### String
+    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
+    StringContents ::= TODO
+
+A `String` is a sequence of characters enclosed in double or single quotes. There is
+no significance between the different quotes.
+
+Strings may contain `\`-escaped characters, which will be expanded as expected.
+
+Some such escape sequences and their expansion are:
+
+Escape | Expansion
+-- | --
+`\n` | newline
+`\r` | carriage return
+`\t` | horizontal tab
+`\"` | literal `"`
+`\'` | literal `'`
+ etc | ...
+
+The `String()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting String Value
 --- | --- | ---
 Null | null | `""`
@@ -365,17 +423,46 @@ String | any value | that value
 Array | any value | A String containing a constructor of that Array
 Map | any value | A String containing a constructor of that Map
 
-##### Array()
+##### Array
+    ArrayConstructor ::= "[" (Expression ","?)* "]"
+
+An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotations to constrain Array elements to a single type.*
+
+For more details see:
+
+* [Array operations](#array-operations)
+* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
+
+The `Array()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting Array Value
 --- | --- | ---
 String | A String containing an [Array constructor](#array) | the constructed Array
 Array | any value | that value
 
-##### Map()
+##### Map
+    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
+
+A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
+values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
+
+For more details see:
+
+* [Map operations](#map-operations)
+* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
+
+The `Map()` type conversion function can be used to convert the following:
+
 From Type | With Value | Resulting Map Value
 --- | --- | ---
 String | A String containing a [Map constructor](#map) | the constructed Map
 Map | any value | that value
+
+##### Function
+The `Function` type identifies a normal function defined with the `fn` keyword. See [functions](#functions) for more information.
+
+##### Builtin
+The `Builtin` type identifies an internal built-in function. See [built-in functions](#built-in-functions) for more information.
 
 ### Scoping
 Variables and functions are lexically scoped. Statement groups introduce a new lexical scope.
@@ -464,7 +551,7 @@ Function definitions may optionally include type annotations to explicitly restr
 what types the function works with. Without a type annotation the `Any` type is used,
 which tells Plang to infer the actual type from the value being supplied or returned.
 
-See [gradual typing](#gradual-typing) for more information and examples.
+See [Optional type annotations](#optional-type-annotations) for more information and examples.
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
@@ -766,7 +853,8 @@ the empty map.
 These are the built-in functions. You can add additional built-in functions
 through Plang's embedding API.
 
-#### print
+#### Input/Output
+##### print
 The `print` function sends text to the standard output stream.
 
 Its [`whatis`](#whatis) is: `Builtin (Any expr, String end = "\n") -> Null`
@@ -788,7 +876,8 @@ Optionally, you can use [named arguments](#named-arguments) for clarity:
     > print("hello!", end=" "); print("good", end=""); print("-bye!");
      hello! good-bye!
 
-#### type
+#### Introspection
+##### type
 The `type` function returns the type of an expression, as a string. For functions,
 it returns strictly the type signature. If you're interested in function parameter
 identifiers and default arguments, see the [`whatis`](#whatis) builtin function.
@@ -807,7 +896,7 @@ Its [`whatis`](#whatis) is: `Builtin (Any expr) -> String`
     > type(filter)
      "Builtin (Function (Any) -> Boolean, Array) -> Array"
 
-#### whatis
+##### whatis
 The `whatis` function is identical to the [`type`](#type) function, but with the
 addition of function parameter identifiers and function default arguments.
 
@@ -820,7 +909,8 @@ addition of function parameter identifiers and function default arguments.
     > whatis(filter)
      "Builtin (Function (Any) -> Boolean func, Array list) -> Array"
 
-#### length
+#### Data and structures
+##### length
 The `length` function returns the count of elements within an expression of type
 `String`, `Array` or `Map`.
 
@@ -840,7 +930,7 @@ Its [`whatis`](#whatis) is: `Builtin (Any expr) -> Number`
     > length({"a": 1, "b": 2, "c": 3})
      3
 
-#### map
+##### map
 The `map` function applies a function to each element of an array, updating that
 element in-place with the result of the applied function. The parameter of the
 applicative function is the current element it is being applied upon.
@@ -854,7 +944,7 @@ In other words, it takes two parameters and returns an `Array`. The first parame
     > map(fn(x) x*10, [1,2,3,4,5])
      [10,20,30,40,50]
 
-#### filter
+##### filter
 The `filter` function applies a function over an array's elements and constructs
 a new array whose elements meet the criteria of the applied function.
 
@@ -870,32 +960,5 @@ In other words, it takes two parameters and returns an `Array`. The first parame
     > filter(fn(x) x['type'] == 'dog', [{'type': 'dog', 'name': 'Woofers'}, {'type': 'cat', 'name': 'Whiskers'}])
      [{'type': 'dog', 'name': 'Woofers'}]
 
-#### Null
-The `Null` function attempts to convert a value to type `Null`.
-
-See [Null](#null-1) for more information.
-
-#### Boolean
-The `Boolean` function attempts to convert a value to type `Boolean`.
-
-See [Boolean](#boolean-1) for more information.
-
-#### Number
-The `Number` function attempts to convert a value to type `Number`.
-
-See [Number](#number-1) for more information.
-
-#### String
-The `String` function attempts to convert a value to type `String`.
-
-See [String](#string-1) for more information.
-
-#### Array
-The `Array` function attempts to convert a value to type `Array`.
-
-See [Array](#array-1) for more information.
-
-#### Map
-The `Map` function attempts to convert a value to type `Map`.
-
-See [Map](#map-1) for more information.
+#### Type conversion
+See [Types](#types).

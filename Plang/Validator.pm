@@ -13,106 +13,6 @@ use parent 'Plang::AstInterpreter';
 
 use Data::Dumper;
 
-sub initialize {
-    my ($self, %conf) = @_;
-
-    $self->SUPER::initialize(%conf);
-
-    $self->{eval_unary_op_ANY} = {
-        'NOT' => sub { ['BOOL', 0 ]},
-        'NEG' => sub { ['NUM',  0 ]},
-        'POS' => sub { ['NUM',  0 ]},
-    };
-
-    $self->{eval_binary_op_ANY} = {
-        'POW'    => sub { ['NUM',    0  ]},
-        'REM'    => sub { ['NUM',    0  ]},
-        'MUL'    => sub { ['NUM',    0  ]},
-        'DIV'    => sub { ['NUM',    0  ]},
-        'ADD'    => sub { ['NUM',    0  ]},
-        'SUB'    => sub { ['NUM',    0  ]},
-        'GTE'    => sub { ['BOOL',   0  ]},
-        'LTE'    => sub { ['BOOL',   0  ]},
-        'GT'     => sub { ['BOOL',   0  ]},
-        'LT'     => sub { ['BOOL',   0  ]},
-        'EQ'     => sub { ['BOOL',   0  ]},
-        'NEQ'    => sub { ['BOOL',   0  ]},
-        'STRCAT' => sub { ['STRING', "" ]},
-        'STRIDX' => sub { ['NUM',    0  ]},
-    };
-
-    $self->{internal_types} = {
-        'Any'     => 'ANY',
-        'Null'    => 'NULL',
-        'Boolean' => 'BOOL',
-        'Number'  => 'NUM',
-        'String'  => 'STRING',
-        'Map'     => 'MAP',
-        'Array'   => 'ARRAY',
-    };
-}
-
-sub parse_pretty_type {
-    my ($self, $pretty_type) = @_;
-
-    if (exists $self->{internal_types}->{$pretty_type}) {
-        return [$self->{internal_types}->{$pretty_type}];
-    }
-
-    if ($pretty_type =~ /^(?:Builtin|Function)\s/) {
-        my ($type, $rest) = $self->parse_pretty_type_function($pretty_type);
-        return [$type];
-    }
-
-    die "unknown type `$pretty_type`";
-}
-
-sub parse_pretty_type_function {
-    my ($self, $pretty_type) = @_;
-    my $result = [];
-
-    $pretty_type =~ s/^(Builtin|Function)\s*//;
-    push @$result, $1;
-
-    # parameter types
-    if ($pretty_type =~ s/^\(//) {
-      NEXT_PARAM:
-        $pretty_type =~ s/(\w+)//;
-        my $type = $1;
-        my $rest;
-
-        if (exists $self->{internal_types}->{$type}) {
-            push @$result, $self->{internal_types}->{$type};
-        }
-
-        elsif ($type eq 'Function' or $type eq 'Builtin') {
-            ($type, $rest) = $self->parse_pretty_type_function($type . $pretty_type);
-            push @$result, $type;
-            $pretty_type = $rest;
-        }
-
-        if ($pretty_type =~ s/^,\s*//) {
-            goto NEXT_PARAM;
-        }
-
-        $pretty_type =~ s/^\)\s*//;
-    }
-
-    # return type
-    $pretty_type =~ s/^->\s*(\w+)//;
-    my $type = $1;
-    my $rest;
-
-    if (exists $self->{internal_types}->{$type}) {
-        push @$result, $self->{internal_types}->{$type};
-        return ($result, $pretty_type);
-    }
-
-    ($type, $rest) = $self->parse_pretty_type_function($type . $pretty_type);
-    push @$result, $type;
-    return ($result, $rest);
-}
-
 sub unary_op {
     my ($self, $context, $data, $op, $debug_msg) = @_;
 
@@ -124,20 +24,19 @@ sub unary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
         }
 
-        if ($self->is_arithmetic_type($value)) {
-            if (exists $self->{eval_unary_op_NUM}->{$op}) {
-                return $self->{eval_unary_op_NUM}->{$op}->($value->[1]);
+        if ($self->{types}->is_arithmetic($value->[0])) {
+            if (exists $self->{eval_unary_op_Number}->{$op}) {
+                my $result = $self->{eval_unary_op_Number}->{$op}->($value->[1]);
+
+                if ($self->{types}->is_subtype($value->[0], $result->[0])) {
+                    $result->[0] = $value->[0];
+                }
+
+                return $result;
             }
         }
 
-        # infer type
-        if ($value->[0] eq 'Any') {
-            if (exists $self->{eval_unary_op_ANY}->{$op}) {
-                return $self->{eval_unary_op_ANY}->{$op}->($value->[1]);
-            }
-        }
-
-        $self->error($context, "cannot apply unary operator $op to type " . $self->pretty_type($value) . "\n");
+        $self->error($context, "cannot apply unary operator $op to type " . $self->{types}->to_string($value->[0]) . "\n");
     }
 
     return;
@@ -156,28 +55,27 @@ sub binary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
         }
 
-        if ($self->is_arithmetic_type($left_value) and $self->is_arithmetic_type($right_value)) {
-            if (exists $self->{eval_binary_op_NUM}->{$op}) {
-                return $self->{eval_binary_op_NUM}->{$op}->($left_value->[1], $right_value->[1]);
+        if ($self->{types}->is_arithmetic($left_value->[0]) and $self->{types}->is_arithmetic($right_value->[0])) {
+            if (exists $self->{eval_binary_op_Number}->{$op}) {
+                my $result = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
+
+                if ($self->{types}->is_subtype($left_value->[0], $result->[0])) {
+                    $result->[0] = $left_value->[0];
+                }
+
+                return $result;
             }
         }
 
-        if ($left_value->[0] eq 'STRING' or $right_value->[0] eq 'STRING') {
-            if (exists $self->{eval_binary_op_STRING}->{$op}) {
-                $left_value->[1]  = chr $left_value->[1]  if $left_value->[0]  eq 'NUM';
-                $right_value->[1] = chr $right_value->[1] if $right_value->[0] eq 'NUM';
-                return $self->{eval_binary_op_STRING}->{$op}->($left_value->[1], $right_value->[1]);
+        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
+            if (exists $self->{eval_binary_op_String}->{$op}) {
+                $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
+                $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
+                return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
             }
         }
 
-        # infer type
-        if ($left_value->[0] eq 'Any') {
-            if (exists $self->{eval_binary_op_ANY}->{$op}) {
-                return $self->{eval_binary_op_ANY}->{$op}->($left_value->[1], $right_value->[1]);
-            }
-        }
-
-        $self->error($context, "cannot apply binary operator $op (have types " . $self->pretty_type($left_value) . " and " . $self->pretty_type($right_value) . ")");
+        $self->error($context, "cannot apply binary operator $op (have types " . $self->{types}->to_string($left_value->[0]) . " and " . $self->{types}->to_string($right_value->[0]) . ")");
     }
 
     return;
@@ -186,21 +84,25 @@ sub binary_op {
 sub type_check_prefix_postfix_op {
     my ($self, $context, $data, $op) = @_;
 
-    if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ARRAY_INDEX' && $data->[1]->[1]->[0] eq 'IDENT') {
+    if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ACCESS' && $data->[1]->[1]->[0] eq 'IDENT') {
         my $var = $self->statement($context, $data->[1]);
 
-        if ($self->is_arithmetic_type($var)) {
+        if ($self->{types}->is_arithmetic($var->[0])) {
             return $var;
         }
 
-        if ($var->[0] eq 'Any') {
-            return $var;
-        }
-
-        $self->error($context, "cannot apply $op to type " . $self->pretty_type($var));
+        $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($var->[0]));
     }
 
-    $self->error($context, "cannot apply $op to type " . $self->pretty_type($data->[1]));
+    if ($data->[1]->[0] eq 'LITERAL') {
+        $self->error($context, "cannot apply $op to a " . $self->{types}->to_string($data->[1]->[1]) . " literal");
+    }
+
+    if (ref ($data->[1]->[0]) ne 'ARRAY') {
+        $self->error($context, "cannot apply $op to instruction " . $data->[1]->[0]);
+    }
+
+    $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($data->[1]->[0]));
 }
 
 sub prefix_increment {
@@ -226,18 +128,21 @@ sub postfix_decrement {
 sub type_check_op_assign {
     my ($self, $context, $data, $op) = @_;
 
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $data->[1];
+    my $right = $data->[2];
 
-    if ($self->is_arithmetic_type($left) and $self->is_arithmetic_type($right)) {
+    if ($left->[0] eq 'LITERAL') {
+        $self->error($context, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal");
+    }
+
+    $left  = $self->statement($context, $left);
+    $right = $self->statement($context, $right);
+
+    if ($self->{types}->is_arithmetic($left->[0]) and $self->{types}->is_arithmetic($right->[0])) {
         return $left;
     }
 
-    if ($left->[0] eq 'Any' and $self->is_arithmetic_type($right)) {
-        return $left;
-    }
-
-    $self->error($context, "cannot apply operator $op (have types " . $self->pretty_type($left) . " and " . $self->pretty_type($right) . ")");
+    $self->error($context, "cannot apply operator $op (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
 }
 
 sub add_assign {
@@ -263,27 +168,56 @@ sub div_assign {
 sub variable_declaration {
     my ($self, $context, $data) = @_;
 
-    my $initializer = $data->[2];
+    my $type        = $data->[1];
+    my $name        = $data->[2];
+    my $initializer = $data->[3];
     my $right_value = undef;
 
     if ($initializer) {
         $right_value = $self->statement($context, $initializer);
     } else {
-        $right_value = ['NULL', undef];
+        $right_value = [['TYPE', 'Null'], undef];
     }
 
-    if (!$self->{repl} and (my $var = $self->get_variable($context, $data->[1], locals_only => 1))) {
-        if ($var->[0] ne 'BUILTIN') {
+    if (!$self->{repl} and (my $var = $self->get_variable($context, $name, locals_only => 1))) {
+        if ($var->[0] ne 'Builtin') {
             $self->error($context, "cannot redeclare existing local `$data->[1]`");
         }
     }
 
-    if ($self->get_builtin_function($data->[1])) {
+    if ($self->get_builtin_function($name)) {
         $self->error($context, "cannot override builtin function `$data->[1]`");
     }
 
-    $self->set_variable($context, $data->[1], $right_value);
+    if (not $self->{types}->check($type, $right_value->[0])) {
+        $self->error($context, "cannot initialize `$name` with value of type "
+            . $self->{types}->to_string($right_value->[0])
+            . " (expected " . $self->{types}->to_string($type) . ")");
+    }
+
+    if ($self->{types}->check($type, ['TYPE', 'Any'])) {
+        # narrow type to initialized value type
+        $type = $right_value->[0];
+    }
+
+    $self->declare_variable($context, $type, $name, $right_value);
     return $right_value;
+}
+
+sub set_variable {
+    my ($self, $context, $name, $value) = @_;
+
+    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context) . "\n") if $self->{debug};
+
+    my $guard = $context->{guards}->{$name};
+
+    if (defined $guard and not $self->{types}->check($guard, $value->[0])) {
+        $self->error($context, "cannot assign to `$name` a value of type "
+            . $self->{types}->to_string($value->[0])
+            . " (expected " . $self->{types}->to_string($guard) . ")");
+    }
+
+    $context->{locals}->{$name} = $value;
 }
 
 sub map_constructor {
@@ -300,89 +234,89 @@ sub map_constructor {
                 $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
             }
 
-            if ($var->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
                 $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
                 next;
             }
 
-            $self->error($context, "cannot use type `" . $self->pretty_type($var) . "` as Map key");
+            $self->error($context, "cannot use type `" . $self->{types}->to_string($var->[0]) . "` as Map key");
         }
 
-        if ($entry->[0]->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
             $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
             next;
         }
 
-        $self->error($context, "cannot use type `" . $self->pretty_type($entry->[0]) . "` as Map key");
+        $self->error($context, "cannot use type `" . $self->{types}->to_string($entry->[0]->[0]) . "` as Map key");
     }
 
-    return ['MAP', $hashref];
+    return [['TYPE', 'Map'], $hashref];
 }
 
 sub keyword_exists {
     my ($self, $context, $data) = @_;
 
     # check for key in map
-    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+    if ($data->[1]->[0] eq 'ACCESS') {
         my $var = $self->statement($context, $data->[1]->[1]);
 
         # map index
-        if ($var->[0] eq 'MAP') {
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->statement($context, $data->[1]->[2]);
 
-            if ($key->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 if (exists $var->[1]->{$key->[1]}) {
-                    return ['BOOL', 1];
+                    return [['TYPE', 'Boolean'], 1];
                 } else {
-                    return ['BOOL', 0];
+                    return [['TYPE', 'Boolean'], 0];
                 }
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
         }
 
-        $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($var) . ")");
+        $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
     }
 
-    $self->error($context, "exists must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+    $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($data->[1]->[0]) . ")");
 }
 
 sub keyword_delete {
     my ($self, $context, $data) = @_;
 
     # delete one key in map
-    if ($data->[1]->[0] eq 'ARRAY_INDEX') {
+    if ($data->[1]->[0] eq 'ACCESS') {
         my $var = $self->statement($context, $data->[1]->[1]);
 
         # map index
-        if ($var->[0] eq 'MAP') {
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->statement($context, $data->[1]->[2]);
 
-            if ($key->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 my $val = delete $var->[1]->{$key->[1]};
-                return ['NULL', undef] if not defined $val;
+                return [['TYPE', 'Null'], undef] if not defined $val;
                 return $val;
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
         }
 
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
     }
 
     # delete all keys in map
     if ($data->[1]->[0] eq 'IDENT') {
         my $var = $self->get_variable($context, $data->[1]->[1]);
 
-        if ($var->[0] eq 'MAP') {
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             $var->[1] = {};
             return $var;
         }
 
-        $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($var) . ")");
+        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
     }
 
-    $self->error($context, "delete must be used on Maps (got " . $self->pretty_type($data->[1]) . ")");
+    $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($data->[1]->[0]) . ")");
 }
 
 sub function_definition {
@@ -393,13 +327,16 @@ sub function_definition {
     my $parameters = $data->[3];
     my $statements = $data->[4];
 
-    my $func = ['FUNC', [$context, $ret_type, $parameters, $statements]];
+    my $param_types = [];
+    my $func_type   = ['TYPEFUNC', 'Function', $param_types, $ret_type];
+    my $func_data   = [$context, $ret_type, $parameters, $statements];
+    my $func        = [$func_type, $func_data];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
     }
 
-    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0] ne 'BUILTIN') {
+    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0] ne 'Builtin') {
         $self->error($context, "cannot define function `$name` with same name as existing local");
     }
 
@@ -415,6 +352,8 @@ sub function_definition {
     foreach my $param (@$parameters) {
         my ($type, $ident, $default_value) = @$param;
 
+        push @$param_types, $type;
+
         my $value = $self->statement($new_context, $default_value);
 
         if (not defined $value) {
@@ -424,8 +363,8 @@ sub function_definition {
         } else {
             $got_default_value = 1;
 
-            if ($type ne 'Any' and $type ne $self->pretty_type($value)) {
-                $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as $type but default value has type " . $self->pretty_type($value));
+            if (not $self->{types}->check($type, $value->[0])) {
+                $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]));
             }
         }
     }
@@ -433,46 +372,14 @@ sub function_definition {
     return $func;
 }
 
-sub validate_types {
-	my ($self, $type1, $type2) = @_;
-
-	if (ref($type1) eq 'ARRAY' and ref($type2) eq 'ARRAY') {
-		# function/builtin
-		for (my $i = 0; $i < @$type1; $i++) {
-			if ($type1->[$i] ne 'ANY' and $type1->[$i] ne $type2->[$i]) {
-				return 0;
-			}
-		}
-	}
-
-	elsif (ref($type1 eq 'ARRAY')) {
-		return 0;
-	}
-
-	elsif ($type1 ne 'ANY' and $type1 ne $type2) {
-		return 0;
-	}
-
-	return 1;
-}
-
 sub validate_function_argument_type {
     my ($self, $context, $name, $parameter, $arg_type, %opts) = @_;
 
-    my $type1 = $self->parse_pretty_type($parameter->[0]);
-    my $type2 = $self->parse_pretty_type($arg_type);
+    my $type1 = $parameter->[0];
+    my $type2 = $arg_type;
 
-    my $valid = 1;
-
-    for (my $i = 0; $i < @$type1; $i++) {
-        if (not $self->validate_types($type1->[$i], $type2->[$i])) {
-            $valid = 0;
-            last;
-        }
-    }
-
-    if (not $valid) {
-        $self->error($context, "in function call for `$name`, expected $parameter->[0] for parameter `$parameter->[1]` but got " . $arg_type);
+    if (not $self->{types}->check($type1, $type2)) {
+        $self->error($context, "in function call for `$name`, expected " . $self->{types}->to_string($parameter->[0]) . " for parameter `$parameter->[1]` but got " . $self->{types}->to_string($arg_type));
     }
 }
 
@@ -516,7 +423,7 @@ sub process_function_call_arguments {
                     $self->error($context, "function `$name` has no parameter named `$ident`");
                 }
             } else {
-                $self->error($context, "named argument must be an identifier (got " . $self->pretty_type($named_arg) . ")");
+                $self->error($context, "named argument must be an identifier (got " . $self->{types}->to_string($named_arg->[0]) . ")");
             }
         } else {
             # normal argument
@@ -571,7 +478,7 @@ sub type_check_builtin_function {
 
     # type-check arguments
     for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($context, $name, $parameters->[$i], $self->pretty_type($evaled_args->[$i]));
+        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
     }
 
     return $result;
@@ -589,8 +496,8 @@ sub function_call {
         $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $name = $target->[1];
         $func = $self->get_variable($context, $target->[1]);
-        $func = undef if defined $func and $func->[0] eq 'BUILTIN';
-    } elsif ($target->[0] eq 'FUNC') {
+        $func = undef if defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin';
+    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $func = $target;
         $name = "anonymous-1";
     } else {
@@ -599,34 +506,34 @@ sub function_call {
         $name = "anonymous-2";
     }
 
-    my $return;
-    my $closure;
-    my $ret_type;
-    my $parameters;
-    my $statements;
+    my $closure;       # function's closure context
+    my $return_type;   # function signature's return type
+    my $parameters;    # function signature's parameters
+    my $statements;    # function's statements
+    my $return_value;  # value returned from function
 
     if (defined $func) {
-        if ($func->[0] ne 'FUNC') {
-            $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->pretty_type($func) . ")");
+        if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
+            $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->{types}->to_string($func->[0]) . ")");
         }
 
-        $closure    = $func->[1]->[0];
-        $ret_type   = $func->[1]->[1];
-        $parameters = $func->[1]->[2];
-        $statements = $func->[1]->[3];
+        $closure     = $func->[1]->[0];
+        $return_type = $func->[1]->[1];
+        $parameters  = $func->[1]->[2];
+        $statements  = $func->[1]->[3];
     } else {
         if ($target->[0] eq 'IDENT') {
             if (defined ($func = $self->get_builtin_function($target->[1]))) {
                 # builtin function
-                $ret_type = $func->{ret};
+                $return_type = $func->{ret};
 
                 if ($target->[1] eq 'print') {
                     # skip builtin print() call
-                    $return = ['NULL', undef];
+                    $return_value = [['TYPE', 'Null'], undef];
                 } elsif ($target->[1] eq 'filter' or $target->[1] eq 'map') {
-                    $return = $self->type_check_builtin_function($context, $data, $target->[1]);
+                    $return_value = $self->type_check_builtin_function($context, $data, $target->[1]);
                 } else {
-                    $return = $self->call_builtin_function($context, $data, $target->[1]);
+                    $return_value = $self->call_builtin_function($context, $data, $target->[1]);
                 }
                 goto CHECK_RET_TYPE;
             } else {
@@ -646,7 +553,7 @@ sub function_call {
 
     foreach my $stmt (@$statements) {
         if ($stmt->[0] eq 'RET') {
-            $return = $self->statement($new_context, $stmt->[1]);
+            $return_value = $self->statement($new_context, $stmt->[1]);
             goto CHECK_RET_TYPE;
         }
 
@@ -655,27 +562,31 @@ sub function_call {
             next;
         }
 
-        $return = $self->statement($new_context, $stmt);
+        $return_value = $self->statement($new_context, $stmt);
     }
 
   CHECK_RET_TYPE:
-    if ($ret_type ne 'Any' and $ret_type ne $self->pretty_type($return)) {
-        $self->error($context, "cannot return " . $self->pretty_type($return) . " from function declared to return " . $ret_type);
+    if ($self->{types}->is_subtype($return_type, $return_value->[0])) {
+        $return_value->[0] = $return_type;
     }
 
-    if ($ret_type eq 'Any') {
+    if (not $self->{types}->check($return_type, $return_value->[0])) {
+        $self->error($context, "cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type));
+    }
+
+    if ($self->{types}->check($return_type, ['TYPE', 'Any'])) {
         # set inferred return type
-        $func->[1]->[1] = $self->pretty_type($return);
+        $func->[1]->[1] = $return_value->[0];
     }
 
     # type-check arguments after inference
     if (defined $parameters) {
         for (my $i = 0; $i < @$parameters; $i++) {
-            $self->validate_function_argument_type($context, $name, $parameters->[$i], $self->pretty_type($evaled_args->[$i]));
+            $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
         }
     }
 
-    return $return;
+    return $return_value;
 }
 
 sub keyword_next {
@@ -715,7 +626,7 @@ sub keyword_if {
     # validate else
     $result = $self->statement($context, $data->[3]);
 
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 sub keyword_while {
@@ -727,7 +638,7 @@ sub keyword_while {
     # validate statements
     $result = $self->statement($context, $data->[2]);
 
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 # lvalue assignment
@@ -745,82 +656,82 @@ sub assignment {
         return $right_value;
     }
 
-    # lvalue array index
-    if ($left_value->[0] eq 'ARRAY_INDEX') {
+    # lvalue array/map access
+    if ($left_value->[0] eq 'ACCESS') {
         my $var = $self->statement($context, $left_value->[1]);
 
-        if ($var->[0] eq 'MAP') {
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->statement($context, $left_value->[2]);
 
-            if ($key->[0] eq 'STRING') {
+            if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 my $val = $self->statement($context, $right_value);
                 $var->[1]->{$key->[1]} = $val;
                 return $val;
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
         }
 
-        if ($var->[0] eq 'ARRAY') {
+        if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
             my $index = $self->statement($context, $left_value->[2]);
 
-            if ($index->[0] eq 'NUM') {
+            if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
                 my $val = $self->statement($context, $right_value);
                 $var->[1]->[$index->[1]] = $val;
                 return $val;
             }
 
-            $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+            $self->error($context, "Array index must be of type Number (got " . $self->{types}->to_string($index->[0]) . ")");
         }
 
-        if ($var->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
             my $value = $self->statement($context, $left_value->[2]->[1]);
 
             if ($value->[0] eq 'RANGE') {
                 my $from = $value->[1];
                 my $to   = $value->[2];
 
-                if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                    if ($right_value->[0] eq 'STRING') {
+                if ($self->{types}->check(['TYPE', 'Number'], $from->[0]) and $self->{types}->check(['TYPE', 'Number'], $to->[0])) {
+                    if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
-                        return ['STRING', $var->[1]];
+                        return [['TYPE', 'String'], $var->[1]];
                     }
 
-                    if ($right_value->[0] eq 'NUM') {
+                    if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
                         substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
-                        return ['STRING', $var->[1]];
+                        return [['TYPE', 'String'], $var->[1]];
                     }
 
-                    $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with RANGE in postfix []");
+                    $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with RANGE in postfix []");
                 }
 
-                $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside assignment postfix []");
+                $self->error($context, "invalid types to RANGE (have " . $self->{types}->to_string($from->[0]) . " and " . $self->{types}->to_string($to->[0]) . ") inside assignment postfix []");
             }
 
-            if ($value->[0] eq 'NUM') {
+            if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
                 my $index = $value->[1];
-                if ($right_value->[0] eq 'STRING') {
+                if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
                     substr ($var->[1], $index, 1) = $right_value->[1];
-                    return ['STRING', $var->[1]];
+                    return [['TYPE', 'String'], $var->[1]];
                 }
 
-                if ($right_value->[0] eq 'NUM') {
+                if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
                     substr ($var->[1], $index, 1) = chr $right_value->[1];
-                    return ['STRING', $var->[1]];
+                    return [['TYPE', 'String'], $var->[1]];
                 }
 
-                $self->error($context, "cannot assign from type " . $self->pretty_type($right_value) . " to type " . $self->pretty_type($left_value) . " with postfix []");
+                $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with postfix []");
             }
 
-            $self->error($context, "invalid type " . $self->pretty_type($value) . " inside assignment postfix []");
+            $self->error($context, "invalid type " . $self->{types}->to_string($value->[0]) . " inside assignment postfix []");
         }
 
-        $self->error($context, "cannot assign to postfix [] on type " . $self->pretty_type($var));
+        $self->error($context, "cannot assign to postfix [] on type " . $self->{types}->to_string($var->[0]));
     }
 
     # a statement
     my $eval = $self->statement($context, $data->[1]);
-    $self->error($context, "cannot assign to non-lvalue type " . $self->pretty_type($eval));
+    $self->error($context, "cannot assign to non-lvalue type " . $self->{types}->to_string($eval->[0]));
 }
 
 # rvalue array/map index
@@ -829,63 +740,63 @@ sub array_index_notation {
     my $var = $self->statement($context, $data->[1]);
 
     # infer type
-    if ($var->[0] eq 'Any') {
+    if ($self->{types}->check($var->[0], ['TYPE', 'Any'])) {
         return $var;
     }
 
     # map index
-    if ($var->[0] eq 'MAP') {
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
         my $key = $self->statement($context, $data->[2]);
 
-        if ($key->[0] eq 'STRING') {
+        if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
             my $val = $var->[1]->{$key->[1]};
-            return ['NULL', undef] if not defined $val;
+            return [['TYPE', 'Null'], undef] if not defined $val;
             return $val;
         }
 
-        $self->error($context, "Map key must be of type String (got " . $self->pretty_type($key) . ")");
+        $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
     }
 
     # array index
-    if ($var->[0] eq 'ARRAY') {
+    if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
         my $index = $self->statement($context, $data->[2]);
 
         # number index
-        if ($index->[0] eq 'NUM') {
+        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
-            return ['NULL', undef] if not defined $val;
+            return [['TYPE', 'Null'], undef] if not defined $val;
             return $val;
         }
 
         # TODO support RANGE and x:y splices and negative indexing
 
-        $self->error($context, "Array index must be of type Number (got " . $self->pretty_type($index) . ")");
+        $self->error($context, "Array index must be of type Number (got " . $self->{types}->to_string($index->[0]) . ")");
     }
 
     # string index
-    if ($var->[0] eq 'STRING') {
+    if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
         my $value = $self->statement($context, $data->[2]->[1]);
 
         if ($value->[0] eq 'RANGE') {
             my $from = $value->[1];
             my $to = $value->[2];
 
-            if ($from->[0] eq 'NUM' and $to->[0] eq 'NUM') {
-                return ['STRING', substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+            if ($self->{types}->check(['TYPE', 'Number'], $from->[0]) and $self->{types}->check(['TYPE', 'Number'], $to->[0])) {
+                return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
             }
 
-            $self->error($context, "invalid types to RANGE (have " . $self->pretty_type($from) . " and " . $self->pretty_type($to) . ") inside postfix []");
+            $self->error($context, "invalid types to RANGE (have " . $self->{types}->to_string($from->[0]) . " and " . $self->{types}->to_string($to->[0]) . ") inside postfix []");
         }
 
-        if ($value->[0] eq 'NUM') {
+        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
             my $index = $value->[1];
-            return ['STRING', substr($var->[1], $index, 1) // ""];
+            return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
         }
 
-        $self->error($context, "invalid type " . $self->pretty_type($value) . " inside postfix []");
+        $self->error($context, "invalid type " . $self->{types}->to_string($value->[0]) . " inside postfix []");
     }
 
-    $self->error($context, "cannot use postfix [] on type " . $self->pretty_type($var));
+    $self->error($context, "cannot use postfix [] on type " . $self->{types}->to_string($var->[0]));
 }
 
 sub function_builtin_length {
@@ -894,11 +805,12 @@ sub function_builtin_length {
 
      my $type = $val->[0];
 
-     if ($type ne 'STRING' and $type ne 'ARRAY' and $type ne 'MAP') {
-         $self->error($context, "cannot get length of a " . $self->pretty_type($val));
+     if ($type->[0] eq 'TYPE' and
+         ($type->[1] eq 'String' or $type->[1] eq 'Array' or $type->[1] eq 'Map')) {
+         return [['TYPE', 'Number'], 0];
      }
 
-     return ['NUM', 0];
+     $self->error($context, "cannot get length of a " . $self->{types}->to_string($val->[0]));
 }
 
 sub function_builtin_map {
@@ -906,8 +818,8 @@ sub function_builtin_map {
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, [['Any', undef]]];
-	my $result = $self->function_call($context, $data);
-    return ['ARRAY', $result];
+    my $result = $self->function_call($context, $data);
+    return [['TYPE', 'Array'], $result];
 }
 
 sub function_builtin_filter {
@@ -915,8 +827,8 @@ sub function_builtin_filter {
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, [['Any', undef]]];
-	my $result = $self->function_call($context, $data);
-    return ['ARRAY', $result];
+    my $result = $self->function_call($context, $data);
+    return [['TYPE', 'Array'], $result];
 }
 
 sub handle_statement_result {
@@ -930,18 +842,20 @@ sub validate {
 
     # override builtins for typechecking
     $self->add_builtin_function('length',
-        [['Any', 'expr']],
-        'Number',
+        [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
+        ['TYPE', 'Integer'],
         \&function_builtin_length);
 
     $self->add_builtin_function('map',
-        [['Function (Any) -> Any', 'func', undef], ['Array', 'list', undef]],
-        'Array',
+        [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
+            [['TYPE', 'Array'], 'list', undef]],
+        ['TYPE', 'Array'],
         \&function_builtin_map);
 
     $self->add_builtin_function('filter',
-        [['Function (Any) -> Boolean', 'func', undef], ['Array', 'list', undef]],
-        'Array',
+        [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
+            [['TYPE', 'Array'], 'list', undef]],
+        ['TYPE', 'Array'],
         \&function_builtin_filter);
 
     my $result = $self->run($ast, typecheck => 1);

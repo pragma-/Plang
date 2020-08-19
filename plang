@@ -79,6 +79,7 @@ sub plang_dbg {
     # and exit with the return value.
     return 0 if $dumptokens;
 
+    print "VALIDATOR\n";
     # validate the program
     my $errors = $plang->{validator}->validate($result);
 
@@ -87,6 +88,7 @@ sub plang_dbg {
         exit 1;
     }
 
+    print "INTERPRETER\n";
     # interpret the program
     return $plang->{interpreter}->run($result);
 }

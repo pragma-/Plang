@@ -13,6 +13,7 @@ use strict;
 use Plang::Lexer;
 use Plang::Parser;
 use Plang::Grammar qw/Program/;
+use Plang::Types;
 use Plang::Validator;
 use Plang::AstInterpreter;
 
@@ -69,6 +70,8 @@ sub initialize {
         ['PLUS_PLUS',        qr{\G(   \+\+                )}x],
         ['STAR_STAR',        qr{\G(   \*\*                )}x],
         ['MINUS_MINUS',      qr{\G(   --                  )}x],
+# !used ['L_ARROW',          qr{\G(   <-                  )}x],
+        ['R_ARROW',          qr{\G(   ->                  )}x],
         ['ASSIGN',           qr{\G(   =                   )}x],
         ['PLUS',             qr{\G(   \+                  )}x],
         ['MINUS',            qr{\G(   -                   )}x],
@@ -77,18 +80,16 @@ sub initialize {
         ['BANG',             qr{\G(   !                   )}x],
         ['QUESTION',         qr{\G(   \?                  )}x],
         ['COLON',            qr{\G(   :                   )}x],
-        ['TILDE_TILDE',      qr{\G(   ~~                  )}x],
+# !used ['TILDE_TILDE',      qr{\G(   ~~                  )}x],
         ['TILDE',            qr{\G(   ~                   )}x],
         ['PIPE_PIPE',        qr{\G(   \|\|                )}x],
-        ['PIPE',             qr{\G(   \|                  )}x],
+# !used ['PIPE',             qr{\G(   \|                  )}x],
         ['AMP_AMP',          qr{\G(   &&                  )}x],
-        ['AMP',              qr{\G(   &                   )}x],
+# !used ['AMP',              qr{\G(   &                   )}x],
         ['CARET',            qr{\G(   ^                   )}x],
         ['PERCENT',          qr{\G(   %                   )}x],
         ['POUND',            qr{\G(   \#                  )}x],
         ['COMMA',            qr{\G(   ,                   )}x],
-        ['DOT_DOT',          qr{\G(   \.\.                )}x],
-        ['DOT',              qr{\G(   \.                  )}x],
         ['STAR',             qr{\G(   \*                  )}x],
         ['SLASH',            qr{\G(   /                   )}x],
         ['BSLASH',           qr{\G(   \\                  )}x],
@@ -99,7 +100,10 @@ sub initialize {
         ['L_BRACE',          qr{\G(   \{                  )}x],
         ['R_BRACE',          qr{\G(   \}                  )}x],
         ['HEX',              qr{\G(   0[xX][0-9a-fA-F]+   )}x],
-        ['NUM',              qr{\G(   [0-9]+(?:\.[0-9]*[eE][+-]?[0-9]+|\.[0-9]+|[eE][+-]?[0-9]+)?  )}x],
+        ['FLT',              qr{\G(   [0-9]*(?:\.[0-9]*[eE][+-]?[0-9]+|\.[0-9]+|[eE][+-]?[0-9]+)  )}x],
+        ['INT',              qr{\G(   [0-9]+              )}x],
+        ['DOT_DOT',          qr{\G(   \.\.                )}x],
+        ['DOT',              qr{\G(   \.                  )}x],
         ['NOT',              qr{\G(   not                 )}x],
         ['AND',              qr{\G(   and                 )}x],
         ['OR',               qr{\G(   or                  )}x],
@@ -121,13 +125,13 @@ sub initialize {
         'exists', 'delete',
     );
 
-    $self->{parser}->define_types(
-        'Any', 'Null', 'Boolean', 'Number', 'String', 'Array', 'Map', 'Function', 'Builtin',
-    );
+    $self->{types} = Plang::Types->new;
 
-    $self->{validator}   = Plang::Validator->new(debug => $conf{debug});
+    $self->{parser}->define_types($self->{types}->as_list);
 
-    $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug});
+    $self->{validator}   = Plang::Validator->new(debug => $conf{debug}, types => $self->{types});
+
+    $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug}, types => $self->{types});
 }
 
 # discard token

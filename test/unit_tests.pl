@@ -17,43 +17,43 @@ STDOUT->autoflush(1);
 # the ['STDOUT', ''] field can be omitted if no output is expected
 my @tests = (
     ['print("hello", " ") print("world")  42',
-        ['NUM', 42], ['STDOUT', "hello world\n" ]],
+        [['TYPE', 'Integer'], 42], ['STDOUT', "hello world\n" ]],
     ['1 + 4 * 3 + 2 * 4',
-        ['NUM', 21 ]],
+        [['TYPE', 'Integer'], 21 ]],
     ['fn add(a, b = 10) a + b; add(5)',
-        ['NUM', 15]],
+        [['TYPE', 'Integer'], 15]],
     ['(fn (a, b) a + b)(1, 2)',
-        ['NUM', 3]],
+        [['TYPE', 'Integer'], 3]],
     ['var adder = fn (a, b) a + b; adder(10, 20)',
-        ['NUM', 30]],
+        [['TYPE', 'Integer'], 30]],
     ['(fn 42)()',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['"blue" < "red"',
-        ['BOOL', 1]],
+        [['TYPE', 'Boolean'], 1]],
     ['"hi"',
-        ['STRING', "hi" ]],
+        [['TYPE', 'String'], "hi" ]],
     ['"hello world" ~ "world"',
-        ['NUM', 6 ]],
+        [['TYPE', 'Integer'], 6 ]],
     ['"hello world" ~ "bye"',
-        ['NUM', -1 ]],
+        [['TYPE', 'Integer'], -1 ]],
     ['"hi " . 0x263a',
-        ['STRING', 'hi ☺' ]],
+        [['TYPE', 'String'], 'hi ☺' ]],
     ['fn fib(n) n == 1 ? 1 : n == 2 ? 1 : fib(n-1) + fib(n-2); fib(12)',
-        ['NUM', 144 ]],
+        [['TYPE', 'Integer'], 144 ]],
     ['"hi" && 42',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['"" && 42',
-        ['STRING', '']],
+        [['TYPE', 'String'], '']],
     ['"" || 42',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['1 == 1',
-        ['BOOL', 1 ]],
+        [['TYPE', 'Boolean'], 1 ]],
     ['fn square(x) x * x; var a = 5; $"square of {a} = {square(a)}"',
-        ['STRING', 'square of 5 = 25']],
+        [['TYPE', 'String'], 'square of 5 = 25']],
     ['var a = fn 5 + 5; a()',
-        ['NUM', 10 ]],
+        [['TYPE', 'Integer'], 10 ]],
     ['var a = fn (a, b) a + b; a(10, 20)',
-        ['NUM', 30 ]],
+        [['TYPE', 'Integer'], 30 ]],
     [ <<'CODE'
 # semi-colons and commas are largely optional
 # (but recommended, this test just proves that they
@@ -67,31 +67,33 @@ fn test
 test(2 3)     # prints 5 (yep no comma)
 CODE
         ,
-        ['NUM', 5             ]],
+        [['TYPE', 'Integer'], 5             ]],
     ['type(fn)',
-        ['STRING', 'Function -> Any' ]],
+        [['TYPE', 'String'], 'Function () -> Any' ]],
+    ['fn Boolean f(Number a, String b) true; type(f)',
+        [['TYPE', 'String'], 'Function (Number, String) -> Boolean' ]],
     ['type(1==1)',
-        ['STRING', 'Boolean'  ]],
+        [['TYPE', 'String'], 'Boolean'  ]],
     ['type("hi")',
-        ['STRING', 'String'   ]],
+        [['TYPE', 'String'], 'String'   ]],
     ['type(42)',
-        ['STRING', 'Number'   ]],
+        [['TYPE', 'String'], 'Integer'   ]],
     ['type(null)',
-        ['STRING', 'Null',    ]],
+        [['TYPE', 'String'], 'Null',    ]],
     ['"Hello!"[1..4]',
-        ['STRING', 'ello',    ]],
+        [['TYPE', 'String'], 'ello',    ]],
     ['"Good-bye!"[5..7] = "night"',
-        ['STRING', 'Good-night!' ]],
+        [['TYPE', 'String'], 'Good-night!' ]],
     ['"Hello!"[0] = "Jee"',
-        ['STRING', 'Jeeello!' ]],
+        [['TYPE', 'String'], 'Jeeello!' ]],
     ['"Hello!"[0]',
-        ['STRING', 'H'        ]],
+        [['TYPE', 'String'], 'H'        ]],
     ['var a',
-        ['NULL',    undef      ]],
+        [['TYPE', 'Null'],    undef      ]],
     ['1e2 + 1e3',
-        ['NUM',    1100       ]],
+        [['TYPE', 'Real'],    1100       ]],
     ['1e-4',
-        ['NUM',    0.0001     ]],
+        [['TYPE', 'Real'],    0.0001     ]],
     [ <<'CODE'
 # closure test
 fn counter() {
@@ -107,7 +109,7 @@ var count2 = counter()
 $"{count1()} {count1()} {count1()} {count2()} {count1()} {count2()}";
 CODE
         ,
-        ['STRING', '1 2 3 1 4 2' ]],
+        [['TYPE', 'String'], '1 2 3 1 4 2' ]],
     [ <<'CODE'
 # another closure test
 var x = "global"
@@ -119,43 +121,43 @@ fn outer {
 outer();
 CODE
         ,
-        ['NULL', undef], ['STDOUT', "outer\n" ]],
+        [['TYPE', 'Null'], undef], ['STDOUT', "outer\n" ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)',
-        ['NUM', 7 ]],
+        [['TYPE', 'Integer'], 7 ]],
     ['fn curriedAdd(x) fn add(y) x + y;  curriedAdd(3)(4)(5)',
-        ['ERROR',  "Error: cannot invoke `7` as a function (have type Number)\n" ]],
+        ['ERROR',  "Error: cannot invoke `7` as a function (have type Integer)\n" ]],
     ['var a = fn (x) fn (y) x + y;  a(3)(4)',
-        ['NUM', 7 ]],
+        [['TYPE', 'Integer'], 7 ]],
     ['fn force(f) f(); var lazy = fn 1 + 1; force(lazy)',
-        ['NUM', 2 ]],
+        [['TYPE', 'Integer'], 2 ]],
     ['fn force(f)f(); fn a(x){print("a");x}; var lazy = fn 1 + a(2); print("b"); force(lazy)',
-        ['NUM', 3], ['STDOUT', "b\na\n"]],
+        [['TYPE', 'Integer'], 3], ['STDOUT', "b\na\n"]],
     ['var i = 0; while (i < 5) print(++i)',
-        ['NULL', undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
+        [['TYPE', 'Null'], undef], ['STDOUT', "1\n2\n3\n4\n5\n"]],
     ['var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]',
-        ['NUM', 75]],
+        [['TYPE', 'Integer'], 75]],
     ['var a = {}; a["color"] = "blue"; $"The color is {a[\\"color\\"]}!"',
-        ['STRING', 'The color is blue!']],
+        [['TYPE', 'String'], 'The color is blue!']],
     ['var a = {"x": 42}; ++a["x"]; a["x"] += 5; a["x"] + 1',
-        ['NUM', 49]],
+        [['TYPE', 'Integer'], 49]],
     ['var a = {"x": {"y": 42}}; a["x"]["y"] # nested Maps',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['var a = {}; a["x"] = {"y": 42}; a["x"]["y"] # assign anonymous Map to another Map key',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['var a = ["red", "blue", 3, 4]; a[1]',
-        ['STRING', 'blue']],
+        [['TYPE', 'String'], 'blue']],
     ['var a = [[1,2], [3, 4], [5,6]]; a[2][1] # nested arrays',
-        ['NUM', 6]],
+        [['TYPE', 'Integer'], 6]],
     ['var a = [fn "hi", fn "bye"]; a[1]() # functions as array element',
-        ['STRING', 'bye']],
+        [['TYPE', 'String'], 'bye']],
     ['var a = {"say_hi": fn "hi", "say_bye": fn "bye"};  a["say_bye"]() # functions as map value',
-        ['STRING', 'bye']],
+        [['TYPE', 'String'], 'bye']],
     ['var a = [1, 2, 3, 4]; a[-1] # index backwards',
-        ['NUM', 4]],
+        [['TYPE', 'Integer'], 4]],
     ['var a = ["hi", "bye", {"foo": 42}];  a[2]["foo"] # map as array element',
-        ['NUM', 42]],
+        [['TYPE', 'Integer'], 42]],
     ['var a = {"hi": [1, "bye"]}; a["hi"][1] # array as map element',
-        ['STRING', 'bye']],
+        [['TYPE', 'String'], 'bye']],
 );
 
 use Data::Dumper;
@@ -171,10 +173,10 @@ my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
 # the output for testing, instead of printing it
 $plang->add_builtin_function('print',
     # these are the parameters we want: `expr` and `end`.
-    # `expr` has no default value; `end` has default value [STRING, "\n"]
-    [['Any', 'expr', undef], ['String', 'end', ['STRING', "\n"]]],
+    # `expr` has no default value; `end` has default value [String, "\n"]
+    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [['TYPE', 'String'], "\n"]]],
     # the type of value print() returns
-    'Null',
+    ['TYPE', 'Null'],
     # subref to our function that will override the `print` function
     \&print_override);
 
@@ -186,7 +188,7 @@ sub print_override {
     my ($plang, $context, $name, $arguments) = @_;
     my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
     $output .= "$expr$end"; # append the print output to our $output
-    return ['NULL', undef];
+    return [['TYPE', 'Null'], undef];
 }
 
 my @selected_tests;
@@ -242,14 +244,16 @@ foreach my $test (@selected_tests) {
 
 print "\nPass: ", scalar @pass, "; Fail: ", scalar @fail, "\n";
 
-foreach my $failure (@fail) {
-    print '-' x 70, "\n";
-    print "FAIL (Test #", $failure->[0], ")\n";
-    print "\n$failure->[1]\n";
-    print "       Expected: ", $failure->[2], "\n";
-    print "            Got: ", $failure->[3], "\n";
-    print "Expected Stdout: ", $failure->[4], "\n";
-    print "     Got Stdout: ", $failure->[5], "\n";
+unless ($ENV{QUIET}) {
+    foreach my $failure (@fail) {
+        print '-' x 70, "\n";
+        print "FAIL (Test #", $failure->[0], ")\n";
+        print "\n$failure->[1]\n";
+        print "       Expected: ", $failure->[2], "\n";
+        print "            Got: ", $failure->[3], "\n";
+        print "Expected Stdout: ", $failure->[4], "\n";
+        print "     Got Stdout: ", $failure->[5], "\n";
+    }
 }
 
 exit 1 if @fail;
