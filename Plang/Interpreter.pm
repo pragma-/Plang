@@ -216,7 +216,7 @@ sub interpret {
     my ($self, %opt) = @_;
 
     my $errors = $self->handle_parse_errors;
-    return ['ERROR', $errors] if defined $errors;
+    die $errors if defined $errors;
 
     $errors = $self->validate($self->{ast});
 
