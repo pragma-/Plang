@@ -55,7 +55,23 @@ sub binary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
         }
 
-        if ($self->{types}->is_arithmetic($left_value->[0]) and $self->{types}->is_arithmetic($right_value->[0])) {
+        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
+            if (exists $self->{eval_binary_op_String}->{$op}) {
+                $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
+                $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
+                return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
+            }
+        }
+
+        if (not $self->{types}->is_arithmetic($left_value->[0])) {
+            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left_value->[0]));
+        }
+
+        if (not $self->{types}->is_arithmetic($right_value->[0])) {
+            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right_value->[0]));
+        }
+
+        if ($self->{types}->check($left_value->[0], $right_value->[0])) {
             if (exists $self->{eval_binary_op_Number}->{$op}) {
                 my $result = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
 
@@ -64,14 +80,6 @@ sub binary_op {
                 }
 
                 return $result;
-            }
-        }
-
-        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-            if (exists $self->{eval_binary_op_String}->{$op}) {
-                $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
-                $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
-                return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
             }
         }
 
@@ -138,7 +146,15 @@ sub type_check_op_assign {
     $left  = $self->statement($context, $left);
     $right = $self->statement($context, $right);
 
-    if ($self->{types}->is_arithmetic($left->[0]) and $self->{types}->is_arithmetic($right->[0])) {
+    if (not $self->{types}->is_arithmetic($left->[0])) {
+        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]));
+    }
+
+    if (not $self->{types}->is_arithmetic($right->[0])) {
+        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]));
+    }
+
+    if ($self->{types}->check($left->[0], $right->[0])) {
         return $left;
     }
 
