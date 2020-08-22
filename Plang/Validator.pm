@@ -817,16 +817,22 @@ sub function_builtin_map {
     my ($self, $context, $name, $arguments) = @_;
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
-    my $data = ['CALL', $func, [['Any', undef]]];
-    my $result = $self->function_call($context, $data);
-    return [['TYPE', 'Array'], $result];
+    my $data = ['CALL', $func, undef];
+
+    foreach my $val (@{$list->[1]}) {
+        $data->[2] = [$val];
+        $val = $self->function_call($context, $data);
+    }
+
+    return $list;
 }
 
 sub function_builtin_filter {
     my ($self, $context, $name, $arguments) = @_;
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
-    my $data = ['CALL', $func, [['Any', undef]]];
+    my $data = ['CALL', $func, undef];
+    $data->[2] = [$list->[1]->[0]];
     my $result = $self->function_call($context, $data);
     return [['TYPE', 'Array'], $result];
 }
@@ -842,19 +848,25 @@ sub validate {
 
     # override builtins for typechecking
     $self->add_builtin_function('length',
-        [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
+        [
+            [['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]
+        ],
         ['TYPE', 'Integer'],
         \&function_builtin_length);
 
     $self->add_builtin_function('map',
-        [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
-            [['TYPE', 'Array'], 'list', undef]],
+        [
+            [['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
+            [['TYPE', 'Array'], 'list', undef]
+        ],
         ['TYPE', 'Array'],
         \&function_builtin_map);
 
     $self->add_builtin_function('filter',
-        [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
-            [['TYPE', 'Array'], 'list', undef]],
+        [
+            [['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
+            [['TYPE', 'Array'], 'list', undef]
+        ],
         ['TYPE', 'Array'],
         \&function_builtin_filter);
 

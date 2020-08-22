@@ -153,7 +153,7 @@ sub check {
 
         # fail if parameter types are not equal
         for (my $i = 0; $i < @$guard_params; $i++) {
-            return 0 if not $self->has_subtype($guard_params->[$i], $type_params->[$i]);
+            return 0 if not $self->is_subtype($type_params->[$i], $guard_params->[$i]);
         }
 
         # return result of return value check
@@ -210,6 +210,8 @@ sub to_string {
 
         return "$kind $param_string -> $return_string";
     }
+
+    return $type->[0];
 }
 
 1;
