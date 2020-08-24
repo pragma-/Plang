@@ -194,6 +194,7 @@ my %function_builtins = (
                    [['TYPE', 'String'], 'end',  [['TYPE', 'String'], "\n"]]],
         ret    => ['TYPE', 'Null'],
         subref => \&function_builtin_print,
+        vsubref => \&validate_builtin_print,
     },
     'type' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
@@ -363,6 +364,10 @@ sub function_builtin_filter {
 }
 
 # builtin function validators
+sub validate_builtin_print {
+    return [['TYPE', 'Null'], undef];
+}
+
 sub validate_builtin_length {
      my ($self, $context, $name, $arguments) = @_;
      my ($val) = ($arguments->[0]);

@@ -178,7 +178,8 @@ $plang->add_builtin_function('print',
     # the type of value print() returns
     ['TYPE', 'Null'],
     # subref to our function that will override the `print` function
-    \&print_override);
+    \&print_override,
+    \&print_validator);
 
 # we'll collect the output in here
 my $output;
@@ -188,6 +189,10 @@ sub print_override {
     my ($plang, $context, $name, $arguments) = @_;
     my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
     $output .= "$expr$end"; # append the print output to our $output
+    return [['TYPE', 'Null'], undef];
+}
+
+sub print_validator {
     return [['TYPE', 'Null'], undef];
 }
 

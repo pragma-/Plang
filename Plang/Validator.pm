@@ -590,7 +590,6 @@ sub function_call {
 
     if ($self->{types}->check($return_type, ['TYPE', 'Any'])) {
         # set inferred return type
-        print "set infer type\n";
         $func->[1]->[1] = $return_value->[0];
         $func->[0]->[3] = $return_value->[0];
     }
