@@ -20,18 +20,18 @@ print($"square of {foo}: {square(foo)}")  # prints "square of 4: 16"
 
 # you can make an anonymous function that takes no parameters by omitting the
 # function name and the parameter identifier list
-var a = fn { var x = 1 + 2;  $"x = {x}" }
-print(a()) # prints x = 3
+var v1 = fn { var x = 1 + 2;  $"x = {x}" }
+print(v1()) # prints x = 3
 
 # you can make an anonymous function with parameters by omitting just the function name
-var a = fn (a, b) { var x = a + b;  $"{a} + {b} = {x}" }
-print(a(5, 10)) # prints 5 + 10 = 15
+var v2 = fn (a, b) { var x = a + b;  $"{a} + {b} = {x}" }
+print(v2(5, 10)) # prints 5 + 10 = 15
 
 # you can declare a new function `add` and assign it to a variable `a`
 # both of these can be called as the same function
-var a = fn add(a, b) { var x = a + b;  $"{a} + {b} = {x}" }
-print(add(5, 10)) # prints 5 + 10 = 15
-print(a(1, 2))    # prints 1 + 2 = 3
+var v3 = fn add(a, b) { var x = a + b;  $"{a} + {b} = {x}" }
+print(add(5, 10))  # prints 5 + 10 = 15
+print(v3(1, 2))    # prints 1 + 2 = 3
 
 # commas and semi-colons are largely optional
 fn test
