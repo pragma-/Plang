@@ -5,33 +5,19 @@
 use warnings;
 use strict;
 
-# allow loading .pm modules from the current directory
-use lib '.';
+# allow loading .pm modules from this script's directory
+BEGIN {
+    use File::Basename;
+    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
+    unshift @INC, "$home";
+}
 
 use Data::Dumper;
 use Plang::Interpreter;
 
 print "This script reads from standard input.\n" and exit if @ARGV;
 
-# example of setting up a simple straight-forward Plang interpreter
-sub plang {
-    my ($text) = @_;
-
-    # create Plang object
-    my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG});
-
-    if (defined $text) {
-        # if a string argument was provided, interpret the string
-        return $plang->interpret_string($text);
-    } else {
-        # otherwise interpret the standard input stream
-        return $plang->interpret_stream(*STDIN);
-    }
-}
-
-# and that's all there is to it!
-
-# example using more control over the lex/parse/validate/interpret stages
+# debug tags from $DEBUG environment variable
 my $debug = $ENV{DEBUG} // 0;
 my @debug_tags = split /,/, $debug;
 
@@ -92,22 +78,7 @@ sub plang_dbg {
 }
 
 # our return value/exit code
-my $ret;
-
-# two ways to run the simple example:
-#
-# $ret = plang 'fn square(x) x * x; square(7)';  # interpret a string
-#
-# or
-#
-# $ret = plang;  # interpet stdin; e.g. `$ ./plang <<< '2 * 3'` or `$ ./plang < program.p`
-
-# but for this program, we'll run the dbg example, unless PLANG_EMBED is defined:
-if ($ENV{PLANG_EMBED}) {
-    $ret = plang;
-} else {
-    $ret = plang_dbg;
-}
+my $ret = plang_dbg() // 0;
 
 no warnings;
 exit $ret;

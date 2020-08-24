@@ -485,12 +485,18 @@ sub type_check_builtin_function {
 
     my $parameters = $builtin->{params};
     my $func       = $builtin->{subref};
+    my $validate   = $builtin->{vsubref};
     my $arguments  = $data->[2];
 
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
 
-    # invoke builtin-in to infer types
-    my $result = $func->($self, $context, $name, $evaled_args);
+    my $result;
+
+    if ($validate) {
+        $result = $validate->($self, $context, $name, $evaled_args);
+    } else {
+        $result = $func->($self, $context, $name, $evaled_args);
+    }
 
     # type-check arguments
     for (my $i = 0; $i < @$parameters; $i++) {
@@ -541,16 +547,8 @@ sub function_call {
         if ($target->[0] eq 'IDENT') {
             if (defined ($func = $self->get_builtin_function($target->[1]))) {
                 # builtin function
-                $return_type = $func->{ret};
-
-                if ($target->[1] eq 'print') {
-                    # skip builtin print() call
-                    $return_value = [['TYPE', 'Null'], undef];
-                } elsif ($target->[1] eq 'filter' or $target->[1] eq 'map') {
-                    $return_value = $self->type_check_builtin_function($context, $data, $target->[1]);
-                } else {
-                    $return_value = $self->call_builtin_function($context, $data, $target->[1]);
-                }
+                $return_type  = $func->{ret};
+                $return_value = $self->type_check_builtin_function($context, $data, $target->[1]);
                 goto CHECK_RET_TYPE;
             } else {
                 # undefined function
@@ -592,6 +590,7 @@ sub function_call {
 
     if ($self->{types}->check($return_type, ['TYPE', 'Any'])) {
         # set inferred return type
+        print "set infer type\n";
         $func->[1]->[1] = $return_value->[0];
         $func->[0]->[3] = $return_value->[0];
     }
@@ -816,44 +815,6 @@ sub array_index_notation {
     $self->error($context, "cannot use postfix [] on type " . $self->{types}->to_string($var->[0]));
 }
 
-sub function_builtin_length {
-     my ($self, $context, $name, $arguments) = @_;
-     my ($val) = ($arguments->[0]);
-
-     my $type = $val->[0];
-
-     if ($type->[0] eq 'TYPE' and
-         ($type->[1] eq 'String' or $type->[1] eq 'Array' or $type->[1] eq 'Map')) {
-         return [['TYPE', 'Number'], 0];
-     }
-
-     $self->error($context, "cannot get length of a " . $self->{types}->to_string($val->[0]));
-}
-
-sub function_builtin_map {
-    my ($self, $context, $name, $arguments) = @_;
-    my ($func, $list) = ($arguments->[0], $arguments->[1]);
-
-    my $data = ['CALL', $func, undef];
-
-    foreach my $val (@{$list->[1]}) {
-        $data->[2] = [$val];
-        $val = $self->function_call($context, $data);
-    }
-
-    return $list;
-}
-
-sub function_builtin_filter {
-    my ($self, $context, $name, $arguments) = @_;
-    my ($func, $list) = ($arguments->[0], $arguments->[1]);
-
-    my $data = ['CALL', $func, undef];
-    $data->[2] = [$list->[1]->[0]];
-    my $result = $self->function_call($context, $data);
-    return [['TYPE', 'Array'], $result];
-}
-
 sub handle_statement_result {
     my ($self, $result) = @_;
     return $result;
@@ -862,35 +823,8 @@ sub handle_statement_result {
 # validate the program
 sub validate {
     my ($self, $ast) = @_;
-
-    # override builtins for typechecking
-    $self->add_builtin_function('length',
-        [
-            [['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]
-        ],
-        ['TYPE', 'Integer'],
-        \&function_builtin_length);
-
-    $self->add_builtin_function('map',
-        [
-            [['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
-            [['TYPE', 'Array'], 'list', undef]
-        ],
-        ['TYPE', 'Array'],
-        \&function_builtin_map);
-
-    $self->add_builtin_function('filter',
-        [
-            [['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
-            [['TYPE', 'Array'], 'list', undef]
-        ],
-        ['TYPE', 'Array'],
-        \&function_builtin_filter);
-
-    my $result = $self->run($ast, typecheck => 1);
-    return if not defined $result;
-    return if $result->[0] ne 'ERROR';
-    return $result;
+    $self->run($ast);
+    return;
 }
 
 1;

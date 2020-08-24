@@ -1,0 +1,76 @@
+#!/usr/bin/env perl
+
+# simple example Plang interpreter script with a simple
+# built-in function demonstration
+
+use warnings;
+use strict;
+
+BEGIN {
+    use File::Basename;
+    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
+    unshift @INC, "$home";
+}
+
+# use Plang
+use Plang::Interpreter;
+
+# plang() can be used as:
+#   $ret = plang 'fn square(x) x * x; square(7)';  # interpret a string
+# or
+#   $ret = plang;  # interpet stdin; e.g. `$ ./plang <<< '2 * 3'` or `$ ./plang < program.p`
+sub plang {
+    my ($text) = @_;
+
+    # create Plang object
+    my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG});
+
+    # example of adding a simple builtin function
+    $plang->add_builtin_function('greet',        # function name
+        [                                        # parameter list
+            [['TYPE', 'String'], 'name', undef], # parameter 1
+        ],                                       # end parameter list
+        ['TYPE', 'Null'],                        # return type
+        \&builtin_greet,                         # function subref
+        \&validate_greet);                       # optional compile-time checking
+
+    if (defined $text and length $text) {
+        # if a string argument was provided, interpret the string
+        return $plang->interpret_string($text);
+    } else {
+        # otherwise interpret the standard input stream
+        return $plang->interpret_stream(*STDIN);
+    }
+}
+
+# interpret plang script and exit using returned value
+my $ret = plang("@ARGV") // 0;
+exit int $ret;
+
+
+# example type-checking/validation of builtin function
+# (this is invoked only at compile-time)
+sub validate_greet {
+    my ($plang, $context, $name, $arguments) = @_;
+    my $arg_name = $arguments->[0];
+
+    # here we could do further type/semantic checking, but what
+    # we don't do is the actual I/O that builtin_greet() does.
+
+    return [['TYPE', 'Null'], undef];
+}
+
+# example builtin function
+# (this is invoked only at run-time)
+sub builtin_greet {
+    my ($plang, $context, $name, $arguments) = @_;
+    my $arg_name = $arguments->[0];
+
+    # this is the run-time version of greet(), opposed to the
+    # previous compile-time version, and so we perform the
+    # actual I/O or side-effects -- in this case, we simply
+    # print a greeting message to stdout
+
+    print "Hello there, $arg_name->[1]!\n";
+    return [['TYPE', 'Null'], undef];
+}

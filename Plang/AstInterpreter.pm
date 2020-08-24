@@ -209,6 +209,7 @@ my %function_builtins = (
         params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
         ret    => ['TYPE', 'Integer'],
         subref => \&function_builtin_length,
+        vsubref => \&validate_builtin_length,
     },
     'map' => {
         params => [[['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
@@ -221,16 +222,6 @@ my %function_builtins = (
                    [['TYPE', 'Array'], 'list', undef]],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_filter,
-    },
-    'Null' => {
-        params => [[['TYPE', 'Any'], 'expr', undef]],
-        ret    => ['TYPE', 'Null'],
-        subref => \&function_builtin_Null,
-    },
-    'Number' => {
-        params => [[['TYPE', 'Any'], 'expr', undef]],
-        ret    => ['TYPE', 'Number'],
-        subref => \&function_builtin_Number,
     },
     'Integer' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
@@ -371,30 +362,22 @@ sub function_builtin_filter {
     return [['TYPE', 'Array'], $new_list];
 }
 
-# cast functions
-sub function_builtin_Number {
-    my ($self, $context, $name, $arguments) = @_;
-    my ($expr) = ($arguments->[0]);
+# builtin function validators
+sub validate_builtin_length {
+     my ($self, $context, $name, $arguments) = @_;
+     my ($val) = ($arguments->[0]);
 
-    if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
-        return [['TYPE', 'Number'], 0];
-    }
+     my $type = $val->[0];
 
-    if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
-        return [['TYPE', 'Number'], $expr->[1]];
-    }
+     if ($type->[0] eq 'TYPE' and
+         ($type->[1] eq 'String' or $type->[1] eq 'Array' or $type->[1] eq 'Map')) {
+         return [['TYPE', 'Number'], 0];
+     }
 
-    if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
-        return [['TYPE', 'Number'], $expr->[1] + 0];
-    }
-
-    if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
-        return [['TYPE', 'Number'], $expr->[1]];
-    }
-
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Number");
+     $self->error($context, "cannot get length of a " . $self->{types}->to_string($val->[0]));
 }
 
+# cast functions
 sub function_builtin_Integer {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -503,12 +486,6 @@ sub function_builtin_Boolean {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Boolean");
 }
 
-sub function_builtin_Null {
-    my ($self, $context, $name, $arguments) = @_;
-    my ($expr) = ($arguments->[0]);
-    return [['TYPE', 'Null'], undef];
-}
-
 sub function_builtin_Map {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -544,8 +521,8 @@ sub function_builtin_Array {
 }
 
 sub add_builtin_function {
-    my ($self, $name, $parameters, $return_type, $subref) = @_;
-    $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref };
+    my ($self, $name, $parameters, $return_type, $subref, $validate_subref) = @_;
+    $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref, vsubref => $validate_subref };
 }
 
 sub get_builtin_function {
@@ -837,7 +814,6 @@ sub keyword_while {
 
         next if $result->[0] eq 'NEXT';
         last if $result->[0] eq 'LAST';
-        return $result if $result->[0] eq 'ERROR'; # TODO: do we need this?
     }
 
     return [['TYPE', 'Null'], undef];
@@ -1253,26 +1229,6 @@ sub run {
         return;
     }
 
-    if (not $opt{typecheck}) {
-        # restore builtins overridden for typechecking
-        $self->add_builtin_function('length',
-            [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
-            ['TYPE', 'Integer'],
-            \&function_builtin_length);
-
-        $self->add_builtin_function('map',
-            [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
-                [['TYPE', 'Array'], 'list', undef]],
-            ['TYPE', 'Array'],
-            \&function_builtin_map);
-
-        $self->add_builtin_function('filter',
-            [[['TYPEFUNC', 'Function', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
-                [['TYPE', 'Array'], 'list', undef]],
-            ['TYPE', 'Array'],
-            \&function_builtin_filter);
-    }
-
     # set up the global environment
     my $context;
 
@@ -1290,6 +1246,7 @@ sub run {
         my $ret_type = $function_builtins{$builtin}{ret};
         my $param_types  = [];
         my $param_whatis = [];
+
         foreach my $param (@{$function_builtins{$builtin}{params}}) {
             push @$param_types, $param->[0];
             push @$param_whatis, $param;
@@ -1297,6 +1254,7 @@ sub run {
 
         my $type = ['TYPEFUNC', 'Builtin', $param_types, $ret_type];
         my $data = [$context, $ret_type, $param_whatis, undef];
+
         $self->set_variable($context, $builtin, [$type, $data]);
     }
 
@@ -1338,7 +1296,6 @@ sub interpret_ast {
                     $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
                     return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
                     return $result->[1] if $result->[0] eq 'RETURN';
-                    return $result if $result->[0] eq 'ERROR'; # TODO: do we need this
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }
