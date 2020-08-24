@@ -297,17 +297,6 @@ The `Any` type tells Plang to infer the actual type from the type of the provide
 
 The `Null` type's value is always `null`. It is used to signify that there is no meaningful value.
 
-The `Null()` type conversion function can be used to convert the following:
-
-From Type | With Value | Resulting Null Value
---- | --- | ---
-Null | `null` | `null`
-Boolean | any value | `null`
-Number | any value | `null`
-String | any value | `null`
-Array | any value | `null`
-Map | any value | `null`
-
 ##### Boolean
     Boolean ::= "true" | "false"
 
@@ -327,19 +316,8 @@ String | not `""` | `true`
 ##### Number
     Number ::= HexLiteral | OctalLiteral | IntegerLiteral | RealLiteral
 
-The `Number` type is the supertype of `Integer` and `Real`. Any value typed as `Number`
-can hold a value of `Integer` or `Real`.
-
-The `Number()` type conversion function can be used to convert the following:
-
-From Type | With Value | Resulting Number Value
---- | --- | ---
-Null | `null` | `0`
-Boolean | `true` | `1`
-Boolean | `false` | `0`
-Number | any value | that value
-String | `""` | `0`
-String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+The `Number` type is the supertype of `Integer` and `Real`. Any guard typed as `Number`
+will accept a value of types `Integer` or `Real`.
 
 ##### Integer
     HexLiteral     ::= "0" ("x" | "X") (Digit | "a" - "f" | "A" - "F")+
@@ -361,7 +339,8 @@ From Type | With Value | Resulting Number Value
 Null | `null` | `0`
 Boolean | `true` | `1`
 Boolean | `false` | `0`
-Number | any value | that value
+Integer | any value | that value
+Real | any value | that value with the factional part truncated
 String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
 
@@ -387,7 +366,8 @@ From Type | With Value | Resulting Number Value
 Null | `null` | `0`
 Boolean | `true` | `1`
 Boolean | `false` | `0`
-Number | any value | that value
+Integer | any value | that value
+Real | any value | that value
 String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
 
@@ -917,9 +897,7 @@ The `length` function returns the count of elements within an expression of type
 For `String` it returns the count of characters. For `Array` it returns the count
 of elements. For `Map` it returns the count of keys.
 
-Its [`whatis`](#whatis) is: `Builtin (Any expr) -> Number`
-
-*TODO: Support list-style type annotation so the whatis can be `Builtin ([String Array Map] expr) -> Number` instead.*
+Its [`whatis`](#whatis) is: `Builtin ([Array, Map, String] expr) -> Integer`
 
     > length("Hello!")
      6
