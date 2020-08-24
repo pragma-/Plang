@@ -334,7 +334,7 @@ The `Integer` type denotes an integral value. `Integer` is a subtype of `Number`
 
 The `Integer()` type conversion function can be used to convert the following:
 
-From Type | With Value | Resulting Number Value
+From Type | With Value | Resulting Integer Value
 --- | --- | ---
 Null | `null` | `0`
 Boolean | `true` | `1`
@@ -342,7 +342,7 @@ Boolean | `false` | `0`
 Integer | any value | that value
 Real | any value | that value with the factional part truncated
 String | `""` | `0`
-String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+String | `"X"` | if `"X"` begins with an Integer then its value, otherwise `0`
 
 ##### Real
     RealLiteral ::= Digit+
@@ -361,7 +361,7 @@ The `Real` type denotes a floating-point value. `Real` is a subtype of `Number`.
 
 The `Real()` type conversion function can be used to convert the following:
 
-From Type | With Value | Resulting Number Value
+From Type | With Value | Resulting Real Value
 --- | --- | ---
 Null | `null` | `0`
 Boolean | `true` | `1`
@@ -369,7 +369,7 @@ Boolean | `false` | `0`
 Integer | any value | that value
 Real | any value | that value
 String | `""` | `0`
-String | `"X"` | if `"X"` begins with a Number then its value, otherwise `0`
+String | `"X"` | if `"X"` begins with a Real then its value, otherwise `0`
 
 ##### String
     String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
