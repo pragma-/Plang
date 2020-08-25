@@ -197,12 +197,12 @@ sub variable_declaration {
 
     if (!$self->{repl} and (my $var = $self->get_variable($context, $name, locals_only => 1))) {
         if ($var->[0] ne 'Builtin') {
-            $self->error($context, "cannot redeclare existing local `$data->[1]`");
+            $self->error($context, "cannot redeclare existing local `$name`");
         }
     }
 
     if ($self->get_builtin_function($name)) {
-        $self->error($context, "cannot override builtin function `$data->[1]`");
+        $self->error($context, "cannot override builtin function `$name`");
     }
 
     if (not $self->{types}->check($type, $right_value->[0])) {
@@ -490,17 +490,16 @@ sub type_check_builtin_function {
 
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
 
+    for (my $i = 0; $i < @$parameters; $i++) {
+        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
+    }
+
     my $result;
 
     if ($validate) {
         $result = $validate->($self, $context, $name, $evaled_args);
     } else {
         $result = $func->($self, $context, $name, $evaled_args);
-    }
-
-    # type-check arguments
-    for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
     }
 
     return $result;
@@ -545,6 +544,7 @@ sub function_call {
         $statements  = $func->[1]->[3];
     } else {
         if ($target->[0] eq 'IDENT') {
+            $self->{dprint}->('FUNCS', "Calling builtin function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
             if (defined ($func = $self->get_builtin_function($target->[1]))) {
                 # builtin function
                 $return_type  = $func->{ret};

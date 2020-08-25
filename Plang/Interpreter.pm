@@ -125,7 +125,7 @@ sub initialize {
         'exists', 'delete',
     );
 
-    $self->{types} = Plang::Types->new;
+    $self->{types} = Plang::Types->new(debug => $conf{debug});
 
     $self->{parser}->define_types($self->{types}->as_list);
 

@@ -7,6 +7,8 @@ package Plang::Types;
 use warnings;
 use strict;
 
+use Data::Dumper;
+
 sub new {
     my ($proto, %conf) = @_;
     my $class = ref($proto) || $proto;
@@ -17,6 +19,22 @@ sub new {
 
 sub initialize {
     my ($self, %conf) = @_;
+
+    $self->{debug}    = $conf{debug};
+
+    if ($self->{debug}) {
+        my @tags = split /,/, $self->{debug};
+        $self->{debug}  = \@tags;
+        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
+        $self->{dprint} = sub {
+            my $tag = shift;
+            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        };
+        $self->{indent} = 0;
+    } else {
+        $self->{dprint} = sub {};
+        $self->{clean}  = sub {''};
+    }
 
     # root type is Any
     $self->add('Any');
@@ -114,6 +132,11 @@ sub is_arithmetic {
 # type-checking
 sub check {
     my ($self, $guard, $type) = @_;
+
+    if ($self->{debug}) {
+        $Data::Dumper::Terse = 1;
+        $self->{dprint}->('TYPES', "type check ", Dumper($guard), " vs ", Dumper($type), "\n");
+    }
 
     # a type
     if ($guard->[0] eq 'TYPE') {
