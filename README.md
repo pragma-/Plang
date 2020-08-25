@@ -112,7 +112,7 @@ You can set the `DEBUG` environment variable to enable debugging output.
 
 The value is a comma-separated list of tags, or `ALL` for everything.
 
-Currently available `DEBUG` tags are: `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `STMT`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
+Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `STMT`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
 
     $ DEBUG=OPERS,VARS ./plang <<< '1 + 2'  # debug messages only for tags `OPERS` and `VARS`
 <!-- -->
