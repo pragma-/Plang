@@ -759,6 +759,10 @@ sub ExistsStatement {
 
     {
         if ($parser->consume('KEYWORD_exists')) {
+            my $map = MapConstructor($parser);
+            return if $parser->errored;
+            return ['EXISTS', $map] if $map;
+
             my $statement = Statement($parser);
             return if $parser->errored;
 
@@ -782,6 +786,10 @@ sub DeleteStatement {
 
     {
         if ($parser->consume('KEYWORD_delete')) {
+            my $map = MapConstructor($parser);
+            return if $parser->errored;
+            return ['DELETE', $map] if $map;
+
             my $statement = Statement($parser);
             return if $parser->errored;
 
@@ -805,6 +813,10 @@ sub KeysStatement {
 
     {
         if ($parser->consume('KEYWORD_keys')) {
+            my $map = MapConstructor($parser);
+            return if $parser->errored;
+            return ['KEYS', $map] if $map;
+
             my $statement = Statement($parser);
             return if $parser->errored;
 
@@ -828,6 +840,10 @@ sub ValuesStatement {
 
     {
         if ($parser->consume('KEYWORD_values')) {
+            my $map = MapConstructor($parser);
+            return if $parser->errored;
+            return ['VALUES', $map] if $map;
+
             my $statement = Statement($parser);
             return if $parser->errored;
 

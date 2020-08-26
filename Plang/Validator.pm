@@ -294,7 +294,7 @@ sub keyword_exists {
         $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
     }
 
-    $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($data->[1]->[0]) . ")");
+    $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($data->[1]) . ")");
 }
 
 sub keyword_delete {
@@ -332,7 +332,7 @@ sub keyword_delete {
         $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
     }
 
-    $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($data->[1]->[0]) . ")");
+    $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($data->[1]) . ")");
 }
 
 sub keyword_keys {
