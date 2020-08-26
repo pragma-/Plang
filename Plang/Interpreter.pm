@@ -123,6 +123,7 @@ sub initialize {
         'while', 'next', 'last',
         'if', 'then', 'else',
         'exists', 'delete',
+        'keys', 'values',
     );
 
     $self->{types} = Plang::Types->new(debug => $conf{debug});

@@ -135,6 +135,8 @@ sub alternate_statement {
 #                        | ElseWithoutIf
 #                        | ExistsStatement
 #                        | DeleteStatement
+#                        | KeysStatement
+#                        | ValuesStatement
 #                        | RangeStatement
 #                        | Expression TERM
 #                        | UnexpectedKeyword
@@ -183,6 +185,12 @@ sub Statement {
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&DeleteStatement,     'Statement: DeleteStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&KeysStatement,       'Statement: KeysStatement'));
+    return if $parser->errored;
+
+    return $result if defined ($result = alternate_statement($parser, \&ValuesStatement,     'Statement: ValuesStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
@@ -783,6 +791,52 @@ sub DeleteStatement {
 
             $parser->advance;
             return ['DELETE', $statement->[1]];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: KeysStatement ::= KEYWORD_keys Statement
+sub KeysStatement {
+    my ($parser) = @_;
+
+    $parser->try('KeysStatement');
+
+    {
+        if ($parser->consume('KEYWORD_keys')) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+
+            if (not $statement or not defined $statement->[1]) {
+                return expected($parser, "statement after keys keyword");
+            }
+
+            $parser->advance;
+            return ['KEYS', $statement->[1]];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# Grammar: ValuesStatement ::= KEYWORD_values Statement
+sub ValuesStatement {
+    my ($parser) = @_;
+
+    $parser->try('ValuesStatement');
+
+    {
+        if ($parser->consume('KEYWORD_values')) {
+            my $statement = Statement($parser);
+            return if $parser->errored;
+
+            if (not $statement or not defined $statement->[1]) {
+                return expected($parser, "statement after values keyword");
+            }
+
+            $parser->advance;
+            return ['VALUES', $statement->[1]];
         }
     }
 

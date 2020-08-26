@@ -130,6 +130,476 @@ sub get_variable {
     return undef;
 }
 
+sub variable_declaration {
+    my ($self, $context, $data) = @_;
+
+    my $type        = $data->[1];
+    my $name        = $data->[2];
+    my $initializer = $data->[3];
+    my $right_value = undef;
+
+    if ($initializer) {
+        $right_value = $self->statement($context, $initializer);
+    } else {
+        $right_value = [['TYPE', 'Null'], undef];
+    }
+
+    $self->declare_variable($context, $type, $name, $right_value);
+    return $right_value;
+}
+
+sub process_function_call_arguments {
+    my ($self, $context, $name, $parameters, $arguments) = @_;
+
+    my $evaluated_arguments;
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        if (not defined $arguments->[$i]) {
+            # no argument provided, but there's guaranteed to be a default
+            # argument here since validator caught missing arguments, etc
+            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+        } else {
+            # argument provided
+            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
+            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+        }
+    }
+
+    return $evaluated_arguments;
+}
+
+sub function_call {
+    my ($self, $context, $data) = @_;
+
+    $Data::Dumper::Indent = 0;
+
+    my $target    = $data->[1];
+    my $arguments = $data->[2];
+    my $func;
+
+    if ($target->[0] eq 'IDENT') {
+        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $func = $self->get_variable($context, $target->[1]);
+
+        if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
+            # builtin function
+            return $self->call_builtin_function($context, $data, $target->[1]);
+        }
+    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
+        $self->{dprint}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $func = $target;
+    } else {
+        $self->{dprint}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $func = $self->statement($context, $target);
+    }
+
+    my $closure    = $func->[1]->[0];
+    my $ret_type   = $func->[1]->[1];
+    my $parameters = $func->[1]->[2];
+    my $statements = $func->[1]->[3];
+
+    # wedge closure in between current scope and previous scope
+    my $new_context = $self->new_context($closure);
+    $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
+    $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
+
+    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
+
+    # check for recursion limit
+    if (++$self->{recursions} > $self->{max_recursion}) {
+        $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
+    }
+
+    # invoke the function
+    my $result = $self->interpret_ast($new_context, $statements);
+    $self->{recursion}--;
+
+    # update inferred return type
+    $func->[1]->[1] = $self->{types}->to_string($result->[0]);
+
+    return $result;
+}
+
+sub function_definition {
+    my ($self, $context, $data) = @_;
+
+    my $ret_type   = $data->[1];
+    my $name       = $data->[2];
+    my $parameters = $data->[3];
+    my $statements = $data->[4];
+
+    my $param_types = [];
+
+    foreach my $param (@$parameters) {
+        push @$param_types, $param->[0];
+    }
+
+    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $statements]];
+
+    if ($name eq '#anonymous') {
+        $name = "anonfunc$func";
+    }
+
+    $context->{locals}->{$name} = $func;
+    return $func;
+}
+
+sub map_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $map     = $data->[1];
+    my $hashref = {};
+
+    foreach my $entry (@$map) {
+        if ($entry->[0]->[0] eq 'IDENT') {
+            my $var = $self->get_variable($context, $entry->[0]->[1]);
+            $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+            next;
+        }
+
+        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
+            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
+            next;
+        }
+    }
+
+    return [['TYPE', 'Map'], $hashref];
+}
+
+sub array_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $array    = $data->[1];
+    my $arrayref = [];
+
+    foreach my $entry (@$array) {
+        push @$arrayref, $self->statement($context, $entry);
+    }
+
+    return [['TYPE', 'Array'], $arrayref];
+}
+
+sub keyword_exists {
+    my ($self, $context, $data) = @_;
+
+    my $var = $self->statement($context, $data->[1]->[1]);
+    my $key = $self->statement($context, $data->[1]->[2]);
+
+    if (exists $var->[1]->{$key->[1]}) {
+        return [['TYPE', 'Boolean'], 1];
+    } else {
+        return [['TYPE', 'Boolean'], 0];
+    }
+}
+
+sub keyword_delete {
+    my ($self, $context, $data) = @_;
+
+    # delete one key in map
+    if ($data->[1]->[0] eq 'ACCESS') {
+        my $var = $self->statement($context, $data->[1]->[1]);
+        my $key = $self->statement($context, $data->[1]->[2]);
+
+        my $val = delete $var->[1]->{$key->[1]};
+        return [['TYPE', 'Null'], undef] if not defined $val;
+        return $val;
+    }
+
+    # delete all keys in map
+    if ($data->[1]->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $data->[1]->[1]);
+        $var->[1] = {};
+        return $var;
+    }
+}
+
+sub keyword_keys {
+    my ($self, $context, $data) = @_;
+
+    my $map = $self->statement($context, $data->[1]);
+
+    my $hash = $map->[1];
+    my $list = [];
+
+    foreach my $key (keys %$hash) {
+        push @$list, [['TYPE', 'String'], $key];
+    }
+
+    return [['TYPE', 'Array'], $list];
+}
+
+sub keyword_values {
+    my ($self, $context, $data) = @_;
+
+    my $map = $self->statement($context, $data->[1]);
+
+    my $hash = $map->[1];
+    my $list = [];
+
+    foreach my $value (values %$hash) {
+        push @$list, $value;
+    }
+
+    return [['TYPE', 'Array'], $list];
+}
+
+sub keyword_return {
+    my ($self, $context, $data) = @_;
+    return ['RETURN', $self->statement($context, $data->[1]->[1])];
+}
+
+sub keyword_next {
+    my ($self, $context, $data) = @_;
+    return ['NEXT', undef];
+}
+
+sub keyword_last {
+    my ($self, $context, $data) = @_;
+    return ['LAST', undef];
+}
+
+sub keyword_while {
+    my ($self, $context, $data) = @_;
+
+    while ($self->is_truthy($context, $data->[1])) {
+        if (++$self->{iterations} > $self->{max_iterations}) {
+            $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
+        }
+
+        my $result = $self->statement($context, $data->[2]);
+
+        next if $result->[0] eq 'NEXT';
+        last if $result->[0] eq 'LAST';
+    }
+
+    return [['TYPE', 'Null'], undef];
+}
+
+sub add_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+    $left->[1] += $right->[1];
+    return $left;
+}
+
+sub sub_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+    $left->[1] -= $right->[1];
+    return $left;
+}
+
+sub mul_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+    $left->[1] *= $right->[1];
+    return $left;
+}
+
+sub div_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+    $left->[1] /= $right->[1];
+    return $left;
+}
+
+sub cat_assign {
+    my ($self, $context, $data) = @_;
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
+    $left->[1] .= $right->[1];
+    return $left;
+}
+
+sub prefix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+    $var->[1]++;
+    return $var;
+}
+
+sub prefix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+    $var->[1]--;
+    return $var;
+}
+
+sub postfix_increment {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+    my $temp_var = [$var->[0], $var->[1]];
+    $var->[1]++;
+    return $temp_var;
+}
+
+sub postfix_decrement {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+    my $temp_var = [$var->[0], $var->[1]];
+    $var->[1]--;
+    return $temp_var;
+}
+
+# ?: ternary conditional operator
+sub conditional {
+    my ($self, $context, $data) = @_;
+
+    if ($self->is_truthy($context, $data->[1])) {
+        return $self->interpret_ast($context, [$data->[2]]);
+    } else {
+        return $self->interpret_ast($context, [$data->[3]]);
+    }
+}
+
+# if statement
+sub keyword_if {
+    my ($self, $context, $data) = @_;
+
+    if ($self->is_truthy($context, $data->[1])) {
+        return $self->statement($context, $data->[2]);
+    } else {
+        return $self->statement($context, $data->[3]);
+    }
+}
+
+sub logical_and {
+    my ($self, $context, $data) = @_;
+    my $left_value = $self->statement($context, $data->[1]);
+    return $left_value if not $self->is_truthy($context, $left_value);
+    return $self->statement($context, $data->[2]);
+}
+
+sub logical_or {
+    my ($self, $context, $data) = @_;
+    my $left_value = $self->statement($context, $data->[1]);
+    return $left_value if $self->is_truthy($context, $left_value);
+    return $self->statement($context, $data->[2]);
+}
+
+sub range_operator {
+    my ($self, $context, $data) = @_;
+
+    my ($to, $from) = ($data->[1], $data->[2]);
+
+    $to   = $self->statement($context, $to);
+    $from = $self->statement($context, $from);
+
+    return ['RANGE', $to, $from];
+}
+
+# lvalue assignment
+sub assignment {
+    my ($self, $context, $data) = @_;
+
+    my $left_value  = $data->[1];
+    my $right_value = $self->statement($context, $data->[2]);
+
+    # lvalue variable
+    if ($left_value->[0] eq 'IDENT') {
+        my $var = $self->get_variable($context, $left_value->[1]);
+        $self->set_variable($context, $left_value->[1], $right_value);
+        return $right_value;
+    }
+
+    # lvalue array/map access
+    if ($left_value->[0] eq 'ACCESS') {
+        my $var = $self->statement($context, $left_value->[1]);
+
+        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+            my $key = $self->statement($context, $left_value->[2]);
+            my $val = $self->statement($context, $right_value);
+            $var->[1]->{$key->[1]} = $val;
+            return $val;
+        }
+
+        if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
+            my $index = $self->statement($context, $left_value->[2]);
+            my $val = $self->statement($context, $right_value);
+            $var->[1]->[$index->[1]] = $val;
+            return $val;
+        }
+
+        if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
+            my $value = $self->statement($context, $left_value->[2]->[1]);
+
+            if ($value->[0] eq 'RANGE') {
+                my $from = $value->[1];
+                my $to   = $value->[2];
+
+                if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
+                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
+                    return [['TYPE', 'String'], $var->[1]];
+                }
+
+                if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
+                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
+                    return [['TYPE', 'String'], $var->[1]];
+                }
+            }
+
+            my $index = $value->[1];
+            if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
+                substr ($var->[1], $index, 1) = $right_value->[1];
+                return [['TYPE', 'String'], $var->[1]];
+            }
+
+            if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
+                substr ($var->[1], $index, 1) = chr $right_value->[1];
+                return [['TYPE', 'String'], $var->[1]];
+            }
+        }
+    }
+}
+
+# rvalue array/map index
+sub array_index_notation {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    # map index
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+        my $key = $self->statement($context, $data->[2]);
+        my $val = $var->[1]->{$key->[1]};
+        return [['TYPE', 'Null'], undef] if not defined $val;
+        return $val;
+    }
+
+    # array index
+    if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
+        my $index = $self->statement($context, $data->[2]);
+
+        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
+            my $val = $var->[1]->[$index->[1]];
+            return [['TYPE', 'Null'], undef] if not defined $val;
+            return $val;
+        }
+
+        # TODO support RANGE and x:y splices and negative indexing
+    }
+
+    # string index
+    if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
+        my $value = $self->statement($context, $data->[2]->[1]);
+
+        if ($value->[0] eq 'RANGE') {
+            my $from = $value->[1];
+            my $to = $value->[2];
+            return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+        }
+
+        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
+            my $index = $value->[1];
+            return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
+        }
+    }
+}
+
 sub unary_op {
     my ($self, $context, $data, $op, $debug_msg) = @_;
 
@@ -181,6 +651,116 @@ sub binary_op {
             $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
             return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
         }
+    }
+
+    return;
+}
+
+sub identifier {
+    my ($self, $context, $data) = @_;
+    my $var = $self->get_variable($context, $data->[1]);
+    $self->error($context, "undeclared variable `$data->[1]`") if not defined $var;
+    return $var;
+}
+
+sub stmt_literal {
+    my ($self, $context, $data) = @_;
+    my $type  = $data->[1];
+    my $value = $data->[2];
+    return [$type, $value];
+}
+
+sub statement_group {
+    my ($self, $context, $data) = @_;
+    my $new_context = $self->new_context($context);
+    return $self->interpret_ast($new_context, $data->[1]);
+}
+
+sub statement {
+    my ($self, $context, $data) = @_;
+    return if not $data;
+
+    my $ins = $data->[0];
+    $Data::Dumper::Indent = 0;
+    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n") if $self->{debug};
+
+    return $self->statement($context, $data->[1])       if $ins eq 'STMT';
+    return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
+    return $self->stmt_literal($context, $data)         if $ins eq 'LITERAL';
+    return $self->variable_declaration($context, $data) if $ins eq 'VAR';
+    return $self->map_constructor($context, $data)      if $ins eq 'MAPINIT';
+    return $self->array_constructor($context, $data)    if $ins eq 'ARRAYINIT';
+    return $self->keyword_exists($context, $data)       if $ins eq 'EXISTS';
+    return $self->keyword_delete($context, $data)       if $ins eq 'DELETE';
+    return $self->keyword_keys($context, $data)         if $ins eq 'KEYS';
+    return $self->keyword_values($context, $data)       if $ins eq 'VALUES';
+    return $self->conditional($context, $data)          if $ins eq 'COND';
+    return $self->keyword_while($context, $data)        if $ins eq 'WHILE';
+    return $self->keyword_next($context, $data)         if $ins eq 'NEXT';
+    return $self->keyword_last($context, $data)         if $ins eq 'LAST';
+    return $self->keyword_if($context, $data)           if $ins eq 'IF';
+    return $self->logical_and($context, $data)          if $ins eq 'AND';
+    return $self->logical_or($context, $data)           if $ins eq 'OR';
+    return $self->assignment($context, $data)           if $ins eq 'ASSIGN';
+    return $self->add_assign($context, $data)           if $ins eq 'ADD_ASSIGN';
+    return $self->sub_assign($context, $data)           if $ins eq 'SUB_ASSIGN';
+    return $self->mul_assign($context, $data)           if $ins eq 'MUL_ASSIGN';
+    return $self->div_assign($context, $data)           if $ins eq 'DIV_ASSIGN';
+    return $self->cat_assign($context, $data)           if $ins eq 'CAT_ASSIGN';
+    return $self->identifier($context, $data)           if $ins eq 'IDENT';
+    return $self->function_definition($context, $data)  if $ins eq 'FUNCDEF';
+    return $self->function_call($context, $data)        if $ins eq 'CALL';
+    return $self->keyword_return($context, $data)       if $ins eq 'RET';
+    return $self->prefix_increment($context, $data)     if $ins eq 'PREFIX_ADD';
+    return $self->prefix_decrement($context, $data)     if $ins eq 'PREFIX_SUB';
+    return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
+    return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
+    return $self->range_operator($context, $data)       if $ins eq 'RANGE';
+    return $self->array_index_notation($context, $data) if $ins eq 'ACCESS';
+
+    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
+
+    # unary operators
+    my $value;
+    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '!/not $a'));
+    return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
+    return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
+
+    # binary operators
+    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a . $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
+    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
+
+    # unknown instruction
+    return $data;
+}
+
+sub is_truthy {
+    my ($self, $context, $expr) = @_;
+
+    my $result = $self->statement($context, $expr);
+
+    if ($self->{types}->check(['TYPE', 'Number'], $result->[0])) {
+        return $result->[1] != 0;
+    }
+
+    if ($self->{types}->check(['TYPE', 'String'], $result->[0])) {
+        return $result->[1] ne "";
+    }
+
+    if ($self->{types}->check(['TYPE', 'Boolean'], $result->[0])) {
+        return $result->[1] != 0;
     }
 
     return;
@@ -255,6 +835,25 @@ my %function_builtins = (
         subref => \&function_builtin_Map,
     },
 );
+
+sub add_builtin_function {
+    my ($self, $name, $parameters, $return_type, $subref, $validate_subref) = @_;
+    $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref, vsubref => $validate_subref };
+}
+
+sub get_builtin_function {
+    my ($self, $name) = @_;
+    return $function_builtins{$name};
+}
+
+sub call_builtin_function {
+    my ($self, $context, $data, $name) = @_;
+    my $parameters  = $function_builtins{$name}->{params};
+    my $func        = $function_builtins{$name}->{subref};
+    my $arguments   = $data->[2];
+    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
+    return $func->($self, $context, $name, $evaled_args);
+}
 
 # just like type() except include function parameter identifiers and default values
 sub introspect {
@@ -525,142 +1124,6 @@ sub function_builtin_Array {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
 }
 
-sub add_builtin_function {
-    my ($self, $name, $parameters, $return_type, $subref, $validate_subref) = @_;
-    $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref, vsubref => $validate_subref };
-}
-
-sub get_builtin_function {
-    my ($self, $name) = @_;
-    return $function_builtins{$name};
-}
-
-sub call_builtin_function {
-    my ($self, $context, $data, $name) = @_;
-    my $parameters  = $function_builtins{$name}->{params};
-    my $func        = $function_builtins{$name}->{subref};
-    my $arguments   = $data->[2];
-    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
-    return $func->($self, $context, $name, $evaled_args);
-}
-
-sub process_function_call_arguments {
-    my ($self, $context, $name, $parameters, $arguments) = @_;
-
-    my $evaluated_arguments;
-
-    for (my $i = 0; $i < @$parameters; $i++) {
-        if (not defined $arguments->[$i]) {
-            # no argument provided, but there's guaranteed to be a default
-            # argument here since validator caught missing arguments, etc
-            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
-            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
-        } else {
-            # argument provided
-            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
-            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
-        }
-    }
-
-    return $evaluated_arguments;
-}
-
-sub function_definition {
-    my ($self, $context, $data) = @_;
-
-    my $ret_type   = $data->[1];
-    my $name       = $data->[2];
-    my $parameters = $data->[3];
-    my $statements = $data->[4];
-
-    my $param_types = [];
-
-    foreach my $param (@$parameters) {
-        push @$param_types, $param->[0];
-    }
-
-    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $statements]];
-
-    if ($name eq '#anonymous') {
-        $name = "anonfunc$func";
-    }
-
-    $context->{locals}->{$name} = $func;
-    return $func;
-}
-
-sub function_call {
-    my ($self, $context, $data) = @_;
-
-    $Data::Dumper::Indent = 0;
-
-    my $target    = $data->[1];
-    my $arguments = $data->[2];
-    my $func;
-
-    if ($target->[0] eq 'IDENT') {
-        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->get_variable($context, $target->[1]);
-
-        if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
-            # builtin function
-            return $self->call_builtin_function($context, $data, $target->[1]);
-        }
-    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $self->{dprint}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $target;
-    } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->statement($context, $target);
-    }
-
-    my $closure    = $func->[1]->[0];
-    my $ret_type   = $func->[1]->[1];
-    my $parameters = $func->[1]->[2];
-    my $statements = $func->[1]->[3];
-
-    # wedge closure in between current scope and previous scope
-    my $new_context = $self->new_context($closure);
-    $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
-    $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
-
-    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
-
-    # check for recursion limit
-    if (++$self->{recursions} > $self->{max_recursion}) {
-        $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
-    }
-
-    # invoke the function
-    my $result = $self->interpret_ast($new_context, $statements);
-    $self->{recursion}--;
-
-    # update inferred return type
-    $func->[1]->[1] = $self->{types}->to_string($result->[0]);
-
-    return $result;
-}
-
-sub is_truthy {
-    my ($self, $context, $expr) = @_;
-
-    my $result = $self->statement($context, $expr);
-
-    if ($self->{types}->check(['TYPE', 'Number'], $result->[0])) {
-        return $result->[1] != 0;
-    }
-
-    if ($self->{types}->check(['TYPE', 'String'], $result->[0])) {
-        return $result->[1] ne "";
-    }
-
-    if ($self->{types}->check(['TYPE', 'Boolean'], $result->[0])) {
-        return $result->[1] != 0;
-    }
-
-    return;
-}
-
 # TODO: do this much more efficiently
 sub parse_string {
     my ($self, $string) = @_;
@@ -687,435 +1150,6 @@ sub interpolate_string {
     $string =~ /\G(.*)/gc;
     $new_string .= $1;
     return $new_string;
-}
-
-sub statement_group {
-    my ($self, $context, $data) = @_;
-    my $new_context = $self->new_context($context);
-    return $self->interpret_ast($new_context, $data->[1]);
-}
-
-sub variable_declaration {
-    my ($self, $context, $data) = @_;
-
-    my $type        = $data->[1];
-    my $name        = $data->[2];
-    my $initializer = $data->[3];
-    my $right_value = undef;
-
-    if ($initializer) {
-        $right_value = $self->statement($context, $initializer);
-    } else {
-        $right_value = [['TYPE', 'Null'], undef];
-    }
-
-    $self->declare_variable($context, $type, $name, $right_value);
-    return $right_value;
-}
-
-sub map_constructor {
-    my ($self, $context, $data) = @_;
-
-    my $map     = $data->[1];
-    my $hashref = {};
-
-    foreach my $entry (@$map) {
-        if ($entry->[0]->[0] eq 'IDENT') {
-            my $var = $self->get_variable($context, $entry->[0]->[1]);
-            $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
-            next;
-        }
-
-        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
-            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
-            next;
-        }
-    }
-
-    return [['TYPE', 'Map'], $hashref];
-}
-
-sub array_constructor {
-    my ($self, $context, $data) = @_;
-
-    my $array    = $data->[1];
-    my $arrayref = [];
-
-    foreach my $entry (@$array) {
-        push @$arrayref, $self->statement($context, $entry);
-    }
-
-    return [['TYPE', 'Array'], $arrayref];
-}
-
-sub keyword_exists {
-    my ($self, $context, $data) = @_;
-
-    my $var = $self->statement($context, $data->[1]->[1]);
-    my $key = $self->statement($context, $data->[1]->[2]);
-
-    if (exists $var->[1]->{$key->[1]}) {
-        return [['TYPE', 'Boolean'], 1];
-    } else {
-        return [['TYPE', 'Boolean'], 0];
-    }
-}
-
-sub keyword_delete {
-    my ($self, $context, $data) = @_;
-
-    # delete one key in map
-    if ($data->[1]->[0] eq 'ACCESS') {
-        my $var = $self->statement($context, $data->[1]->[1]);
-        my $key = $self->statement($context, $data->[1]->[2]);
-
-        my $val = delete $var->[1]->{$key->[1]};
-        return [['TYPE', 'Null'], undef] if not defined $val;
-        return $val;
-    }
-
-    # delete all keys in map
-    if ($data->[1]->[0] eq 'IDENT') {
-        my $var = $self->get_variable($context, $data->[1]->[1]);
-        $var->[1] = {};
-        return $var;
-    }
-}
-
-sub conditional {
-    my ($self, $context, $data) = @_;
-
-    if ($self->is_truthy($context, $data->[1])) {
-        return $self->interpret_ast($context, [$data->[2]]);
-    } else {
-        return $self->interpret_ast($context, [$data->[3]]);
-    }
-}
-
-sub keyword_return {
-    my ($self, $context, $data) = @_;
-    return ['RETURN', $self->statement($context, $data->[1]->[1])];
-}
-
-sub keyword_next {
-    my ($self, $context, $data) = @_;
-    return ['NEXT', undef];
-}
-
-sub keyword_last {
-    my ($self, $context, $data) = @_;
-    return ['LAST', undef];
-}
-
-sub keyword_while {
-    my ($self, $context, $data) = @_;
-
-    while ($self->is_truthy($context, $data->[1])) {
-        if (++$self->{iterations} > $self->{max_iterations}) {
-            $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
-        }
-
-        my $result = $self->statement($context, $data->[2]);
-
-        next if $result->[0] eq 'NEXT';
-        last if $result->[0] eq 'LAST';
-    }
-
-    return [['TYPE', 'Null'], undef];
-}
-
-sub keyword_if {
-    my ($self, $context, $data) = @_;
-
-    if ($self->is_truthy($context, $data->[1])) {
-        return $self->statement($context, $data->[2]);
-    } else {
-        return $self->statement($context, $data->[3]);
-    }
-}
-
-sub add_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-    $left->[1] += $right->[1];
-    return $left;
-}
-
-sub sub_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-    $left->[1] -= $right->[1];
-    return $left;
-}
-
-sub mul_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-    $left->[1] *= $right->[1];
-    return $left;
-}
-
-sub div_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-    $left->[1] /= $right->[1];
-    return $left;
-}
-
-sub cat_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
-    $left->[1] .= $right->[1];
-    return $left;
-}
-
-sub identifier {
-    my ($self, $context, $data) = @_;
-    my $var = $self->get_variable($context, $data->[1]);
-    $self->error($context, "undeclared variable `$data->[1]`") if not defined $var;
-    return $var;
-}
-
-sub stmt_literal {
-    my ($self, $context, $data) = @_;
-    my $type  = $data->[1];
-    my $value = $data->[2];
-    return [$type, $value];
-}
-
-sub prefix_increment {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-    $var->[1]++;
-    return $var;
-}
-
-sub prefix_decrement {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-    $var->[1]--;
-    return $var;
-}
-
-sub postfix_increment {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-    my $temp_var = [$var->[0], $var->[1]];
-    $var->[1]++;
-    return $temp_var;
-}
-
-sub postfix_decrement {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-    my $temp_var = [$var->[0], $var->[1]];
-    $var->[1]--;
-    return $temp_var;
-}
-
-sub logical_and {
-    my ($self, $context, $data) = @_;
-    my $left_value = $self->statement($context, $data->[1]);
-    return $left_value if not $self->is_truthy($context, $left_value);
-    return $self->statement($context, $data->[2]);
-}
-
-sub logical_or {
-    my ($self, $context, $data) = @_;
-    my $left_value = $self->statement($context, $data->[1]);
-    return $left_value if $self->is_truthy($context, $left_value);
-    return $self->statement($context, $data->[2]);
-}
-
-sub range_operator {
-    my ($self, $context, $data) = @_;
-
-    my ($to, $from) = ($data->[1], $data->[2]);
-
-    $to   = $self->statement($context, $to);
-    $from = $self->statement($context, $from);
-
-    return ['RANGE', $to, $from];
-}
-
-# lvalue assignment
-sub assignment {
-    my ($self, $context, $data) = @_;
-
-    my $left_value  = $data->[1];
-    my $right_value = $self->statement($context, $data->[2]);
-
-    # lvalue variable
-    if ($left_value->[0] eq 'IDENT') {
-        my $var = $self->get_variable($context, $left_value->[1]);
-        $self->set_variable($context, $left_value->[1], $right_value);
-        return $right_value;
-    }
-
-    # lvalue array/map access
-    if ($left_value->[0] eq 'ACCESS') {
-        my $var = $self->statement($context, $left_value->[1]);
-
-        if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->statement($context, $left_value->[2]);
-            my $val = $self->statement($context, $right_value);
-            $var->[1]->{$key->[1]} = $val;
-            return $val;
-        }
-
-        if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-            my $index = $self->statement($context, $left_value->[2]);
-            my $val = $self->statement($context, $right_value);
-            $var->[1]->[$index->[1]] = $val;
-            return $val;
-        }
-
-        if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->statement($context, $left_value->[2]->[1]);
-
-            if ($value->[0] eq 'RANGE') {
-                my $from = $value->[1];
-                my $to   = $value->[2];
-
-                if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = $right_value->[1];
-                    return [['TYPE', 'String'], $var->[1]];
-                }
-
-                if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
-                    substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1]) = chr $right_value->[1];
-                    return [['TYPE', 'String'], $var->[1]];
-                }
-            }
-
-            my $index = $value->[1];
-            if ($self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-                substr ($var->[1], $index, 1) = $right_value->[1];
-                return [['TYPE', 'String'], $var->[1]];
-            }
-
-            if ($self->{types}->check(['TYPE', 'Number'], $right_value->[0])) {
-                substr ($var->[1], $index, 1) = chr $right_value->[1];
-                return [['TYPE', 'String'], $var->[1]];
-            }
-        }
-    }
-}
-
-# rvalue array/map index
-sub array_index_notation {
-    my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
-
-    # map index
-    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        my $key = $self->statement($context, $data->[2]);
-        my $val = $var->[1]->{$key->[1]};
-        return [['TYPE', 'Null'], undef] if not defined $val;
-        return $val;
-    }
-
-    # array index
-    if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-        my $index = $self->statement($context, $data->[2]);
-
-        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
-            my $val = $var->[1]->[$index->[1]];
-            return [['TYPE', 'Null'], undef] if not defined $val;
-            return $val;
-        }
-
-        # TODO support RANGE and x:y splices and negative indexing
-    }
-
-    # string index
-    if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->statement($context, $data->[2]->[1]);
-
-        if ($value->[0] eq 'RANGE') {
-            my $from = $value->[1];
-            my $to = $value->[2];
-            return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
-        }
-
-        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
-            my $index = $value->[1];
-            return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
-        }
-    }
-}
-
-sub statement {
-    my ($self, $context, $data) = @_;
-    return if not $data;
-
-    my $ins = $data->[0];
-    $Data::Dumper::Indent = 0;
-    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n") if $self->{debug};
-
-    return $self->statement($context, $data->[1])       if $ins eq 'STMT';
-    return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
-    return $self->stmt_literal($context, $data)         if $ins eq 'LITERAL';
-    return $self->variable_declaration($context, $data) if $ins eq 'VAR';
-    return $self->map_constructor($context, $data)      if $ins eq 'MAPINIT';
-    return $self->array_constructor($context, $data)    if $ins eq 'ARRAYINIT';
-    return $self->keyword_exists($context, $data)       if $ins eq 'EXISTS';
-    return $self->keyword_delete($context, $data)       if $ins eq 'DELETE';
-    return $self->conditional($context, $data)          if $ins eq 'COND';
-    return $self->keyword_while($context, $data)        if $ins eq 'WHILE';
-    return $self->keyword_next($context, $data)         if $ins eq 'NEXT';
-    return $self->keyword_last($context, $data)         if $ins eq 'LAST';
-    return $self->keyword_if($context, $data)           if $ins eq 'IF';
-    return $self->logical_and($context, $data)          if $ins eq 'AND';
-    return $self->logical_or($context, $data)           if $ins eq 'OR';
-    return $self->assignment($context, $data)           if $ins eq 'ASSIGN';
-    return $self->add_assign($context, $data)           if $ins eq 'ADD_ASSIGN';
-    return $self->sub_assign($context, $data)           if $ins eq 'SUB_ASSIGN';
-    return $self->mul_assign($context, $data)           if $ins eq 'MUL_ASSIGN';
-    return $self->div_assign($context, $data)           if $ins eq 'DIV_ASSIGN';
-    return $self->cat_assign($context, $data)           if $ins eq 'CAT_ASSIGN';
-    return $self->identifier($context, $data)           if $ins eq 'IDENT';
-    return $self->function_definition($context, $data)  if $ins eq 'FUNCDEF';
-    return $self->function_call($context, $data)        if $ins eq 'CALL';
-    return $self->keyword_return($context, $data)       if $ins eq 'RET';
-    return $self->prefix_increment($context, $data)     if $ins eq 'PREFIX_ADD';
-    return $self->prefix_decrement($context, $data)     if $ins eq 'PREFIX_SUB';
-    return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
-    return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
-    return $self->range_operator($context, $data)       if $ins eq 'RANGE';
-    return $self->array_index_notation($context, $data) if $ins eq 'ACCESS';
-
-    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
-
-    # unary operators
-    my $value;
-    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '!/not $a'));
-    return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
-    return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
-
-    # binary operators
-    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a . $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
-
-    # unknown instruction
-    return $data;
 }
 
 # converts a map to a string

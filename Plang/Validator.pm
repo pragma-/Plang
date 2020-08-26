@@ -335,6 +335,30 @@ sub keyword_delete {
     $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($data->[1]->[0]) . ")");
 }
 
+sub keyword_keys {
+    my ($self, $context, $data) = @_;
+
+    my $map = $self->statement($context, $data->[1]);
+
+    if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
+        $self->error($context, "keys must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
+    }
+
+    return [['TYPE', 'Array'], []];
+}
+
+sub keyword_values {
+    my ($self, $context, $data) = @_;
+
+    my $map = $self->statement($context, $data->[1]);
+
+    if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
+        $self->error($context, "values must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
+    }
+
+    return [['TYPE', 'Array'], []];
+}
+
 sub function_definition {
     my ($self, $context, $data) = @_;
 
