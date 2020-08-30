@@ -171,26 +171,26 @@ But be careful. If a `String` gets passed to it, Plang will terminate its execut
 with an undesirable run-time error:
 
     > fn add(a, b) a + b; add(3, "4")
-     Error: cannot apply binary operator ADD (have types Number and String)
+     Error: cannot apply binary operator ADD (have types Integer and String)
 
-One way to resolve this is to apply the `Number()` type-conversion function to the
+One way to resolve this is to apply the `Real()` type-conversion function to the
 parameters inside the function body, creating a polymorphic function that can accept
-any arguments that can be converted to `Number`:
+any arguments that can be converted to `Real`:
 
-    > fn add(a, b) Number(a) + Number(b); add(3, "4")
+    > fn add(a, b) Real(a) + Real(b); add(3, "4")
      7
 
 On the other hand, if you desire explicit type checking on the parameters you can add a
 type annotation before each parameter identifier:
 
-    > fn add(Number a, Number b) a + b; print(type(add));
-      Function (Number, Number) -> Any
+    > fn add(Real a, Real b) a + b; print(type(add));
+      Function (Real, Real) -> Any
 
 Now Plang will throw a compile-time error if the types of the arguments do not match the
 types specified for the parameters:
 
-    > fn add(Number a, Number b) a + b; add(3, "4")
-     Error: In function call for `add`, expected Number for parameter `b` but got String
+    > fn add(Real a, Real b) a + b; add(3, "4")
+     Error: In function call for `add`, expected Real for parameter `b` but got String
 
 This version of `add` returns `Any` and its return type will be inferred at run-time from
 the value being returned.
@@ -219,14 +219,14 @@ compile-time type checking. For example, if we pass it a function inferred to re
 Let's return to the `add` function. To specify the type of the return value, you
 can place a type annotation before the function identifier:
 
-    > fn Number add(Number a, Number b) a + b; print(type(add))
-     Function (Number, Number) -> Number
+    > fn Real add(Real a, Real b) a + b; print(type(add))
+     Function (Real, Real) -> Real
 
 Now Plang will throw a compile-time error if `add` attempts to return a value that
-is not a `Number`:
+is not a `Real`:
 
-    > fn Number add(Number a, Number b) "42"; add(3, 4)
-     Error: cannot return String from function declared to return Number
+    > fn Real add(Real a, Real b) "42"; add(3, 4)
+     Error: cannot return String from function declared to return Real
 
 #### Type narrowing during inference
 Variables declared as `Any` will be narrowed to the type of the value being assigned.
@@ -253,11 +253,11 @@ function named after the desired type. To convert `x` to a `Boolean`, write `Boo
 Wrong:
 
     > var a = "45"; a + 1
-     Error: cannot apply binary operator ADD (have types String and Number)
+     Error: cannot apply binary operator ADD (have types String and Integer)
 
 Right:
 
-    > var a = "45"; Number(a) + 1
+    > var a = "45"; Integer(a) + 1
      46
 
 #### Type lists
@@ -661,45 +661,44 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
-The precedence values are large to give me some space to add new operators with
-new precedence. When the dust settles, the values will be made more sensible.
-
-P | Operator | Description | Type
---- | --- | --- | ---
-100 | () | Function call    |
-70 | [] | Array notation    | Postfix
-70 | ++ | Post-increment    | Postfix
-70 | -- | Post-decrement    | Postfix
-60 | ++ | Pre-increment     | Prefix
-60 | -- | Pre-decrement     | Prefix
-60 | !  | Logical negation  | Prefix
-50 | ** | Exponent          | Infix (right-to-left)
-50 | %  | Remainder         | Infix (left-to-right)
-40 | *  | Product           | Infix (left-to-right)
-40 | /  | Division          | Infix (left-to-right)
-30 | +  | Addition          | Infix (left-to-right)
-30 | -  | Subtraction       | Infix (left-to-right)
-25 | .  | String concatenation | Infix (left-to-right)
-25 | ~  | Substring index      | Infix (left-to-right)
-23 | >= | Greater or equal  | Infix (left-to-right)
-23 | <= | Less or equal     | Infix (left-to-right)
-23 | >  | Greater           | Infix (left-to-right)
-23 | <  | Less              | Infix (left-to-right)
-20 | == | Equality          | Infix (left-to-right)
-20 | != | Inequality        | Infix (left-to-right)
-17 | && | Logical and       | Infix (left-to-right)
-16 | \|\| | Logical or        | Infix (left-to-right)
-15 | ?: | Conditional       | Infix ternary (right-to-left)
-10 | =  | Assignment        | Infix (right-to-left)
-10 | += | Addition assignment     | Infix (right-to-left)
-10 | -= | Subtraction assignment  | Infix (right-to-left)
-10 | \*= | Product assignment     | Infix (right-to-left)
-10 | /= | Division assignment     | Infix (right-to-left)
-7  | .= | String concat assignment | Infix (right-to-left)
-5  | ,  | Comma             | Infix (left-to-right)
-4  | not | Logical negation | Prefix
-3  | and | Logical and      | Infix (left-to-right)
-2  | or  | Logical or       | Infix (left-to-right)
+ P  | Op  | Description              | Associativity
+--- | --- | ---                      | ---
+18  | .   | Class/Map access         | Infix (right-to-left)
+17  | ()  | Function call            | Postfix
+16  | []  | Array/Map access         | Postfix
+16  | ++  | Post-increment           | Postfix
+16  | --  | Post-decrement           | Postfix
+15  | ++  | Pre-increment            | Prefix
+15  | --  | Pre-decrement            | Prefix
+15  | !   | Logical negation         | Prefix
+14  | ^   | Exponent                 | Infix (right-to-left)
+14  | **  | Exponent                 | Infix (right-to-left)
+14  | %   | Remainder                | Infix (left-to-right)
+13  | *   | Product                  | Infix (left-to-right)
+13  | /   | Division                 | Infix (left-to-right)
+12  | +   | Addition                 | Infix (left-to-right)
+12  | -   | Subtraction              | Infix (left-to-right)
+11  | ^^  | String concatenation     | Infix (left-to-right)
+11  | ~   | Substring index          | Infix (left-to-right)
+10  | >=  | Greater or equal         | Infix (left-to-right)
+10  | <=  | Less or equal            | Infix (left-to-right)
+10  | >   | Greater                  | Infix (left-to-right)
+10  | <   | Less                     | Infix (left-to-right)
+9   | ==  | Equality                 | Infix (left-to-right)
+9   | !=  | Inequality               | Infix (left-to-right)
+8   | &&  | Logical and              | Infix (left-to-right)
+7   | \|\ | | Logical or             | Infix (left-to-right)
+6   | ?:  | Conditional              | Infix ternary (right-to-left)
+5   | =   | Assignment               | Infix (right-to-left)
+5   | +=  | Addition assignment      | Infix (right-to-left)
+5   | -=  | Subtraction assignment   | Infix (right-to-left)
+5   | \*= | Product assignment       | Infix (right-to-left)
+5   | /=  | Division assignment      | Infix (right-to-left)
+5   | .=  | String concat assignment | Infix (right-to-left)
+4   | ,   | Comma                    | Infix (left-to-right)
+3   | not | Logical negation         | Prefix
+2   | and | Logical and              | Infix (left-to-right)
+1   | or  | Logical or               | Infix (left-to-right)
 
 `!`, `&&`, and `||` have high precedence such that they are useful in constructing an expression;
 `not`, `and`, and `or` have low precedence such that they are useful for flow control between
@@ -730,9 +729,9 @@ When prefixed with a dollar-sign, a `String` will interpolate any brace-enclosed
      "hello 43 world"
 
 #### Concatenation
-To concatenate two strings, use the `.` operator. But consider using [interpolation](#interpolation) instead.
+To concatenate two strings, use the `^^` operator. But consider using [interpolation](#interpolation) instead.
 
-    > var a = "Plang"; var b = "Rocks!"; a . " " . b
+    > var a = "Plang"; var b = "Rocks!"; a ^^ " " ^^ b
      "Plang Rocks!"
 
 #### Substring search
@@ -865,7 +864,7 @@ identifiers and default arguments, see the [`whatis`](#whatis) builtin function.
 Its [`whatis`](#whatis) is: `Builtin (Any expr) -> String`
 
     > type(3.14)
-     "Number"
+     "Real"
 
     > var a = "hello"; type(a)
      "String"

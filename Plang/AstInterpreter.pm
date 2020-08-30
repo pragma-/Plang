@@ -557,8 +557,8 @@ sub assignment {
     }
 }
 
-# rvalue array/map index
-sub array_index_notation {
+# rvalue array/map access
+sub access_notation {
     my ($self, $context, $data) = @_;
     my $var = $self->statement($context, $data->[1]);
 
@@ -636,21 +636,20 @@ sub binary_op {
             $self->{dprint}->('OPERS', "$debug_msg\n");
         }
 
-        if ($self->{types}->is_arithmetic($left_value->[0]) and $self->{types}->is_arithmetic($right_value->[0])) {
-            my $result = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
-
-            if ($self->{types}->is_subtype($left_value->[0], $result->[0])) {
-                $result->[0] = $left_value->[0];
-            }
-
-            return $result;
-        }
-
         if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-            $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
+            $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0]);
             $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
             return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
         }
+
+        my $result    = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
+        my $promotion = $self->{types}->get_promoted_type($left_value->[0], $right_value->[0]);
+
+        if ($self->{types}->is_subtype($promotion, $result->[0])) {
+            $result->[0] = $promotion;
+        }
+
+        return $result;
     }
 
     return;
@@ -716,7 +715,7 @@ sub statement {
     return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
     return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
     return $self->range_operator($context, $data)       if $ins eq 'RANGE';
-    return $self->array_index_notation($context, $data) if $ins eq 'ACCESS';
+    return $self->access_notation($context, $data)      if $ins eq 'ACCESS';
 
     return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
 

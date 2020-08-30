@@ -52,8 +52,17 @@ sub initialize {
     $self->add('Number', 'Real');
     $self->add('Number', 'Integer');
 
+    # subtype of Real
+    $self->add('Real', 'Integer');
+
     # subtype of Function
     $self->add('Function', 'Builtin');
+
+    # ranks for promotions
+    $self->{rank}->{Null}    = 5;
+    $self->{rank}->{Boolean} = 10;
+    $self->{rank}->{Integer} = 15;
+    $self->{rank}->{Real}    = 20;
 }
 
 # add a type name
@@ -126,7 +135,25 @@ sub is_subtype {
 sub is_arithmetic {
     my ($self, $type) = @_;
     return 1 if $self->has_subtype('Number', $type->[1]);
+    return 1 if $self->has_subtype('Boolean', $type->[1]);
     return 0;
+}
+
+# returns higher ranked type
+sub get_promoted_type {
+    my ($self, $type1, $type2) = @_;
+
+    if ($self->is_subtype($type1, $type2)) {
+        if (exists $self->{rank}->{$type1->[1]} and exists $self->{rank}->{$type2->[1]}) {
+            if ($self->{rank}->{$type1->[1]} > $self->{rank}->{$type2->[1]}) {
+                return $type1;
+            } else {
+                return $type2;
+            }
+        }
+    }
+
+    return $type1;
 }
 
 # type-checking

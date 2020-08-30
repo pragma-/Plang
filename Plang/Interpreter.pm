@@ -86,7 +86,8 @@ sub initialize {
 # !used ['PIPE',             qr{\G(   \|                  )}x],
         ['AMP_AMP',          qr{\G(   &&                  )}x],
 # !used ['AMP',              qr{\G(   &                   )}x],
-        ['CARET',            qr{\G(   ^                   )}x],
+        ['CARET_CARET',      qr{\G(   \^\^                )}x],
+        ['CARET',            qr{\G(   \^                  )}x],
         ['PERCENT',          qr{\G(   %                   )}x],
         ['POUND',            qr{\G(   \#                  )}x],
         ['COMMA',            qr{\G(   ,                   )}x],
@@ -130,7 +131,7 @@ sub initialize {
 
     $self->{parser}->define_types($self->{types}->as_list);
 
-    $self->{validator}   = Plang::Validator->new(debug => $conf{debug}, types => $self->{types});
+    $self->{validator} = Plang::Validator->new(debug => $conf{debug}, types => $self->{types});
 
     $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug}, types => $self->{types});
 }

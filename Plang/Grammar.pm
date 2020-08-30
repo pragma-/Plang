@@ -897,95 +897,66 @@ sub UnexpectedKeyword {
 }
 
 my %precedence_table = (
-    CALL        => 100,
-    POSTFIX     => 70,
-    PREFIX      => 60,
-    EXPONENT    => 50,
-    PRODUCT     => 40,
-    SUM         => 30,
-    STRING      => 25,
-    RELATIONAL  => 23,
-    EQUALITY    => 20,
-    LOGICAL_AND => 17,
-    LOGICAL_OR  => 16,
-    CONDITIONAL => 15,
-    ASSIGNMENT  => 10,
-    STRING_CAT  => 7,
-    COMMA       => 5,
-    LOW_NOT     => 4,
-    LOW_AND     => 3,
-    LOW_OR      => 2,
+    ACCESS      => 18,
+    CALL        => 17,
+    POSTFIX     => 16,
+    PREFIX      => 15,
+    EXPONENT    => 14,
+    PRODUCT     => 13,
+    SUM         => 12,
+    STRING      => 11,
+    RELATIONAL  => 10,
+    EQUALITY    => 9,
+    LOGICAL_AND => 8,
+    LOGICAL_OR  => 7,
+    CONDITIONAL => 6,
+    ASSIGNMENT  => 5,
+    COMMA       => 4,
+    LOW_NOT     => 3,
+    LOW_AND     => 2,
+    LOW_OR      => 1,
 );
 
 # postfix is handled by Infix
 my %infix_token_precedence = (
-    L_PAREN      => $precedence_table{'CALL'},
-    PLUS_PLUS    => $precedence_table{'POSTFIX'},
-    MINUS_MINUS  => $precedence_table{'POSTFIX'},
-    L_BRACKET    => $precedence_table{'POSTFIX'},
-    STAR_STAR    => $precedence_table{'EXPONENT'},
-    PERCENT      => $precedence_table{'EXPONENT'},
-    STAR         => $precedence_table{'PRODUCT'},
-    SLASH        => $precedence_table{'PRODUCT'},
-    PLUS         => $precedence_table{'SUM'},
-    MINUS        => $precedence_table{'SUM'},
-    TILDE        => $precedence_table{'STRING'},
-    DOT          => $precedence_table{'STRING'},
-    GREATER_EQ   => $precedence_table{'RELATIONAL'},
-    LESS_EQ      => $precedence_table{'RELATIONAL'},
-    GREATER      => $precedence_table{'RELATIONAL'},
-    LESS         => $precedence_table{'RELATIONAL'},
-    EQ           => $precedence_table{'EQUALITY'},
-    NOT_EQ       => $precedence_table{'EQUALITY'},
-    AMP_AMP      => $precedence_table{'LOGICAL_AND'},
-    PIPE_PIPE    => $precedence_table{'LOGICAL_OR'},
-    QUESTION     => $precedence_table{'CONDITIONAL'},
-    ASSIGN       => $precedence_table{'ASSIGNMENT'},
-    PLUS_EQ      => $precedence_table{'ASSIGNMENT'},
-    MINUS_EQ     => $precedence_table{'ASSIGNMENT'},
-    STAR_EQ      => $precedence_table{'ASSIGNMENT'},
-    SLASH_EQ     => $precedence_table{'ASSIGNMENT'},
-    DOT_EQ       => $precedence_table{'ASSIGNMENT'},
-    #COMMA        => $precedence_table{'COMMA'},
-    NOT          => $precedence_table{'LOW_NOT'},
-    AND          => $precedence_table{'LOW_AND'},
-    OR           => $precedence_table{'LOW_OR'},
-
+    DOT            => $precedence_table{'ACCESS'},
+    L_PAREN        => $precedence_table{'CALL'},
+    PLUS_PLUS      => $precedence_table{'POSTFIX'},
+    MINUS_MINUS    => $precedence_table{'POSTFIX'},
+    L_BRACKET      => $precedence_table{'POSTFIX'},
+    STAR_STAR      => $precedence_table{'EXPONENT'},
+    CARET          => $precedence_table{'EXPONENT'},
+    PERCENT        => $precedence_table{'EXPONENT'},
+    STAR           => $precedence_table{'PRODUCT'},
+    SLASH          => $precedence_table{'PRODUCT'},
+    PLUS           => $precedence_table{'SUM'},
+    MINUS          => $precedence_table{'SUM'},
+    CARET_CARET    => $precedence_table{'STRING'},
+    TILDE          => $precedence_table{'STRING'},
+    GREATER_EQ     => $precedence_table{'RELATIONAL'},
+    LESS_EQ        => $precedence_table{'RELATIONAL'},
+    GREATER        => $precedence_table{'RELATIONAL'},
+    LESS           => $precedence_table{'RELATIONAL'},
+    EQ             => $precedence_table{'EQUALITY'},
+    NOT_EQ         => $precedence_table{'EQUALITY'},
+    AMP_AMP        => $precedence_table{'LOGICAL_AND'},
+    PIPE_PIPE      => $precedence_table{'LOGICAL_OR'},
+    QUESTION       => $precedence_table{'CONDITIONAL'},
+    ASSIGN         => $precedence_table{'ASSIGNMENT'},
+    PLUS_EQ        => $precedence_table{'ASSIGNMENT'},
+    MINUS_EQ       => $precedence_table{'ASSIGNMENT'},
+    STAR_EQ        => $precedence_table{'ASSIGNMENT'},
+    SLASH_EQ       => $precedence_table{'ASSIGNMENT'},
+    DOT_EQ         => $precedence_table{'ASSIGNMENT'},
+    #COMMA         => $precedence_table{'COMMA'},
+    NOT            => $precedence_table{'LOW_NOT'},
+    AND            => $precedence_table{'LOW_AND'},
+    OR             => $precedence_table{'LOW_OR'},
 );
 
 sub get_precedence {
     my ($tokentype) = @_;
     return $infix_token_precedence{$tokentype} // 0;
-}
-
-sub Expression {
-    my ($parser, $precedence) = @_;
-
-    $precedence ||= 0;
-
-    $parser->try("Expression (prec $precedence)");
-
-    {
-        my $left = Prefix($parser, $precedence);
-        return if $parser->errored;
-
-        goto EXPRESSION_FAIL if not $left;
-
-        while (1) {
-            my $token = $parser->next_token('peek');
-            last if not defined $token;
-            last if $precedence >= get_precedence $token->[0];
-
-            $left = Infix($parser, $left, $precedence);
-            return if $parser->errored;
-        }
-
-        $parser->advance;
-        return $left;
-    }
-
-  EXPRESSION_FAIL:
-    $parser->backtrack;
 }
 
 sub UnaryOp {
@@ -1018,6 +989,36 @@ sub expand_escapes {
     (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
     )/"qq|\\$1|"/geex;
     return $string;
+}
+
+sub Expression {
+    my ($parser, $precedence) = @_;
+
+    $precedence ||= 0;
+
+    $parser->try("Expression (prec $precedence)");
+
+    {
+        my $left = Prefix($parser, $precedence);
+        return if $parser->errored;
+
+        goto EXPRESSION_FAIL if not $left;
+
+        while (1) {
+            my $token = $parser->next_token('peek');
+            last if not defined $token;
+            last if $precedence >= get_precedence $token->[0];
+
+            $left = Infix($parser, $left, get_precedence $token->[0]);
+            return if $parser->errored;
+        }
+
+        $parser->advance;
+        return $left;
+    }
+
+  EXPRESSION_FAIL:
+    $parser->backtrack;
 }
 
 sub Prefix {
@@ -1070,18 +1071,12 @@ sub Prefix {
 
     # special case types as identifiers here
     $token = $parser->next_token('peek');
-    if ($token->[0] =~ /TYPE_(.*)/) {
-        my $ident = $1;
-        $parser->consume;
-        my $postfix = Postfix($parser, ['IDENT', $ident]);
-        return if $parser->errored;
-        return $postfix;
+    if (defined $token and $token->[0] =~ /TYPE_(.*)/) {
+        return ['IDENT', $1];
     }
 
     if ($token = $parser->consume('IDENT')) {
-        my $postfix = Postfix($parser, ['IDENT', $token->[1]]);
-        return if $parser->errored;
-        return $postfix;
+        return ['IDENT', $token->[1]];
     }
 
     if ($token = $parser->consume('SQUOTE_STRING_I')) {
@@ -1160,14 +1155,16 @@ sub Infix {
     }
 
     # binary operators
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'ACCESS',     'ACCESS',       1);
     return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',        'EXPONENT',     1);
+    return $expr if $expr = BinaryOp($parser, $left, 'CARET',       'POW',        'EXPONENT',     1);
     return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',        'EXPONENT');
     return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',        'PRODUCT');
     return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',        'PRODUCT');
     return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',        'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',        'SUM');
     return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX',     'STRING');
-    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'STRCAT',     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'CARET_CARET', 'STRCAT',     'STRING');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',        'RELATIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',        'RELATIONAL');
     return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',         'RELATIONAL');
@@ -1221,7 +1218,7 @@ sub Postfix {
         return ['CALL', $left, $arguments];
     }
 
-    # array/map index
+    # array/map access
     if ($parser->consume('L_BRACKET')) {
         my $stmt = Statement($parser);
         return if $parser->errored;

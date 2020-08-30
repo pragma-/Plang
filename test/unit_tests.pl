@@ -36,7 +36,7 @@ my @tests = (
         [['TYPE', 'Integer'], 6 ]],
     ['"hello world" ~ "bye"',
         [['TYPE', 'Integer'], -1 ]],
-    ['"hi " . 0x263a',
+    ['"hi " ^^ 0x263a',
         [['TYPE', 'String'], 'hi ☺' ]],
     ['fn fib(n) n == 1 ? 1 : n == 2 ? 1 : fib(n-1) + fib(n-2); fib(12)',
         [['TYPE', 'Integer'], 144 ]],

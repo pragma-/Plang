@@ -3,6 +3,8 @@
 # Validates a Plang syntax tree by performing static type-checking,
 # semantic-analysis, etc, so the interpreter need not concern itself
 # with these potentially expensive operations.
+#
+# Also performs various syntax desugaring.
 
 package Plang::Validator;
 
@@ -57,8 +59,6 @@ sub binary_op {
 
         if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
             if (exists $self->{eval_binary_op_String}->{$op}) {
-                $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0],);
-                $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
                 return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
             }
         }
@@ -71,12 +71,13 @@ sub binary_op {
             $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right_value->[0]));
         }
 
-        if ($self->{types}->check($left_value->[0], $right_value->[0])) {
+        if ($self->{types}->check($left_value->[0], $right_value->[0]) or $self->{types}->check($right_value->[0], $left_value->[0])) {
             if (exists $self->{eval_binary_op_Number}->{$op}) {
-                my $result = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
+                my $result    = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
+                my $promotion = $self->{types}->get_promoted_type($left_value->[0], $right_value->[0]);
 
-                if ($self->{types}->is_subtype($left_value->[0], $result->[0])) {
-                    $result->[0] = $left_value->[0];
+                if ($self->{types}->is_subtype($promotion, $result->[0])) {
+                    $result->[0] = $promotion;
                 }
 
                 return $result;
@@ -93,6 +94,11 @@ sub type_check_prefix_postfix_op {
     my ($self, $context, $data, $op) = @_;
 
     if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ACCESS' && $data->[1]->[1]->[0] eq 'IDENT') {
+        # desugar x.y to x['y']
+        if ($data->[2]->[0] eq 'IDENT') {
+            $data->[2] = ['LITERAL', ['TYPE', 'String'], $data->[2]->[1]];
+        }
+
         my $var = $self->statement($context, $data->[1]);
 
         if ($self->{types}->is_arithmetic($var->[0])) {
@@ -680,6 +686,54 @@ sub keyword_while {
     return [['TYPE', 'Null'], undef];
 }
 
+# rvalue array/map access
+sub access_notation {
+    my ($self, $context, $data) = @_;
+    my $var = $self->statement($context, $data->[1]);
+
+    # map index
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+        # desugar x.y to x['y']
+        if ($data->[2]->[0] eq 'IDENT') {
+            $data->[2] = ['LITERAL', ['TYPE', 'String'], $data->[2]->[1]];
+        }
+
+        my $key = $self->statement($context, $data->[2]);
+        my $val = $var->[1]->{$key->[1]};
+        return [['TYPE', 'Null'], undef] if not defined $val;
+        return $val;
+    }
+
+    # array index
+    if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
+        my $index = $self->statement($context, $data->[2]);
+
+        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
+            my $val = $var->[1]->[$index->[1]];
+            return [['TYPE', 'Null'], undef] if not defined $val;
+            return $val;
+        }
+
+        # TODO support RANGE and x:y splices and negative indexing
+    }
+
+    # string index
+    if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
+        my $value = $self->statement($context, $data->[2]->[1]);
+
+        if ($value->[0] eq 'RANGE') {
+            my $from = $value->[1];
+            my $to = $value->[2];
+            return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
+        }
+
+        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
+            my $index = $value->[1];
+            return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
+        }
+    }
+}
+
 # lvalue assignment
 sub assignment {
     my ($self, $context, $data) = @_;
@@ -700,6 +754,11 @@ sub assignment {
         my $var = $self->statement($context, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+            # desugar x.y to x['y']
+            if ($left_value->[2]->[0] eq 'IDENT') {
+                $left_value->[2] = ['LITERAL', ['TYPE', 'String'], $left_value->[2]->[1]];
+            }
+
             my $key = $self->statement($context, $left_value->[2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
