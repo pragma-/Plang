@@ -801,8 +801,8 @@ The second way is to use the `.` operator followed by a bareword value. A
 bareword value is a single `String` word without quotation symbols. As such,
 bareword values cannot contain whitespace.
 
-   > var x = {}; x.y = 42; x
-    {"y": 42}
+    > var x = {}; x.y = 42; x
+     {"y": 42}
 
 Nested maps:
 
@@ -812,7 +812,7 @@ Nested maps:
     > var m = {}; m["x"] = {"y": 42}; m["x"]["y"]
      42
 
-Alternative `.` access syntax:
+Same as above, but using the alternative `.` access syntax:
 
     > var m = {"x": {"y": 42}}; m.x.y
      42
