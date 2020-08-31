@@ -787,7 +787,7 @@ See the documentation for the builtin [filter](#filter-1) function.
 ### Map operations
 #### Creating and accessing maps
 To create a map use curly braces optionally containing a list of key/value pairs
-formatted as `"key": value`.
+formatted as `key: value` where `key` is of type `String`.
 
     > var x = {"y": 42, "z": true}
 
