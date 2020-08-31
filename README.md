@@ -663,7 +663,7 @@ These are the operators implemented so far, from highest to lowest precedence.
 
  P  | Op  | Description              | Associativity
 --- | --- | ---                      | ---
-18  | .   | Class/Map access         | Infix (right-to-left)
+18  | .   | Class/Map access         | Infix (left-to-right)
 17  | ()  | Function call            | Postfix
 16  | []  | Array/Map access         | Postfix
 16  | ++  | Post-increment           | Postfix
@@ -786,22 +786,38 @@ See the documentation for the builtin [filter](#filter-1) function.
 
 ### Map operations
 #### Creating and accessing maps
-Creating a map and accessing a key:
+To create a map use curly braces optionally containing a list of key/value pairs
+formatted as `"key": value`.
 
-    > var player = { "name": "Grok", "health": 100, "iq": 75 }; player["iq"]
-     75
+    > var x = {"y": 42, "z": true}
 
-Creating an empty map and then assigning a value to a key:
+There are two syntactical ways to set/access map keys. The first, and core, way
+is to use a value of type `String` enclosed in square brackets.
 
-    > var m = {}; m["color"] = "blue"; $"The color is {m['color']}!"
-     "The color is blue!"
+    > var x = {}; x["y"] = 42; x
+     {"y": 42}
+
+The second way is to use the `.` operator followed by a bareword value. A
+bareword value is a single `String` word without quotation symbols. As such,
+bareword values cannot contain whitespace.
+
+   > var x = {}; x.y = 42; x
+    {"y": 42}
 
 Nested maps:
 
     > var m = {"x": {"y": 42}}; m["x"]["y"]
      42
 
-    > var m = {}; a["x"] = {"y": 42}; m["x"]["y"]
+    > var m = {}; m["x"] = {"y": 42}; m["x"]["y"]
+     42
+
+Alternative `.` access syntax:
+
+    > var m = {"x": {"y": 42}}; m.x.y
+     42
+
+    > var m = {}; m.x = {"y": 42}; m.x.y
      42
 
 #### exists

@@ -1007,9 +1007,10 @@ sub Expression {
         while (1) {
             my $token = $parser->next_token('peek');
             last if not defined $token;
-            last if $precedence >= get_precedence $token->[0];
+            my $token_precedence = get_precedence $token->[0];
+            last if $precedence >= $token_precedence;
 
-            $left = Infix($parser, $left, get_precedence $token->[0]);
+            $left = Infix($parser, $left, $token_precedence);
             return if $parser->errored;
         }
 
@@ -1155,7 +1156,7 @@ sub Infix {
     }
 
     # binary operators
-    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'ACCESS',     'ACCESS',       1);
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'ACCESS',     'ACCESS');
     return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',        'EXPONENT',     1);
     return $expr if $expr = BinaryOp($parser, $left, 'CARET',       'POW',        'EXPONENT',     1);
     return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',        'EXPONENT');
