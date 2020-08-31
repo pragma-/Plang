@@ -806,6 +806,9 @@ bareword values cannot contain whitespace.
 
 Nested maps:
 
+    > var m = {}; m["x"] = {}; m["x"]["y"] = 42; m
+     {"x": {"y": 42}}
+
     > var m = {"x": {"y": 42}}; m["x"]["y"]
      42
 
@@ -813,6 +816,9 @@ Nested maps:
      42
 
 Same as above, but using the alternative `.` access syntax:
+
+    > var m = {}; m.x = {}; m.x.y = 42; m
+     {"x": {"y": 42}}
 
     > var m = {"x": {"y": 42}}; m.x.y
      42
