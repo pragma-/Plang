@@ -1073,7 +1073,9 @@ sub Prefix {
     # special case types as identifiers here
     $token = $parser->next_token('peek');
     if (defined $token and $token->[0] =~ /TYPE_(.*)/) {
-        return ['IDENT', $1];
+        my $ident = $1;
+        $parser->consume;
+        return ['IDENT', $ident];
     }
 
     if ($token = $parser->consume('IDENT')) {

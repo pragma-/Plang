@@ -1009,19 +1009,19 @@ sub function_builtin_Real {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
-        return [['TYPE', 'Real'], 0];
+        return [['TYPE', 'Real'], sprintf "%f", 0];
     }
 
     if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
-        return [['TYPE', 'Real'], $expr->[1]];
+        return [['TYPE', 'Real'], sprintf "%f", $expr->[1]];
     }
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
-        return [['TYPE', 'Real'], $expr->[1]];
+        return [['TYPE', 'Real'], sprintf "%f", $expr->[1]];
     }
 
     if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
-        return [['TYPE', 'Real'], $expr->[1]];
+        return [['TYPE', 'Real'], sprintf "%f", $expr->[1]];
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Real");
