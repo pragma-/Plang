@@ -127,17 +127,17 @@ sub alternate_statement {
 # Grammar: Statement ::=   StatementGroup
 #                        | VariableDeclaration
 #                        | FunctionDefinition
-#                        | ReturnStatement
+#                        | ReturnExpression
 #                        | NextStatement
 #                        | LastStatement
 #                        | WhileStatement
-#                        | IfStatement
+#                        | IfExpression
 #                        | ElseWithoutIf
-#                        | ExistsStatement
-#                        | DeleteStatement
-#                        | KeysStatement
-#                        | ValuesStatement
-#                        | RangeStatement
+#                        | ExistsExpression
+#                        | DeleteExpression
+#                        | KeysExpression
+#                        | ValuesExpression
+#                        | RangeExpression
 #                        | Expression TERM
 #                        | UnexpectedKeyword
 #                        | TERM
@@ -163,7 +163,7 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'Statement: FunctionDefinition'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,     'Statement: ReturnStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&ReturnExpression,    'Statement: ReturnExpression'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&NextStatement,       'Statement: NextStatement'));
@@ -175,7 +175,7 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&WhileStatement,      'Statement: WhileStatement'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&IfStatement,         'Statement: IfStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&IfExpression,        'Statement: IfExpression'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&ElseWithoutIf,       'Statement: ElseWithoutIf'));
@@ -184,16 +184,16 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&ExistsStatement,     'Statement: ExistsStatement'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&DeleteStatement,     'Statement: DeleteStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&DeleteExpression,    'Statement: DeleteExpression'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&KeysStatement,       'Statement: KeysStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&KeysExpression,      'Statement: KeysExpression'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&ValuesStatement,     'Statement: ValuesStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&ValuesExpression,    'Statement: ValuesExpression'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&RangeStatement,      'Statement: RangeStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&RangeExpression,     'Statement: RangeExpression'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&Expression,          'Statement: Expression'));
@@ -611,11 +611,11 @@ sub IdentifierList {
     $parser->backtrack;
 }
 
-# Grammar: ReturnStatement ::= KEYWORD_return Statement
-sub ReturnStatement {
+# Grammar: ReturnExpression ::= KEYWORD_return Statement
+sub ReturnExpression {
     my ($parser) = @_;
 
-    $parser->try('ReturnStatement');
+    $parser->try('ReturnExpression');
 
     {
         if ($parser->consume('KEYWORD_return')) {
@@ -700,11 +700,11 @@ sub WhileStatement {
     $parser->backtrack;
 }
 
-# Grammar: IfStatement ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
-sub IfStatement {
+# Grammar: IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
+sub IfExpression {
     my ($parser) = @_;
 
-    $parser->try('IfStatement');
+    $parser->try('IfExpression');
 
     {
         if ($parser->consume('KEYWORD_if')) {
@@ -778,11 +778,11 @@ sub ExistsStatement {
     $parser->backtrack;
 }
 
-# Grammar: DeleteStatement ::= KEYWORD_delete Statement
-sub DeleteStatement {
+# Grammar: DeleteExpression ::= KEYWORD_delete Statement
+sub DeleteExpression {
     my ($parser) = @_;
 
-    $parser->try('DeleteStatement');
+    $parser->try('DeleteExpression');
 
     {
         if ($parser->consume('KEYWORD_delete')) {
@@ -805,11 +805,11 @@ sub DeleteStatement {
     $parser->backtrack;
 }
 
-# Grammar: KeysStatement ::= KEYWORD_keys Statement
-sub KeysStatement {
+# Grammar: KeysExpression ::= KEYWORD_keys Statement
+sub KeysExpression {
     my ($parser) = @_;
 
-    $parser->try('KeysStatement');
+    $parser->try('KeysExpression');
 
     {
         if ($parser->consume('KEYWORD_keys')) {
@@ -832,11 +832,11 @@ sub KeysStatement {
     $parser->backtrack;
 }
 
-# Grammar: ValuesStatement ::= KEYWORD_values Statement
-sub ValuesStatement {
+# Grammar: ValuesExpression ::= KEYWORD_values Statement
+sub ValuesExpression {
     my ($parser) = @_;
 
-    $parser->try('ValuesStatement');
+    $parser->try('ValuesExpression');
 
     {
         if ($parser->consume('KEYWORD_values')) {
@@ -859,11 +859,11 @@ sub ValuesStatement {
     $parser->backtrack;
 }
 
-# Grammar: RangeStatement ::= Expression ".." Expression
-sub RangeStatement {
+# Grammar: RangeExpression ::= Expression ".." Expression
+sub RangeExpression {
     my ($parser) = @_;
 
-    $parser->try('RangeStatement');
+    $parser->try('RangeExpression');
 
     {
         my $from = Expression($parser);
@@ -1030,7 +1030,7 @@ sub Prefix {
     return if $parser->errored;
     return $func if $func;
 
-    my $if = IfStatement($parser);
+    my $if = IfExpression($parser);
     return if $parser->errored;
     return $if if $if;
 
