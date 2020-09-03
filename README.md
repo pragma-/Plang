@@ -181,7 +181,7 @@ any arguments that can be converted to `Real`:
      7
 
 On the other hand, if you desire explicit type checking on the parameters you can add a
-type annotation before each parameter identifier:
+type annotation, prefixed with a colon, after each parameter identifier:
 
     > fn add(a: Real, b: Real) a + b; print(type(add));
       Function (Real, Real) -> Any
@@ -209,27 +209,29 @@ as the first argument:
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
-Because the `filter` function is explicitly typed to return a `Boolean`, Plang can perform
-compile-time type checking. For example, if we pass it a function inferred to return an `Integer`:
+Because the first parameter of the `filter` function is explicitly typed to return a `Boolean` value,
+Plang can perform strict compile-time type checking on the return value of the passed argument. For
+example, if we pass it a function inferred instead to return an `Integer` we get a helpful type error:
 
     > filter(fn(a) 4, [1, 2, 3, 4, 5])
      Error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Integer
 
 Let's return to the `add` function. To specify the type of the return value, you
-can place a type annotation before the function identifier:
+can place a type annotation, prefixed with an arrow, just before the function body:
 
     > fn add(a: Real, b: Real) -> Real { a + b }; print(type(add))
      Function (Real, Real) -> Real
 
-Now Plang will throw a compile-time error if `add` attempts to return a value that
+Now Plang will throw a compile-time type error if `add` attempts to return a value that
 is not a `Real`:
 
     > fn add(a: Real, b: Real) -> Real { "42" }; add(3, 4)
      Error: cannot return String from function declared to return Real
 
 #### Type narrowing during inference
-Variables declared as `Any` will be narrowed to the type of the value being assigned.
+To enforce the consistency of values assigned to the variable during its lifetime,
+variables declared as `Any` will be narrowed to the type of the value initially assigned.
 
 For example, a variable of type `Any` initialized to `true` will have its type narrowed
 to `Boolean`:
@@ -237,8 +239,7 @@ to `Boolean`:
     > var a = true; type(a)
      "Boolean"
 
-It will then be a type error to assign a value of any other type to it. This is to enforce
-the consistency of values assigned to the variable during its lifetime.
+It will then be a type error to assign a value of any other type to it.
 
     > var a = true; a = "hello"
      Error: cannot assign to `a` a value of type String (expected Boolean)
@@ -480,17 +481,25 @@ delete | deletes a key from a Map
     Initializer         ::= "=" Statement
 
 Variables are explicitly declared with the `var` keyword, followed by an identifier.
-The identifier may be optionally followed by a type annotation, which is a colon followed by a
-type description. Variables declarations may optionally have an initializer that assigns
+The identifier may be optionally followed by a type annotation, which is a type description
+prefixed with a colon. Variables declarations may optionally have an initializer that assigns
 a default value. Without an initializer, the value of variables will default to `null`.
 
-The `var` statement returns the value of the variable.
+The `var` statement returns the value of the variable. When type annotations are ommited,
+the variable's type will be inferred from its initializer value.
 
-    > var a = 5
+    > var a = 5; print(type(a)); a
+     Integer
      5
 
-    > var a = "hello"
+    > var a = "hello"; print(type(a)); a
+     String
      "hello"
+
+A type annotation may be provided to enable strict compile-time type-checking.
+
+    > var a: String = 5
+     Error: cannot initialize `a` with value of type Integer (expected String)
 
 Attempting to use a variable that has not been declared will produce an error.
 
