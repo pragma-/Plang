@@ -485,7 +485,7 @@ The identifier may be optionally followed by a type annotation, which is a type 
 prefixed with a colon. Variables declarations may optionally have an initializer that assigns
 a default value. Without an initializer, the value of variables will default to `null`.
 
-The `var` statement returns the value of the variable. When type annotations are ommited,
+The `var` statement returns the value of the variable. When type annotations are omitted,
 the variable's type will be inferred from its initializer value.
 
     > var a = 5; print(type(a)); a
