@@ -70,7 +70,7 @@ CODE
         [['TYPE', 'Integer'], 5             ]],
     ['type(fn)',
         [['TYPE', 'String'], 'Function () -> Any' ]],
-    ['fn Boolean f(Number a, String b) true; type(f)',
+    ['fn f(a: Number, b: String) -> Boolean true; type(f)',
         [['TYPE', 'String'], 'Function (Number, String) -> Boolean' ]],
     ['type(1==1)',
         [['TYPE', 'String'], 'Boolean'  ]],

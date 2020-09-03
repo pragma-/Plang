@@ -1207,6 +1207,11 @@ sub output_value {
 
     my $result = "";
 
+    # identifiers
+    if ($value->[0] eq 'IDENT') {
+        return $value->[1];
+    }
+
     if ($self->{repl}) {
         $result .= "[" . $self->{types}->to_string($value->[0]) . "] ";
     }

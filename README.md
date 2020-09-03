@@ -130,7 +130,7 @@ unit-test script](test/unit_tests.pl) for a simple example. For a more advanced 
 [Check out some examples!](examples/)
 
 ## JSON compatibility/serialization
-An [Array constructor](#array) is something like `["red",2,3.1459,null]`.
+An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
 
 A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
 
@@ -152,9 +152,9 @@ Plang is statically typed with optional nominal type annotations.
 #### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
 the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
-value provided. See [Type inference](#type-inference) for more information.
+value provided.
 
-Here is a brief demonstration of function definitions with optional type annotations. Let's consider
+Here is a brief demonstration of a function definition with optional type annotations. Let's consider
 a simple `add` function. With no explicit type annotations, the function's return type and the types
 of its parameters will default to the `Any` type:
 
@@ -183,13 +183,13 @@ any arguments that can be converted to `Real`:
 On the other hand, if you desire explicit type checking on the parameters you can add a
 type annotation before each parameter identifier:
 
-    > fn add(Real a, Real b) a + b; print(type(add));
+    > fn add(a: Real, b: Real) a + b; print(type(add));
       Function (Real, Real) -> Any
 
 Now Plang will throw a compile-time error if the types of the arguments do not match the
 types specified for the parameters:
 
-    > fn add(Real a, Real b) a + b; add(3, "4")
+    > fn add(a: Real, b: Real) a + b; add(3, "4")
      Error: In function call for `add`, expected Real for parameter `b` but got String
 
 This version of `add` returns `Any` and its return type will be inferred at run-time from
@@ -219,13 +219,13 @@ compile-time type checking. For example, if we pass it a function inferred to re
 Let's return to the `add` function. To specify the type of the return value, you
 can place a type annotation before the function identifier:
 
-    > fn Real add(Real a, Real b) a + b; print(type(add))
+    > fn add(a: Real, b: Real) -> Real { a + b }; print(type(add))
      Function (Real, Real) -> Real
 
 Now Plang will throw a compile-time error if `add` attempts to return a value that
 is not a `Real`:
 
-    > fn Real add(Real a, Real b) "42"; add(3, 4)
+    > fn add(a: Real, b: Real) -> Real { "42" }; add(3, 4)
      Error: cannot return String from function declared to return Real
 
 #### Type narrowing during inference
@@ -476,13 +476,13 @@ exists | test if a key exists in a Map
 delete | deletes a key from a Map
 
 ### Variables
-    VariableDeclaration ::= "var" Identifier Initializer?
+    VariableDeclaration ::= "var" Identifier (":" Type)? Initializer?
     Initializer         ::= "=" Statement
 
 Variables are explicitly declared with the `var` keyword, followed by an identifier.
-Variables declarations may optionally have an initializer that assigns a default
-value. Without an initializer, the value of variables will default to `null`, which
-has type `Null`.
+The identifier may be optionally followed by a type annotation, which is a colon followed by a
+type description. Variables declarations may optionally have an initializer that assigns
+a default value. Without an initializer, the value of variables will default to `null`.
 
 The `var` statement returns the value of the variable.
 
@@ -503,19 +503,18 @@ Variables that have not yet been assigned a value will produce an error.
      Error: `b` not defined.
 
 ### Functions
-    FunctionDefinition  ::= "fn" Type? Identifier? IdentifierList? Statement
-    IdentifierList      ::= "(" (Type? Identifier Initializer? ","?)* ")"
-    Type ::= "Any" | "Null" | "Boolean" | "Number" | "String" | "Array" | "Map" | "Function" | "Builtin"
+    FunctionDefinition  ::= "fn" Identifier? IdentifierList? ("->" Type)? Statement
+    IdentifierList      ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
 
 A function definition is created by using the `fn` keyword followed by:
- * a type annotation (which may be omitted to specifiy the `Any` type)
  * an identifer (which may be omitted to create an anonymous function)
  * an identifier list (which may be omitted if there are no parameters desired)
+ * a "->" followed by a type (which may be omitted to infer the return type)
  * and finally either a group of statements or a single statement
 
 An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
-a comma and/or whitespace. Each identifier optionally may be prefixed with a type annotation.
-Each identifier may optionally be followed by an initializer to create a default value.
+a comma and/or whitespace. Each identifier optionally may be followed by a colon and a type
+description. Each identifier may optionally be followed by an initializer to create a default value.
 
 Plang functions automatically return the value of the last statement or statement group.
 You may use the `return` keyword to return the value of an earlier statement.

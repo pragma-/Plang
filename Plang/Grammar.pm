@@ -247,7 +247,7 @@ sub StatementGroup {
     $parser->backtrack;
 }
 
-# Grammar: VariableDeclaration ::= KEYWORD_var Type? IDENT Initializer?
+# Grammar: VariableDeclaration ::= KEYWORD_var IDENT (":" Type)? Initializer?
 sub VariableDeclaration {
     my ($parser) = @_;
 
@@ -255,17 +255,23 @@ sub VariableDeclaration {
 
     {
         if ($parser->consume('KEYWORD_var')) {
-            my $type = Type($parser);
-            return if $parser->errored;
+            my $token = $parser->consume('IDENT');
+            return expected($parser, 'identifier for variable name') if not $token;
+            my $name = $token->[1];
+
+            my $type;
+            if ($parser->consume('COLON')) {
+                $type = Type($parser);
+                return if $parser->errored;
+
+                if (not $type) {
+                    return expected($parser, "type after \":\" for variable `$name`");
+                }
+            }
 
             if (not $type) {
                 $type = ['TYPE', 'Any'];
             }
-
-            my $token = $parser->consume('IDENT');
-            return expected($parser, 'identifier for variable name') if not $token;
-
-            my $name = $token->[1];
 
             my $initializer = Initializer($parser);
             return if $parser->errored;
@@ -517,7 +523,7 @@ sub TypeFunctionReturn {
     return;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn Type? IDENT? IdentifierList? (StatementGroup | Statement)
+# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? ("->" Type)? (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -525,11 +531,6 @@ sub FunctionDefinition {
 
     {
         if ($parser->consume('KEYWORD_fn')) {
-            my $return_type = Type($parser);
-            return if $parser->errored;
-
-            $return_type = ['TYPE', 'Any'] if not defined $return_type;
-
             my $token = $parser->consume('IDENT');
             my $name  = $token ? $token->[1] : '#anonymous';
 
@@ -537,6 +538,14 @@ sub FunctionDefinition {
             return if $parser->errored;
 
             $identlist = [] if not defined $identlist;
+
+            my $return_type;
+            if ($parser->consume('R_ARROW')) {
+                $return_type = Type($parser);
+                return if $parser->errored;
+            }
+
+            $return_type = ['TYPE', 'Any'] if not defined $return_type;
 
             $parser->try('FunctionDefinition body: StatementGroup');
 
@@ -570,7 +579,7 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList ::= L_PAREN (Type? Identifier Initializer? COMMA?)* R_PAREN
+# Grammar: IdentifierList ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -581,22 +590,25 @@ sub IdentifierList {
 
         my $identlist = [];
         while (1) {
-            my $token = $parser->next_token('peek');
-
-            my $type = Type($parser);
-            return if $parser->errored;
-
-            if ($token = $parser->consume('IDENT')) {
+            if (my $token = $parser->consume('IDENT')) {
                 my $name = $token->[1];
-                my $initializer = Initializer($parser);
+
+                my $type;
+                if ($parser->consume('COLON')) {
+                    $type = Type($parser);
+                    return if $parser->errored;
+
+                    if (not $type) {
+                        return expected($parser, "type after \":\" for parameter `$name`");
+                    }
+                }
+
                 $type = ['TYPE', 'Any'] if not $type;
+
+                my $initializer = Initializer($parser);
                 push @{$identlist}, [$type, $name, $initializer];
                 $parser->consume('COMMA');
                 next;
-            }
-
-            if ($type) {
-                return expected($parser, 'parameter identifier after parameter type');
             }
 
             last if $parser->consume('R_PAREN');
