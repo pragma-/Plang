@@ -669,44 +669,44 @@ Expressions perform arithmetic, logical or assignment operations.
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
- P  | Op  | Description              | Associativity
---- | --- | ---                      | ---
-18  | .   | Class/Map access         | Infix (left-to-right)
-17  | ()  | Function call            | Postfix
-16  | []  | Array/Map access         | Postfix
-16  | ++  | Post-increment           | Postfix
-16  | --  | Post-decrement           | Postfix
-15  | ++  | Pre-increment            | Prefix
-15  | --  | Pre-decrement            | Prefix
-15  | !   | Logical negation         | Prefix
-14  | ^   | Exponent                 | Infix (right-to-left)
-14  | **  | Exponent                 | Infix (right-to-left)
-14  | %   | Remainder                | Infix (left-to-right)
-13  | *   | Product                  | Infix (left-to-right)
-13  | /   | Division                 | Infix (left-to-right)
-12  | +   | Addition                 | Infix (left-to-right)
-12  | -   | Subtraction              | Infix (left-to-right)
-11  | ^^  | String concatenation     | Infix (left-to-right)
-11  | ~   | Substring index          | Infix (left-to-right)
-10  | >=  | Greater or equal         | Infix (left-to-right)
-10  | <=  | Less or equal            | Infix (left-to-right)
-10  | >   | Greater                  | Infix (left-to-right)
-10  | <   | Less                     | Infix (left-to-right)
-9   | ==  | Equality                 | Infix (left-to-right)
-9   | !=  | Inequality               | Infix (left-to-right)
-8   | &&  | Logical and              | Infix (left-to-right)
-7   | \|\ | | Logical or             | Infix (left-to-right)
-6   | ?:  | Conditional              | Infix ternary (right-to-left)
-5   | =   | Assignment               | Infix (right-to-left)
-5   | +=  | Addition assignment      | Infix (right-to-left)
-5   | -=  | Subtraction assignment   | Infix (right-to-left)
-5   | \*= | Product assignment       | Infix (right-to-left)
-5   | /=  | Division assignment      | Infix (right-to-left)
-5   | .=  | String concat assignment | Infix (right-to-left)
-4   | ,   | Comma                    | Infix (left-to-right)
-3   | not | Logical negation         | Prefix
-2   | and | Logical and              | Infix (left-to-right)
-1   | or  | Logical or               | Infix (left-to-right)
+ Precedence | Operator   | Description              | Associativity
+--- | ---   | ---                      | ---
+18  | .    | Class/Map access         | Infix (left-to-right)
+17  | ()   | Function call            | Postfix
+16  | []   | Array/Map access         | Postfix
+16  | ++   | Post-increment           | Postfix
+16  | --   | Post-decrement           | Postfix
+15  | ++   | Pre-increment            | Prefix
+15  | --   | Pre-decrement            | Prefix
+15  | !    | Logical negation         | Prefix
+14  | ^    | Exponent                 | Infix (right-to-left)
+14  | **   | Exponent                 | Infix (right-to-left)
+14  | %    | Remainder                | Infix (left-to-right)
+13  | *    | Product                  | Infix (left-to-right)
+13  | /    | Division                 | Infix (left-to-right)
+12  | +    | Addition                 | Infix (left-to-right)
+12  | -    | Subtraction              | Infix (left-to-right)
+11  | ^^   | String concatenation     | Infix (left-to-right)
+11  | ~    | Substring index          | Infix (left-to-right)
+10  | >=   | Greater or equal         | Infix (left-to-right)
+10  | <=   | Less or equal            | Infix (left-to-right)
+10  | >    | Greater                  | Infix (left-to-right)
+10  | <    | Less                     | Infix (left-to-right)
+9   | ==   | Equality                 | Infix (left-to-right)
+9   | !=   | Inequality               | Infix (left-to-right)
+8   | &&   | Logical and              | Infix (left-to-right)
+7   | \|\| | Logical or               | Infix (left-to-right)
+6   | ?:   | Conditional              | Infix ternary (right-to-left)
+5   | =    | Assignment               | Infix (right-to-left)
+5   | +=   | Addition assignment      | Infix (right-to-left)
+5   | -=   | Subtraction assignment   | Infix (right-to-left)
+5   | \*=  | Product assignment       | Infix (right-to-left)
+5   | /=   | Division assignment      | Infix (right-to-left)
+5   | .=   | String concat assignment | Infix (right-to-left)
+4   | ,    | Comma                    | Infix (left-to-right)
+3   | not  | Logical negation         | Prefix
+2   | and  | Logical and              | Infix (left-to-right)
+1   | or   | Logical or               | Infix (left-to-right)
 
 `!`, `&&`, and `||` have high precedence such that they are useful in constructing an expression;
 `not`, `and`, and `or` have low precedence such that they are useful for flow control between
