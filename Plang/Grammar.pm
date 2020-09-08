@@ -400,7 +400,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: Type         ::= "[" (TypeLiteral ,?)+ "]" | TypeLiteral
+# Grammar: Type         ::= TypeLiteral ("|" TypeLiteral)*
 #          TypeLiteral  ::= TypeFunction | TYPE
 #          TypeFunction ::= (TYPE_Function | TYPE_Builtin) TypeFunctionParams? TypeFunctionReturn?
 #          TypeFunctionParams ::= "(" (Type ","?)* ")"
@@ -411,32 +411,35 @@ sub Type {
     $parser->try('Type');
 
     {
-        if ($parser->consume('L_BRACKET')) {
-            my $types = [];
-
-            while (1) {
-                my $type = TypeLiteral($parser);
-                return if $parser->errored;
-
-                if (not $type) {
-                    return expected($parser, 'type name inside [] type list');
-                }
-
-                push @$types, $type;
-
-                $parser->consume('COMMA');
-
-                last if $parser->consume('R_BRACKET');
-            }
-
-            return ['TYPELIST', $types];
-        }
+        my $typelist = [];
 
         my $type = TypeLiteral($parser);
         return if $parser->errored;
-        return $type if $type;
+        goto TYPE_FAIL if not $type;
+
+        while (1) {
+            push @$typelist, $type;
+
+            if (not $parser->consume('PIPE')) {
+                last;
+            }
+
+            $type = TypeLiteral($parser);
+            return if $parser->errored;
+
+            if (not $type) {
+                return expected($parser, 'type after "|"');
+            }
+        }
+
+        if (@$typelist > 1) {
+            return ['TYPELIST', $typelist];
+        } else {
+            return $type;
+        }
     }
 
+  TYPE_FAIL:
     $parser->backtrack;
 };
 

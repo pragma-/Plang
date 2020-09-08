@@ -83,7 +83,7 @@ sub initialize {
 # !used ['TILDE_TILDE',      qr{\G(   ~~                  )}x],
         ['TILDE',            qr{\G(   ~                   )}x],
         ['PIPE_PIPE',        qr{\G(   \|\|                )}x],
-# !used ['PIPE',             qr{\G(   \|                  )}x],
+        ['PIPE',             qr{\G(   \|                  )}x],
         ['AMP_AMP',          qr{\G(   &&                  )}x],
 # !used ['AMP',              qr{\G(   &                   )}x],
         ['CARET_CARET',      qr{\G(   \^\^                )}x],

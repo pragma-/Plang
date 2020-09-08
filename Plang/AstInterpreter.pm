@@ -211,12 +211,15 @@ sub function_call {
         $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
     }
 
-    # invoke the function
-    my $result = $self->interpret_ast($new_context, $statements);
-    $self->{recursion}--;
+    my $result;
 
-    # update inferred return type
-    $func->[1]->[1] = $self->{types}->to_string($result->[0]);
+    # invoke the function
+    foreach my $stmt (@$statements) {
+        $result = $self->statement($new_context, $stmt);
+        last if $stmt->[0] eq 'RET';
+    }
+
+    $self->{recursion}--;
 
     return $result;
 }
@@ -346,7 +349,7 @@ sub keyword_values {
 
 sub keyword_return {
     my ($self, $context, $data) = @_;
-    return ['RETURN', $self->statement($context, $data->[1]->[1])];
+    return $self->statement($context, $data->[1]->[1]);
 }
 
 sub keyword_next {
@@ -449,12 +452,7 @@ sub postfix_decrement {
 # ?: ternary conditional operator
 sub conditional {
     my ($self, $context, $data) = @_;
-
-    if ($self->is_truthy($context, $data->[1])) {
-        return $self->interpret_ast($context, [$data->[2]]);
-    } else {
-        return $self->interpret_ast($context, [$data->[3]]);
-    }
+    return $self->keyword_if($context, $data);
 }
 
 # if statement
@@ -681,7 +679,7 @@ sub statement {
 
     my $ins = $data->[0];
     $Data::Dumper::Indent = 0;
-    $self->{dprint}->('STMT', "stmt ins: $ins (value: " . Dumper($data->[1]) . ")\n") if $self->{debug};
+    $self->{dprint}->('STMT', "stmt: " . Dumper($data) . "\n") if $self->{debug};
 
     return $self->statement($context, $data->[1])       if $ins eq 'STMT';
     return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
@@ -762,7 +760,7 @@ sub is_truthy {
         return $result->[1] != 0;
     }
 
-    return;
+    $self->error($context, "cannot use value of type " . $self->{types}->to_string($result->[0]) . " as conditional");
 }
 
 # builtin functions
@@ -869,9 +867,9 @@ sub introspect {
             my $param_type = $self->{types}->to_string($param->[0]);
             if (defined $param->[2]) {
                 my $default_value = $self->statement($self->new_context, $param->[2]);
-                push @params, "$param_type $param->[1] = " . $self->output_value($default_value, literal => 1);
+                push @params, "$param->[1]: $param_type = " . $self->output_value($default_value, literal => 1);
             } else {
-                push @params, "$param_type $param->[1]";
+                push @params, "$param->[1]: $param_type";
             }
         }
 
@@ -1338,7 +1336,6 @@ sub interpret_ast {
                 if (defined $result) {
                     $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
                     return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
-                    return $result->[1] if $result->[0] eq 'RETURN';
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }

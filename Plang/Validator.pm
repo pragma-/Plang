@@ -22,8 +22,13 @@ sub unary_op {
         my $value  = $self->statement($context, $data->[1]);
 
         if ($self->{debug} and $debug_msg) {
-            $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
+            my $type = $self->{types}->to_string($value->[0]);
+            $debug_msg =~ s/\$a/$value->[1] ($type)/g;
             $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+        }
+
+        if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0])) {
+            return $value;
         }
 
         if ($self->{types}->is_arithmetic($value->[0])) {
@@ -52,9 +57,19 @@ sub binary_op {
         my $right_value = $self->statement($context, $data->[2]);
 
         if ($self->{debug} and $debug_msg) {
-            $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
-            $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
+            my $left_type = $self->{types}->to_string($left_value->[0]);
+            my $right_type = $self->{types}->to_string($right_value->[0]);
+            $debug_msg =~ s/\$a/$left_value->[1] ($left_type)/g;
+            $debug_msg =~ s/\$b/$right_value->[1] ($right_type)/g;
             $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
+        }
+
+        if ($self->{types}->is_equal(['TYPE', 'Any'], $left_value->[0])) {
+            return $left_value;
+        }
+
+        if ($self->{types}->is_equal(['TYPE', 'Any'], $right_value->[0])) {
+            return $right_value;
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
@@ -88,6 +103,18 @@ sub binary_op {
     }
 
     return;
+}
+
+sub is_truthy {
+    my ($self, $context, $expr) = @_;
+
+    my $result = $self->statement($context, $expr);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $result->[0])) {
+        return 1;
+    }
+
+    return $self->SUPER::is_truthy($context, $result);
 }
 
 sub type_check_prefix_postfix_op {
@@ -391,10 +418,10 @@ sub function_definition {
     }
 
     $context->{locals}->{$name} = $func;
-
     my $new_context = $self->new_context($context);
-    my $got_default_value = 0;
 
+    # validate parameters
+    my $got_default_value = 0;
     foreach my $param (@$parameters) {
         my ($type, $ident, $default_value) = @$param;
 
@@ -406,6 +433,8 @@ sub function_definition {
             if ($got_default_value) {
                 $self->error($new_context, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value");
             }
+
+            $value = [$type, undef];
         } else {
             $got_default_value = 1;
 
@@ -413,6 +442,41 @@ sub function_definition {
                 $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]));
             }
         }
+
+        $self->declare_variable($new_context, $type, $ident, $value);
+    }
+
+    # infer return type
+    my @return_types;
+    my $result;
+
+    $new_context->{current_function} = $name;
+
+    foreach my $statement (@$statements) {
+        $result = $self->statement($new_context, $statement);
+
+        # handle a returned value
+        if ($statement->[0] eq 'RET') {
+            push @return_types, $result->[0];
+        }
+    }
+
+    push @return_types, $result->[0];
+
+    delete $new_context->{current_function};
+
+    my $type = $self->{types}->unite(\@return_types);
+
+    # type check return type
+    if (not $self->{types}->check($ret_type, $type)) {
+        $self->error($new_context, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type));
+    }
+
+    # update with inferred return type if original return type is Any
+    if ($self->{types}->is_equal($ret_type, ['TYPE', 'Any'])) {
+        $data->[1]      = $type;
+        $func_type->[3] = $type;
+        $func_data->[1] = $type;
     }
 
     return $func;
@@ -425,7 +489,7 @@ sub validate_function_argument_type {
     my $type2 = $arg_type;
 
     if (not $self->{types}->check($type1, $type2)) {
-        $self->error($context, "in function call for `$name`, expected " . $self->{types}->to_string($parameter->[0]) . " for parameter `$parameter->[1]` but got " . $self->{types}->to_string($arg_type));
+        $self->error($context, "in function call for `$name`, expected " . $self->{types}->to_string($type1) . " for parameter `$parameter->[1]` but got " . $self->{types}->to_string($type2));
     }
 }
 
@@ -503,36 +567,9 @@ sub process_function_call_arguments {
         }
     }
 
-    # rewrite CALL arguments with positional arguments
+    # rewrite/desugar CALL arguments with positional arguments
     $data->[2] = $processed_arguments;
     return $evaluated_arguments;
-}
-
-sub type_check_builtin_function {
-    my ($self, $context, $data, $name) = @_;
-
-    my $builtin = $self->get_builtin_function($name);
-
-    my $parameters = $builtin->{params};
-    my $func       = $builtin->{subref};
-    my $validate   = $builtin->{vsubref};
-    my $arguments  = $data->[2];
-
-    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
-
-    for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
-    }
-
-    my $result;
-
-    if ($validate) {
-        $result = $validate->($self, $context, $name, $evaled_args);
-    } else {
-        $result = $func->($self, $context, $name, $evaled_args);
-    }
-
-    return $result;
 }
 
 sub function_call {
@@ -544,72 +581,55 @@ sub function_call {
     my $name;
 
     if ($target->[0] eq 'IDENT') {
-        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $name = $target->[1];
-        $func = $self->get_variable($context, $target->[1]);
-        $func = undef if defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin';
+        $func = $self->get_variable($context, $name);
+
+        if (not defined $func) {
+            # undefined function
+            $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`.");
+        }
+
+        if ($func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
+            $self->{dprint}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+            $func = $self->get_builtin_function($name);
+            return $self->type_check_builtin_function_call($context, $func, $data, $name);
+        } else {
+            $self->{dprint}->('FUNCS', "Calling user-defined function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        }
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
+        $self->{dprint}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
         $name = "anonymous-1";
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->statement($context, $target);
         $name = "anonymous-2";
-    }
 
-    my $closure;       # function's closure context
-    my $return_type;   # function signature's return type
-    my $parameters;    # function signature's parameters
-    my $statements;    # function's statements
-    my $return_value;  # value returned from function
-
-    if (defined $func) {
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
             $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->{types}->to_string($func->[0]) . ")");
         }
-
-        $closure     = $func->[1]->[0];
-        $return_type = $func->[1]->[1];
-        $parameters  = $func->[1]->[2];
-        $statements  = $func->[1]->[3];
-    } else {
-        if ($target->[0] eq 'IDENT') {
-            $self->{dprint}->('FUNCS', "Calling builtin function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-            if (defined ($func = $self->get_builtin_function($target->[1]))) {
-                # builtin function
-                $return_type  = $func->{ret};
-                $return_value = $self->type_check_builtin_function($context, $data, $target->[1]);
-                goto CHECK_RET_TYPE;
-            } else {
-                # undefined function
-                $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`.");
-            }
-        } else {
-            print "unknown thing: ", Dumper($target), "\n";
-        }
     }
+
+    my $closure     = $func->[1]->[0];
+    my $return_type = $func->[1]->[1];
+    my $parameters  = $func->[1]->[2];
+    my $statements  = $func->[1]->[3];
+    my $return_value;
 
     my $new_context = $self->new_context($closure);
     $new_context->{locals} = { %{$context->{locals}} };
     $new_context = $self->new_context($new_context);
 
-    my $evaled_args = $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments, $data);
+    my $evaled_args = $self->process_function_call_arguments($new_context, $name, $parameters, $arguments, $data);
 
-    foreach my $stmt (@$statements) {
-        if ($stmt->[0] eq 'RET') {
-            $return_value = $self->statement($new_context, $stmt->[1]);
-            goto CHECK_RET_TYPE;
-        }
-
-        if ($stmt->[0] eq 'CALL') {
-            # skip function calls
-            next;
-        }
-
-        $return_value = $self->statement($new_context, $stmt);
+    # invoke the function
+    $new_context->{current_function} = $name;
+    foreach my $statement (@$statements) {
+        $return_value = $self->statement($new_context, $statement->[1]);
+        last if $statement->[1]->[0] eq 'RET';
     }
 
-  CHECK_RET_TYPE:
+    # handle the return value/type
     if ($self->{types}->is_subtype($return_type, $return_value->[0])) {
         $return_value->[0] = $return_type;
     }
@@ -634,44 +654,76 @@ sub function_call {
     return $return_value;
 }
 
-sub keyword_next {
-    my ($self, $context, $data) = @_;
-    $self->error($context, "cannot use `next` outside of loop");
-}
+sub type_check_builtin_function_call {
+    my ($self, $context, $builtin, $data, $name) = @_;
 
-sub keyword_last {
-    my ($self, $context, $data) = @_;
-    $self->error($context, "cannot use `last` outside of loop");
+    my $return_type = $builtin->{ret};
+    my $parameters  = $builtin->{params};
+    my $func        = $builtin->{subref};
+    my $validate    = $builtin->{vsubref};
+    my $arguments   = $data->[2];
+
+    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments, $data);
+
+    for (my $i = 0; $i < @$parameters; $i++) {
+        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
+    }
+
+    my $return_value;
+
+    if ($validate) {
+        $return_value = $validate->($self, $context, $name, $evaled_args);
+    } else {
+        $return_value = $func->($self, $context, $name, $evaled_args);
+    }
+
+    if ($self->{types}->is_subtype($return_type, $return_value->[0])) {
+        $return_value->[0] = $return_type;
+    }
+
+    if (not $self->{types}->check($return_type, $return_value->[0])) {
+        $self->error($context, "in function `$name`: cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type));
+    }
+
+    return $return_value;
 }
 
 sub keyword_return {
     my ($self, $context, $data) = @_;
-    $self->error($context, "cannot use `return` outside of function");
+
+    if (not $context->{current_function}) {
+        $self->error($context, "cannot use `return` outside of function");
+    }
+
+    return $self->statement($context, $data->[1]->[1]);
 }
 
 sub conditional {
     my ($self, $context, $data) = @_;
-
-    if ($self->is_truthy($context, $data->[1])) {
-        return $self->statement($context, [$data->[2]]);
-    } else {
-        return $self->statement($context, [$data->[3]]);
-    }
+    return $self->keyword_if($context, $data);
 }
 
 sub keyword_if {
     my ($self, $context, $data) = @_;
 
     # validate conditional
-    my $result = $self->statement($context, $data->[1]);
+    $self->is_truthy($context, $data->[1]);
+
+    my @types;
+    my $result;
 
     # validate then
     $result = $self->statement($context, $data->[2]);
+    push @types, $result->[0];
 
     # validate else
-    $result = $self->statement($context, $data->[3]);
+    if (defined $data->[3]) {
+        $result = $self->statement($context, $data->[3]);
+        push @types, $result->[0];
+    }
 
-    return [['TYPE', 'Null'], undef];
+    $result->[0] = $self->{types}->unite(\@types);
+    return $result;
 }
 
 sub keyword_while {
@@ -684,6 +736,16 @@ sub keyword_while {
     $result = $self->statement($context, $data->[2]);
 
     return [['TYPE', 'Null'], undef];
+}
+
+sub keyword_next {
+    my ($self, $context, $data) = @_;
+    $self->error($context, "cannot use `next` outside of loop");
+}
+
+sub keyword_last {
+    my ($self, $context, $data) = @_;
+    $self->error($context, "cannot use `last` outside of loop");
 }
 
 # rvalue array/map access

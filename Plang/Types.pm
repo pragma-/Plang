@@ -241,7 +241,7 @@ sub to_string {
             push @$types, $self->to_string($t);
         }
 
-        return "[" . join(", ", sort @$types) . "]";
+        return join ' | ', @$types;
     }
 
     if ($type->[0] eq 'TYPEFUNC') {
@@ -262,6 +262,93 @@ sub to_string {
     }
 
     return $type->[0];
+}
+
+sub is_equal {
+    my ($self, $type1, $type2) = @_;
+
+    # a type
+    if ($type1->[0] eq 'TYPE') {
+        if ($type2->[0] eq 'TYPE') {
+            return 1 if $type1->[1] eq $type2->[1];
+        }
+        return 0;
+    }
+
+    # a list of types
+    if ($type1->[0] eq 'TYPELIST') {
+        return 0 if $type2->[0] ne 'TYPELIST';
+        return 0 if @{$type1->[1]} != @{$type2->[1]};
+
+        for (my $i = 0; $i <= @{$type1->[1]}; ++$i) {
+            return 0 if not $self->is_equal($type1->[1]->[$i], $type2->[1]->[$i]);
+        }
+
+        return 1;
+    }
+
+    # a function-like type
+    if ($type1->[0] eq 'TYPEFUNC') {
+        return 0 if $type2->[0] ne 'TYPEFUNC';
+
+        my $type1_kind   = $type1->[1];
+        my $type1_params = $type1->[2];
+        my $type1_return = $type1->[3];
+
+        my $type_kind   = $type2->[1];
+        my $type_params = $type2->[2];
+        my $type_return = $type2->[3];
+
+        # TODO: for now, we implicitly assume $type1_kind and $type_kind are equal
+        # since Builtin is a subtype of Function and these are the only two types
+        # that use TYPEFUNC.
+
+        # fail if parameter counts are not equal
+        return 0 if @$type1_params != @$type_params;
+
+        # fail if parameter types are not equal
+        for (my $i = 0; $i < @$type1_params; $i++) {
+            return 0 if not $self->is_equal($type_params->[$i], $type1_params->[$i]);
+        }
+
+        # return result of return value comparison
+        return $self->is_equal($type1_return, $type_return);
+    }
+
+    die "unknown type\n";
+    return 0;
+}
+
+
+sub contains {
+    my ($self, $types, $type) = @_;
+
+    foreach my $t (@$types) {
+        return 1 if $self->is_equal($t, $type);
+    }
+
+    return 0;
+}
+
+sub unite {
+    my ($self, $types) = @_;
+
+    my @union;
+    foreach my $type (@$types) {
+        next if $self->contains(\@union, $type);
+        push @union, $type;
+    }
+
+    if (@union == 1) {
+        return $union[0];
+    }
+
+    return $self->make_typelist(\@union);
+}
+
+sub make_typelist {
+    my ($self, $types) = @_;
+    return ['TYPELIST', $types];
 }
 
 1;

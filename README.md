@@ -147,7 +147,7 @@ See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/jso
 
 ## The Plang Language (so far)
 ### Type-checking
-Plang is statically typed with optional nominal type annotations.
+Plang is gradually typed with optional nominal type annotations.
 
 #### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
@@ -184,7 +184,7 @@ On the other hand, if you desire explicit type checking on the parameters you ca
 type annotation, prefixed with a colon, after each parameter identifier:
 
     > fn add(a: Real, b: Real) a + b; print(type(add));
-      Function (Real, Real) -> Any
+      Function (Real, Real) -> Real
 
 Now Plang will throw a compile-time error if the types of the arguments do not match the
 types specified for the parameters:
@@ -192,8 +192,8 @@ types specified for the parameters:
     > fn add(a: Real, b: Real) a + b; add(3, "4")
      Error: In function call for `add`, expected Real for parameter `b` but got String
 
-This version of `add` returns `Any` and its return type will be inferred at run-time from
-the value being returned.
+This version of `add` returns `Real` because its return type was inferred from the types of
+its parameters.
 
 Let's delve a bit into return type inference by considering the `filter` built-in function:
 
@@ -217,7 +217,7 @@ example, if we pass it a function inferred instead to return an `Integer` we get
      Error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Integer
 
-Let's return to the `add` function. To specify the type of the return value, you
+Let's return to the `add` function. To explicitly specify the type of the return value, you
 can place a type annotation, prefixed with an arrow, just before the function body:
 
     > fn add(a: Real, b: Real) -> Real { a + b }; print(type(add))
@@ -226,8 +226,8 @@ can place a type annotation, prefixed with an arrow, just before the function bo
 Now Plang will throw a compile-time type error if `add` attempts to return a value that
 is not a `Real`:
 
-    > fn add(a: Real, b: Real) -> Real { "42" }; add(3, 4)
-     Error: cannot return String from function declared to return Real
+    > fn add(a: Real, b: Real) -> Real { "42" }
+     Error: in definition of function `add`: cannot return value of type String from function declared to return type Real
 
 #### Type narrowing during inference
 To enforce the consistency of values assigned to the variable during its lifetime,
@@ -264,11 +264,11 @@ Right:
 #### Type lists
 Suppose you want to say that a variable, function parameter or function return will
 be only of types X, Y and Z? You can do this with a type list. To make a type list,
-enclose one or more types in square brackets.
+separate two or more types with a pipe symbol.
 
 For example, the signature of the `length()` built-in function is:
 
-    Builtin ([Array, Map, String]) -> Integer
+    Builtin (Array | Map | String) -> Integer
 
 This tells the compiler (and us) that the function is a `Builtin` that takes either
 `Array`, `Map` or `String` and returns an `Integer`.
@@ -866,7 +866,7 @@ through Plang's embedding API.
 ##### print
 The `print` function sends text to the standard output stream.
 
-Its [`whatis`](#whatis) is: `Builtin (Any expr, String end = "\n") -> Null`
+Its signature is: `Builtin (expr: Any, end: String = "\n") -> Null`
 
 In other words, it takes two parameters and returns a `Null` value. The first parameter,
 `expr`, is an expression of `Any` type, signifying what is to be printed. The second
@@ -891,7 +891,7 @@ The `type` function returns the type of an expression, as a string. For function
 it returns strictly the type signature. If you're interested in function parameter
 identifiers and default arguments, see the [`whatis`](#whatis) builtin function.
 
-Its [`whatis`](#whatis) is: `Builtin (Any expr) -> String`
+Its signature is: `Builtin (expr: Any) -> String`
 
     > type(3.14)
      "Real"
@@ -910,13 +910,13 @@ The `whatis` function is identical to the [`type`](#type) function, but with the
 addition of function parameter identifiers and function default arguments.
 
     > whatis(print)
-     "Builtin (Any expr, String end = \"\\n\") -> Null"
+     "Builtin (expr: Any, end: String = \"\\n\") -> Null"
 
     > print(whatis(print)) # use `print` to avoid string escaping
-     Builtin (Any expr, String end = "\n") -> Null
+     Builtin (expr: Any, end: String = "\n") -> Null
 
     > whatis(filter)
-     "Builtin (Function (Any) -> Boolean func, Array list) -> Array"
+     "Builtin (func: Function (Any) -> Boolean, list: Array) -> Array"
 
 #### Data and structures
 ##### length
@@ -926,7 +926,7 @@ The `length` function returns the count of elements within an expression of type
 For `String` it returns the count of characters. For `Array` it returns the count
 of elements. For `Map` it returns the count of keys.
 
-Its [`whatis`](#whatis) is: `Builtin ([Array, Map, String] expr) -> Integer`
+Its signature is: `Builtin (expr: Array | Map | String) -> Integer`
 
     > length("Hello!")
      6
@@ -942,7 +942,7 @@ The `map` function applies a function to each element of an array, updating that
 element in-place with the result of the applied function. The parameter of the
 applicative function is the current element it is being applied upon.
 
-Its [`whatis`](#whatis) is: `Builtin (Function (Any) -> Any func, Array list) -> Array`
+Its signature is: `Builtin (func: Function (Any) -> Any, list: Array) -> Array`
 
 In other words, it takes two parameters and returns an `Array`. The first parameter,
 `func`, is a `Function` that takes `Any` and returns `Any`. The second parameter,
@@ -955,7 +955,7 @@ In other words, it takes two parameters and returns an `Array`. The first parame
 The `filter` function applies a function over an array's elements and constructs
 a new array whose elements meet the criteria of the applied function.
 
-Its [`whatis`](#whatis) is: `Builtin (Function (Any) -> Boolean func, Array list) -> Array`
+Its signature is: `Builtin (func: Function (Any) -> Boolean, list: Array) -> Array`
 
 In other words, it takes two parameters and returns an `Array`. The first parameter,
 `func`, is a `Function` that takes `Any` and returns a `Boolean`. The second parameter,
