@@ -572,6 +572,20 @@ sub process_function_call_arguments {
     return $evaluated_arguments;
 }
 
+sub get_cached_type {
+    my ($self, $context, $name) = @_;
+
+    if (exists $context->{typed}->{$name}) {
+        return $context->{typed}->{$name};
+    }
+
+    if (defined $context->{parent}) {
+        return $self->get_cached_type($context->{parent}, $name);
+    }
+
+    return undef;
+}
+
 sub function_call {
     my ($self, $context, $data) = @_;
 
@@ -589,7 +603,12 @@ sub function_call {
             $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`.");
         }
 
-        if ($func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
+        if ($func->[0]->[0] ne 'TYPEFUNC') {
+            # not a function
+            $self->error($context, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")");
+        }
+
+        if ($func->[0]->[1] eq 'Builtin') {
             $self->{dprint}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
             $func = $self->get_builtin_function($name);
             return $self->type_check_builtin_function_call($context, $func, $data, $name);
@@ -610,6 +629,9 @@ sub function_call {
         }
     }
 
+    my $cached_type = $self->get_cached_type($context, $func);
+    return $cached_type if defined $cached_type;
+
     my $closure     = $func->[1]->[0];
     my $return_type = $func->[1]->[1];
     my $parameters  = $func->[1]->[2];
@@ -621,6 +643,15 @@ sub function_call {
     $new_context = $self->new_context($new_context);
 
     my $evaled_args = $self->process_function_call_arguments($new_context, $name, $parameters, $arguments, $data);
+
+    # type-check arguments
+    if (defined $parameters) {
+        for (my $i = 0; $i < @$parameters; $i++) {
+            $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
+        }
+    }
+
+    $new_context->{typed}->{"$func"} = [['TYPE', 'Any'], 0];
 
     # invoke the function
     $new_context->{current_function} = $name;
@@ -634,6 +665,7 @@ sub function_call {
         $return_value->[0] = $return_type;
     }
 
+    # type-check return value
     if (not $self->{types}->check($return_type, $return_value->[0])) {
         $self->error($context, "cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type));
     }
@@ -644,13 +676,7 @@ sub function_call {
         $func->[0]->[3] = $return_value->[0];
     }
 
-    # type-check arguments after inference
-    if (defined $parameters) {
-        for (my $i = 0; $i < @$parameters; $i++) {
-            $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
-        }
-    }
-
+    $context->{typed}->{"$func"} = $return_value;
     return $return_value;
 }
 

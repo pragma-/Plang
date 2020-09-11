@@ -667,6 +667,10 @@ sub stmt_literal {
     return [$type, $value];
 }
 
+sub null_statement {
+    return [['TYPE', 'Null'], undef];
+}
+
 sub statement_group {
     my ($self, $context, $data) = @_;
     my $new_context = $self->new_context($context);
@@ -681,6 +685,7 @@ sub statement {
     $Data::Dumper::Indent = 0;
     $self->{dprint}->('STMT', "stmt: " . Dumper($data) . "\n") if $self->{debug};
 
+    return $self->null_statement($context, $data)       if $ins eq 'NOP';
     return $self->statement($context, $data->[1])       if $ins eq 'STMT';
     return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
     return $self->stmt_literal($context, $data)         if $ins eq 'LITERAL';

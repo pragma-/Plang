@@ -335,9 +335,12 @@ sub unite {
 
     my @union;
     foreach my $type (@$types) {
+        next if $self->is_equal($type, ['TYPE', 'Any']);
         next if $self->contains(\@union, $type);
         push @union, $type;
     }
+
+    return ['TYPE', 'Any'] if @union == 0;
 
     if (@union == 1) {
         return $union[0];
