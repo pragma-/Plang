@@ -179,6 +179,14 @@ sub type_check_op_assign {
     $left  = $self->statement($context, $left);
     $right = $self->statement($context, $right);
 
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
+        return $left;
+    }
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $right->[0])) {
+        return $right;
+    }
+
     if (not $self->{types}->is_arithmetic($left->[0])) {
         $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]));
     }
@@ -788,7 +796,7 @@ sub access_notation {
 
         my $key = $self->statement($context, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
-        return [['TYPE', 'Null'], undef] if not defined $val;
+        return [['TYPE', 'Any'], 0] if not defined $val;
         return $val;
     }
 
