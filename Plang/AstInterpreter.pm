@@ -810,31 +810,37 @@ my %function_builtins = (
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'Integer'],
         subref => \&function_builtin_Integer,
+        vsubref => \&validate_builtin_Integer,
     },
     'Real' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'Real'],
         subref => \&function_builtin_Real,
+        vsubref => \&validate_builtin_Real,
     },
     'String' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'String'],
         subref => \&function_builtin_String,
+        vsubref => \&validate_builtin_String,
     },
     'Boolean' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'Boolean'],
         subref => \&function_builtin_Boolean,
+        vsubref => \&validate_builtin_Boolean,
     },
     'Array' => {
         params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Array']]], 'expr', undef]],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_Array,
+        vsubref => \&validate_builtin_Array,
     },
     'Map' => {
         params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map']]], 'expr', undef]],
         ret    => ['TYPE', 'Map'],
         subref => \&function_builtin_Map,
+        vsubref => \&validate_builtin_Map,
     },
 );
 
@@ -1007,6 +1013,17 @@ sub function_builtin_Integer {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Integer");
 }
 
+sub validate_builtin_Integer {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_Integer($context, $name, $arguments);
+}
+
 sub function_builtin_Real {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -1028,6 +1045,17 @@ sub function_builtin_Real {
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Real");
+}
+
+sub validate_builtin_Real {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_Real($context, $name, $arguments);
 }
 
 sub function_builtin_String {
@@ -1061,6 +1089,17 @@ sub function_builtin_String {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to String");
 }
 
+sub validate_builtin_String {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_String($context, $name, $arguments);
+}
+
 sub function_builtin_Boolean {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -1092,6 +1131,17 @@ sub function_builtin_Boolean {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Boolean");
 }
 
+sub validate_builtin_Boolean {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_Boolean($context, $name, $arguments);
+}
+
 sub function_builtin_Map {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -1109,6 +1159,17 @@ sub function_builtin_Map {
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Map");
 }
 
+sub validate_builtin_Map {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_Map($context, $name, $arguments);
+}
+
 sub function_builtin_Array {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
@@ -1124,6 +1185,17 @@ sub function_builtin_Array {
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
+}
+
+sub validate_builtin_Array {
+    my ($self, $context, $name, $arguments) = @_;
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_Array($context, $name, $arguments);
 }
 
 # TODO: do this much more efficiently
