@@ -467,18 +467,18 @@ sub TypeFunction {
     my $token = $parser->next_token('peek');
     return if not $token;
 
-    my ($type) = $token->[0] =~ /^TYPE_(.*)/;
+    my ($kind) = $token->[0] =~ /^TYPE_(.*)/;
 
-    if (defined $type and ($type eq 'Function' or  $type eq 'Builtin')) {
+    if (defined $kind and ($kind eq 'Function' or  $kind eq 'Builtin')) {
         $parser->consume;
 
         my $params = TypeFunctionParams($parser) // [];
         return if $parser->errored;
 
-        my $return = TypeFunctionReturn($parser) // 'ANY';
+        my $return_type = TypeFunctionReturn($parser) // ['TYPE', 'Any'];
         return if $parser->errored;
 
-        return ['TYPEFUNC', $type, $params, $return];
+        return ['TYPEFUNC', $kind, $params, $return_type];
     }
 
     return;

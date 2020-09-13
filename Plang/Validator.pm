@@ -611,6 +611,10 @@ sub function_call {
             $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`.");
         }
 
+        if ($self->{types}->is_equal(['TYPE', 'Any'], $func->[0])) {
+            return $func;
+        }
+
         if ($func->[0]->[0] ne 'TYPEFUNC') {
             # not a function
             $self->error($context, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")");
@@ -639,6 +643,10 @@ sub function_call {
 
     my $cached_type = $self->get_cached_type($context, $func);
     return $cached_type if defined $cached_type;
+
+    if (not defined $func->[1]) {
+        return $func;
+    }
 
     my $closure     = $func->[1]->[0];
     my $return_type = $func->[1]->[1];
