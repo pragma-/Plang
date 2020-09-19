@@ -65,7 +65,7 @@ sub expected {
 }
 
 # start-rule:
-# Grammar: Program ::= Statement+
+# Program ::= Statement+
 sub Program {
     my ($parser) = @_;
 
@@ -124,23 +124,23 @@ sub alternate_statement {
     }
 }
 
-# Grammar: Statement ::=   StatementGroup
-#                        | VariableDeclaration
-#                        | FunctionDefinition
-#                        | ReturnExpression
-#                        | NextStatement
-#                        | LastStatement
-#                        | WhileStatement
-#                        | IfExpression
-#                        | ElseWithoutIf
-#                        | ExistsExpression
-#                        | DeleteExpression
-#                        | KeysExpression
-#                        | ValuesExpression
-#                        | RangeExpression
-#                        | Expression TERM
-#                        | UnexpectedKeyword
-#                        | TERM
+# Statement ::= StatementGroup
+#             | VariableDeclaration
+#             | FunctionDefinition
+#             | ReturnExpression
+#             | NextStatement
+#             | LastStatement
+#             | WhileStatement
+#             | IfExpression
+#             | ElseWithoutIf
+#             | ExistsExpression
+#             | DeleteExpression
+#             | KeysExpression
+#             | ValuesExpression
+#             | RangeExpression
+#             | Expression TERM
+#             | UnexpectedKeyword
+#             | TERM
 sub Statement {
     my ($parser) = @_;
 
@@ -215,7 +215,7 @@ sub Statement {
     return ['NOP', undef];
 }
 
-# Grammar: StatementGroup ::= L_BRACE Statement* R_BRACE
+# StatementGroup ::= L_BRACE Statement* R_BRACE
 sub StatementGroup {
     my ($parser) = @_;
 
@@ -247,7 +247,7 @@ sub StatementGroup {
     $parser->backtrack;
 }
 
-# Grammar: VariableDeclaration ::= KEYWORD_var IDENT (":" Type)? Initializer?
+# VariableDeclaration ::= KEYWORD_var IDENT (":" Type)? Initializer?
 sub VariableDeclaration {
     my ($parser) = @_;
 
@@ -284,8 +284,8 @@ sub VariableDeclaration {
     $parser->backtrack;
 }
 
-# Grammar: MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
-#          String ::= DQUOTE_STRING | SQUOTE_STRING
+# MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
+#         String ::= DQUOTE_STRING | SQUOTE_STRING
 sub MapConstructor {
     my ($parser) = @_;
 
@@ -345,7 +345,7 @@ sub MapConstructor {
     $parser->backtrack;
 }
 
-# Grammar: ArrayConstructor ::= "[" (Expression ","?)* "]"
+# ArrayConstructor ::= "[" (Expression ","?)* "]"
 sub ArrayConstructor {
     my ($parser) = @_;
 
@@ -376,7 +376,7 @@ sub ArrayConstructor {
     $parser->backtrack;
 }
 
-# Grammar: Initializer ::= ASSIGN Expression
+# Initializer ::= ASSIGN Expression
 sub Initializer {
     my ($parser) = @_;
 
@@ -400,11 +400,11 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Grammar: Type         ::= TypeLiteral ("|" TypeLiteral)*
-#          TypeLiteral  ::= TypeFunction | TYPE
-#          TypeFunction ::= (TYPE_Function | TYPE_Builtin) TypeFunctionParams? TypeFunctionReturn?
-#          TypeFunctionParams ::= "(" (Type ","?)* ")"
-#          TypeFunctionReturn ::= "->" Type
+# Type         ::= TypeLiteral ("|" TypeLiteral)*
+# TypeLiteral  ::= TypeFunction | TYPE
+# TypeFunction ::= (TYPE_Function | TYPE_Builtin) TypeFunctionParams? TypeFunctionReturn?
+# TypeFunctionParams ::= "(" (Type ","?)* ")"
+# TypeFunctionReturn ::= "->" Type
 sub Type {
     my ($parser) = @_;
 
@@ -526,7 +526,7 @@ sub TypeFunctionReturn {
     return;
 }
 
-# Grammar: FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? ("->" Type)? (StatementGroup | Statement)
+# FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? ("->" Type)? (StatementGroup | Statement)
 sub FunctionDefinition {
     my ($parser) = @_;
 
@@ -582,7 +582,7 @@ sub FunctionDefinition {
     $parser->backtrack;
 }
 
-# Grammar: IdentifierList ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
+# IdentifierList ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -626,7 +626,7 @@ sub IdentifierList {
     $parser->backtrack;
 }
 
-# Grammar: ReturnExpression ::= KEYWORD_return Statement
+# ReturnExpression ::= KEYWORD_return Statement
 sub ReturnExpression {
     my ($parser) = @_;
 
@@ -645,7 +645,7 @@ sub ReturnExpression {
     $parser->backtrack;
 }
 
-# Grammar: NextStatement ::= KEYWORD_next
+# NextStatement ::= KEYWORD_next
 sub NextStatement {
     my ($parser) = @_;
 
@@ -661,7 +661,7 @@ sub NextStatement {
     $parser->backtrack;
 }
 
-# Grammar: LastStatement ::= KEYWORD_last
+# LastStatement ::= KEYWORD_last
 sub LastStatement {
     my ($parser) = @_;
 
@@ -677,7 +677,7 @@ sub LastStatement {
     $parser->backtrack;
 }
 
-# Grammar: WhileStatement ::= KEYWORD_while "(" Expression ")" Statement
+# WhileStatement ::= KEYWORD_while "(" Expression ")" Statement
 sub WhileStatement {
     my ($parser) = @_;
 
@@ -715,7 +715,7 @@ sub WhileStatement {
     $parser->backtrack;
 }
 
-# Grammar: IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
+# IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
 sub IfExpression {
     my ($parser) = @_;
 
@@ -766,7 +766,7 @@ sub ElseWithoutIf {
     return;
 }
 
-# Grammar: ExistsStatement ::= KEYWORD_exists Statement
+# ExistsStatement ::= KEYWORD_exists Statement
 sub ExistsStatement {
     my ($parser) = @_;
 
@@ -793,7 +793,7 @@ sub ExistsStatement {
     $parser->backtrack;
 }
 
-# Grammar: DeleteExpression ::= KEYWORD_delete Statement
+# DeleteExpression ::= KEYWORD_delete Statement
 sub DeleteExpression {
     my ($parser) = @_;
 
@@ -820,7 +820,7 @@ sub DeleteExpression {
     $parser->backtrack;
 }
 
-# Grammar: KeysExpression ::= KEYWORD_keys Statement
+# KeysExpression ::= KEYWORD_keys Statement
 sub KeysExpression {
     my ($parser) = @_;
 
@@ -847,7 +847,7 @@ sub KeysExpression {
     $parser->backtrack;
 }
 
-# Grammar: ValuesExpression ::= KEYWORD_values Statement
+# ValuesExpression ::= KEYWORD_values Statement
 sub ValuesExpression {
     my ($parser) = @_;
 
@@ -874,7 +874,7 @@ sub ValuesExpression {
     $parser->backtrack;
 }
 
-# Grammar: RangeExpression ::= Expression ".." Expression
+# RangeExpression ::= Expression ".." Expression
 sub RangeExpression {
     my ($parser) = @_;
 
@@ -993,19 +993,6 @@ sub BinaryOp {
     }
 }
 
-sub expand_escapes {
-    my ($string) = @_;
-    $string =~ s/\\(
-    (?:[arnt'"\\]) |               # Single char escapes
-    (?:[ul].) |                    # uc or lc next char
-    (?:x[0-9a-fA-F]{2}) |          # 2 digit hex escape
-    (?:x\{[0-9a-fA-F]+\}) |        # more than 2 digit hex
-    (?:\d{2,3}) |                  # octal
-    (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
-    )/"qq|\\$1|"/geex;
-    return $string;
-}
-
 sub Expression {
     my ($parser, $precedence) = @_;
 
@@ -1101,6 +1088,19 @@ sub Prefix {
         $token->[1] =~ s/^\$//;
         $token->[1] =~ s/^\'|\'$//g;
         return ['STRING_I', $token->[1]];
+    }
+
+    sub expand_escapes {
+        my ($string) = @_;
+        $string =~ s/\\(
+        (?:[arnt'"\\]) |               # Single char escapes
+        (?:[ul].) |                    # uc or lc next char
+        (?:x[0-9a-fA-F]{2}) |          # 2 digit hex escape
+        (?:x\{[0-9a-fA-F]+\}) |        # more than 2 digit hex
+        (?:\d{2,3}) |                  # octal
+        (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
+        )/"qq|\\$1|"/geex;
+        return $string;
     }
 
     if ($token = $parser->consume('DQUOTE_STRING_I')) {
