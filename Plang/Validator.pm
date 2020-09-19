@@ -122,7 +122,7 @@ sub type_check_prefix_postfix_op {
 
     if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ACCESS' && $data->[1]->[1]->[0] eq 'IDENT') {
         # desugar x.y to x['y']
-        if ($data->[2]->[0] eq 'IDENT') {
+        if (defined $data->[2] and $data->[2]->[0] eq 'IDENT') {
             $data->[2] = ['LITERAL', ['TYPE', 'String'], $data->[2]->[1]];
         }
 
