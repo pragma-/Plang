@@ -124,7 +124,7 @@ sub name_is {
 sub is_subtype {
     my ($self, $subtype, $type) = @_;
 
-    if ($subtype->[0] eq 'TYPELIST' or $type->[0] eq 'TYPELIST') {
+    if ($subtype->[0] eq 'TYPEUNION' or $type->[0] eq 'TYPEUNION') {
         return 0;
     }
 
@@ -174,7 +174,7 @@ sub check {
     }
 
     # a list of types
-    if ($guard->[0] eq 'TYPELIST') {
+    if ($guard->[0] eq 'TYPEUNION') {
         foreach my $g (@{$guard->[1]}) {
             return 1 if $self->check($g, $type);
         }
@@ -235,7 +235,7 @@ sub to_string {
         return $type->[1];
     }
 
-    if ($type->[0] eq 'TYPELIST') {
+    if ($type->[0] eq 'TYPEUNION') {
         my $types = [];
         foreach my $t (@{$type->[1]}) {
             push @$types, $self->to_string($t);
@@ -276,8 +276,8 @@ sub is_equal {
     }
 
     # a list of types
-    if ($type1->[0] eq 'TYPELIST') {
-        return 0 if $type2->[0] ne 'TYPELIST';
+    if ($type1->[0] eq 'TYPEUNION') {
+        return 0 if $type2->[0] ne 'TYPEUNION';
         return 0 if @{$type1->[1]} != @{$type2->[1]};
 
         for (my $i = 0; $i <= @{$type1->[1]}; ++$i) {
@@ -346,12 +346,12 @@ sub unite {
         return $union[0];
     }
 
-    return $self->make_typelist(\@union);
+    return $self->make_typeunion(\@union);
 }
 
-sub make_typelist {
+sub make_typeunion {
     my ($self, $types) = @_;
-    return ['TYPELIST', $types];
+    return ['TYPEUNION', $types];
 }
 
 1;

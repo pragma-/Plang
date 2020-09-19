@@ -753,6 +753,10 @@ sub is_truthy {
 
     my $result = $self->statement($context, $expr);
 
+    if ($self->{types}->check(['TYPE', 'Null'], $result->[0])) {
+        return 0;
+    }
+
     if ($self->{types}->check(['TYPE', 'Number'], $result->[0])) {
         return $result->[1] != 0;
     }
@@ -789,7 +793,7 @@ my %function_builtins = (
         subref => \&function_builtin_whatis,
     },
     'length' => {
-        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
+        params => [[['TYPEUNION', [['TYPE', 'String'], ['TYPE', 'Map'], ['TYPE', 'Array']]], 'expr', undef]],
         ret    => ['TYPE', 'Integer'],
         subref => \&function_builtin_length,
         vsubref => \&validate_builtin_length,
@@ -831,13 +835,13 @@ my %function_builtins = (
         vsubref => \&validate_builtin_Boolean,
     },
     'Array' => {
-        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Array']]], 'expr', undef]],
+        params => [[['TYPEUNION', [['TYPE', 'String'], ['TYPE', 'Array']]], 'expr', undef]],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_Array,
         vsubref => \&validate_builtin_Array,
     },
     'Map' => {
-        params => [[['TYPELIST', [['TYPE', 'String'], ['TYPE', 'Map']]], 'expr', undef]],
+        params => [[['TYPEUNION', [['TYPE', 'String'], ['TYPE', 'Map']]], 'expr', undef]],
         ret    => ['TYPE', 'Map'],
         subref => \&function_builtin_Map,
         vsubref => \&validate_builtin_Map,

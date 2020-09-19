@@ -24,7 +24,7 @@ This README describes what is implemented so far.
     * [Optional type annotations](#optional-type-annotations)
     * [Type narrowing during inference](#type-narrowing-during-inference)
     * [Type conversion](#type-conversion)
-    * [Type lists](#type-lists)
+    * [Type unions](#type-unions)
     * [Types](#types)
       * [Any](#any)
       * [Null](#null)
@@ -261,10 +261,10 @@ Right:
     > var a = "45"; Integer(a) + 1
      46
 
-#### Type lists
-Suppose you want to say that a variable, function parameter or function return will
-be only of types X, Y and Z? You can do this with a type list. To make a type list,
-separate two or more types with a pipe symbol.
+#### Type unions
+Suppose you want to say that a variable, function parameter or function return will be
+either type X or type Y? You can do this with a type union. To make a type union,
+separate multiple types with a pipe symbol.
 
 For example, the signature of the `length()` built-in function is:
 
@@ -283,7 +283,7 @@ Type | Subtypes
 [Boolean](#Boolean) | -
 [Number](#Number) | [Integer](#Integer), [Real](#Real)
 [Integer](#Integer) | -
-[Real](#Real) | -
+[Real](#Real) | [Integer](#Integer)
 [String](#String) | -
 [Array](#Array) | -
 [Map](#Map) | -

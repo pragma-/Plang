@@ -411,14 +411,14 @@ sub Type {
     $parser->try('Type');
 
     {
-        my $typelist = [];
+        my $typeunion = [];
 
         my $type = TypeLiteral($parser);
         return if $parser->errored;
         goto TYPE_FAIL if not $type;
 
         while (1) {
-            push @$typelist, $type;
+            push @$typeunion, $type;
 
             if (not $parser->consume('PIPE')) {
                 last;
@@ -432,8 +432,8 @@ sub Type {
             }
         }
 
-        if (@$typelist > 1) {
-            return ['TYPELIST', $typelist];
+        if (@$typeunion > 1) {
+            return ['TYPEUNION', $typeunion];
         } else {
             return $type;
         }
