@@ -143,7 +143,7 @@ and Maps to Strings for external storage or transmission.
 The Array() and Map() type conversion functions can be used to convert a String containing
 an Array constructor or a Map constructor back to an Array or a Map object.
 
-See [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl) and [examples/json.pl](examples/json.pl) for more details.
+See [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang) and [examples/json.plang](examples/json.plang) for more details.
 
 ## The Plang Language (so far)
 ### Type-checking
@@ -412,7 +412,7 @@ An `Array` is a collection of values. Array elements can be any type. *TODO: Opt
 For more details see:
 
 * [Array operations](#array-operations)
-* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
+* [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang)
 
 The `Array()` type conversion function can be used to convert the following:
 
@@ -430,7 +430,7 @@ values can be any type. *TODO: Optional interface syntax to ensure that maps con
 For more details see:
 
 * [Map operations](#map-operations)
-* [examples/arrays_and_maps.pl](examples/arrays_and_maps.pl)
+* [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang)
 
 The `Map()` type conversion function can be used to convert the following:
 

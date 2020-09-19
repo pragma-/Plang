@@ -5,4 +5,4 @@ It's not much. Yet. There are some more examples in [the unit test script.](../t
 
 You can run each script from the parent directory with:
 
-    $ ./plang < examples/<script.pl>
+    $ ./plang < examples/<script.plang>
