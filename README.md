@@ -67,8 +67,8 @@ presence of type annotations, respectively.
 
 ### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
-the type will default to `Any`. The `Any` type tells Plang to defer type-checking to run-time
-and to infer the actual type from the value provided.
+the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
+value provided.
 
 [Read more.](doc/README.md#type-checking)
 
