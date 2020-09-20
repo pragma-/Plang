@@ -13,6 +13,7 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 
 Here is a short overview of Plang. For more details see [the documentation](doc/).
 
+## Table of contents
 <details><summary>Click to show Table of Contents</summary>
 
 <!-- md-toc-begin -->
@@ -23,7 +24,7 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
   * [Simple types](#simple-types)
 * [Operators](#operators)
 * [Keywords](#keywords)
-* [Statements and StatementGroups](#statements-and-statementgroups)
+* [Statements and Statement Groups](#statements-and-statement-groups)
   * [if/then/else expression](#ifthenelse-expression)
   * [var expression](#var-expression)
   * [while/next/last instruction](#whilenextlast-instruction)
@@ -82,7 +83,9 @@ either type X or type Y? You can do this with a type union.
 [Read more.](doc/README.md#type-unions)
 
 ### Simple types
-The builtin types and their subtypes are:
+Plang's types are simple and straightforward.
+
+<details><summary>Click to show type table</summary>
 
 Type | Subtypes
 --- | ---
@@ -97,6 +100,8 @@ Type | Subtypes
 [Map](doc/README.md#Map) | -
 [Function](doc/README.md#Function) | [Builtin](doc/README.md#Builtin)
 [Builtin](doc/README.md#Builtin) | -
+
+</details>
 
 ## Operators
 These are the operators implemented so far, from highest to lowest precedence.
@@ -172,7 +177,7 @@ delete | deletes a key from a Map
 
 </details>
 
-## Statements and StatementGroups
+## Statements and Statement Groups
 A statement is a single instruction or expression. A statement group is multiple statements enclosed in curly-braces.
 
 If a statement is an instruction, it instructs Plang to do something. If a statement is an expression, it yields a value.
@@ -185,8 +190,8 @@ If a statement is an instruction, it instructs Plang to do something. If a state
      2
 
 ### var expression
-    > var a = 40; a + 2
-     42
+    > var a = 3.14
+     3.14
 
 ### while/next/last instruction
     > var i = 0; while (++i <= 5) print(i, end=" "); print("");
@@ -235,9 +240,10 @@ A function definition is created by using the `fn` keyword.
      5
 
 ### Optional type annotations
-Type annotations may be provided.
+Type annotations may be provided for compile-time type-checking.
 
-    > fn add(a: Number, b: Number) -> Number { a + b }
+    > fn add(a: Number, b: Number) -> Number { a + b }; add(2, "hi")
+     Error: in function call for `add`, expected Number for parameter `b` but got String
 
 ### Anonymous functions
 Here are some ways to define and call an anonymous function:
@@ -307,7 +313,8 @@ produces the output:
      7
 
 ## Variables
-Variables are explicitly declared with the `var` keyword.
+Variables are explicitly declared with the `var` keyword. Without explicit
+type annotations, the variable will infer its type from the value assigned.
 
     > var a = 5; print(type(a)); a
      Integer
@@ -317,7 +324,13 @@ Variables are explicitly declared with the `var` keyword.
      String
      "hello"
 
-A type annotation may be provided to enable strict compile-time type-checking.
+However, once a variable has been given a value, the variable may not be assigned a value of
+a different type. This enforces the consistency of the variable's type.
+
+    > var a = "hi"; a = 5
+     Error: cannot assign to `a` a value of type Integer (expected String)
+
+A type annotation may be provided to enable more strict compile-time type-checking.
 
     > var a: String = 5
      Error: cannot initialize `a` with value of type Integer (expected String)
