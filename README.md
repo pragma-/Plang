@@ -59,14 +59,16 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 </details>
 
 ## Gradually typed
-Plang is gradually typed with optional nominal type annotations.
+Plang is gradually typed with optional nominal type annotations. This means that Plang
+allows a mixture of run-time and compile-time type-checking depending on the omission or
+presence of type annotations, respectively.
 
 [Read more.](doc/README.md#type-checking)
 
 ### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
-the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
-value provided.
+the type will default to `Any`. The `Any` type tells Plang to defer type-checking to run-time
+and to infer the actual type from the value provided.
 
 [Read more.](doc/README.md#type-checking)
 
@@ -79,6 +81,11 @@ You must convert a value explicitly to a desired type.
 ### Type unions
 Suppose you want to say that a variable, function parameter or function return will be
 either type X or type Y? You can do this with a type union.
+
+For example, a function that accepts either `String` or `Integer` and returns either `Array`
+or `Null`:
+
+    fn f(a: String | Integer) -> Array | Null { ... }
 
 [Read more.](doc/README.md#type-unions)
 
