@@ -291,7 +291,7 @@ Suppose you want to omit some arguments. With positional arguments, you'd also n
 any prior arguments in the parameter list. But with named arguments you can simply name the
 arguments you care about and let the default arguments fill in any omitted parameters.
 
-    new_creature(armor = 200, damage = 100) # name and armor set to default values
+    new_creature(armor = 200, damage = 100) # name and health set to default values
 
 ### Closures
 The following snippet:
