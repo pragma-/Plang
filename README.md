@@ -31,9 +31,10 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
   * [type() function](#type-function)
   * [whatis() function](#whatis-function)
 * [Functions](#functions)
+  * [Optional type annotations](#optional-type-annotations-1)
+  * [Anonymous functions](#anonymous-functions)
   * [Default arguments](#default-arguments)
   * [Named arguments](#named-arguments)
-  * [Anonymous functions](#anonymous-functions)
   * [Closures](#closures)
   * [Currying](#currying)
 * [Variables](#variables)
@@ -228,18 +229,30 @@ addition of function parameter identifiers and function default arguments.
      "Builtin (func: Function (Any) -> Boolean, list: Array) -> Array"
 
 ## Functions
-A function definition is created by using the `fn` keyword followed by:
- * an identifer (which may be omitted to create an anonymous function)
- * an identifier list (which may be omitted if there are no parameters desired)
- * a "->" followed by a type (which may be omitted to infer the return type)
- * and finally either a group of statements or a single statement
+A function definition is created by using the `fn` keyword.
 
-An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
-a comma and/or whitespace. Each identifier optionally may be followed by a colon and a type
-description. Each identifier optionally may be followed by an initializer to create a default value.
+    > fn add(a, b) a + b; add(2, 3)
+     5
 
-Plang functions automatically return the value of the last statement. You may use the `return`
-keyword to return the value of an earlier statement.
+### Optional type annotations
+Type annotations may be provided.
+
+    > fn add(a: Number, b: Number) -> Number { a + b }
+
+### Anonymous functions
+Here are some ways to define and call an anonymous function:
+
+    > var greeter = fn { print("Hello!") }; greeter()
+     Hello!
+<!-- -->
+    > var adder = fn (a, b) a + b; adder(10, 20)
+     30
+<!-- -->
+    > (fn (a, b) a + b)(1, 2)
+     3
+<!-- -->
+    > (fn 42)()
+     42
 
 [Read more.](doc/README.md#Functions)
 
@@ -277,21 +290,6 @@ default arguments do their job for the rest:
 
     new_creature(armor = 200, damage = 100)
 
-### Anonymous functions
-Here are some ways to define and call an anonymous function:
-
-    > var greeter = fn { print("Hello!") }; greeter()
-     Hello!
-<!-- -->
-    > var adder = fn (a, b) a + b; adder(10, 20)
-     30
-<!-- -->
-    > (fn (a, b) a + b)(1, 2)
-     3
-<!-- -->
-    > (fn 42)()
-     42
-
 ### Closures
 The following snippet:
 
@@ -305,7 +303,7 @@ produces the output:
     1 2 3 1 4 2
 
 ### Currying
-    > var a = fn (x) fn (y) x + y;  a(3)(4)
+    > var a = fn (x) fn (y) x + y; a(3)(4)
      7
 
 ## Variables
@@ -392,6 +390,8 @@ You can assign to the above notation to replace the substring instead.
 You may use regular expressions on strings with the `~=` operator.
 
 ## Arrays
+Arrays are lists of values. The types of each value need not be the same.
+
     > var array = ["red, "green", 3, 4]; array[1]
      "green"
 
@@ -413,9 +413,7 @@ a new array whose elements meet the criteria of the applied function.
      [{'type': 'dog', 'name': 'Woofers'}]
 
 ## Maps
-    > var x = {"y": 42, "z": true}
-
-There are two syntactical ways to set/access map keys. The first way
+Maps are key/value pairs. There are two syntactical ways to set/access map keys. The first way
 is to use a value of type `String` enclosed in square brackets.
 
     > var x = {}; x["y"] = 42; x
