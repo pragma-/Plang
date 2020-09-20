@@ -59,33 +59,27 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 </details>
 
 ## Gradually typed
-Plang is gradually typed with optional nominal type annotations. This means that Plang
-allows a mixture of run-time and compile-time type-checking depending on the omission or
-presence of type annotations, respectively.
-
-[Read more.](doc/README.md#type-checking)
+Plang is gradually typed with optional nominal type annotations. Plang allows
+a mixture of dynamic and static type-checking depending on the omission or
+presence of type annotations. [Read more.](doc/README.md#type-checking)
 
 ### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
 the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
-value provided.
-
-[Read more.](doc/README.md#type-checking)
+value provided. [Read more.](doc/README.md#type-checking)
 
 ### Explicit type conversion
 For stricter type-safety, Plang does not allow implicit conversion between types.
-You must convert a value explicitly to a desired type.
-
-[Read more.](doc/README.md#type-conversion)
+You must convert a value explicitly to a desired type. [Read more.](doc/README.md#type-conversion)
 
 ### Type unions
 Suppose you want to say that a variable, function parameter or function return will be
 either type X or type Y? You can do this with a type union.
 
-For example, a function that accepts either `String` or `Integer` and returns either `Array`
-or `Null`:
+For example, a function `f` with a parameter `x` that accepts either `String` or `Integer` and
+returns either `Array` or `Null`:
 
-    fn f(a: String | Integer) -> Array | Null { ... }
+    fn f(x: String | Integer) -> Array | Null { ... }
 
 [Read more.](doc/README.md#type-unions)
 
@@ -484,12 +478,14 @@ the empty map.
 
 ## JSON compatibility/serialization
 Plang's Array and Map syntax is designed to be compatible with JSON for easy and convenient serialization of
-Plang data structures for data-exchange and interoperability.
+Plang data structures for data-exchange and interoperability. See [examples/json.plang](examples/json.plang).
 
 [Read more.](doc/README.md#json-compatibilityserialization)
 
 ## Embeddable
 Plang is designed to be embedded into larger Perl applications.
+
+[Read more.](doc/README.md#embedding-plang)
 
 ## More examples
 [Check out some more examples!](examples/)

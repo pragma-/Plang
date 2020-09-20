@@ -1,14 +1,4 @@
 # Plang
-Plang is a pragmatic scripting language written in Perl.
-
-Why? Because I need a small, yet useful, scripting language I can embed into
-some Perl scripts I have; notably [PBot](https://github.com/pragma-/pbot), an IRC bot that I've been tinkering with
-for quite a while.
-
-I want to be able to allow text from external sources to be safely interpreted
-in a sandbox environment with access to exposed Perl subroutines, with full control over
-how deeply functions are allowed to recurse, et cetera.
-
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
 This README describes what is implemented so far.
@@ -85,7 +75,7 @@ This README describes what is implemented so far.
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
-You may use the [`plang`](plang) executable to interpret Plang scripts. Currently, it
+You may use the [`plang`](../plang) executable to interpret Plang scripts. Currently, it
 strictly reads from standard input.
 
     Usage: plang [--dumptokens]
@@ -123,11 +113,11 @@ Plang is designed to be embedded into larger Perl applications. Here's how you c
 do that.
 
 I will get around to documenting this soon. In the meantime, take a look at [this
-unit-test script](test/unit_tests.pl) for a simple example. For a more advanced example, see
+unit-test script](../test/unit_tests.pl) for a simple example. For a more advanced example, see
  [PBot's Plang plugin.](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
 
 ## Example Plang scripts
-[Check out some examples!](examples/)
+[Check out some examples!](../examples/)
 
 ## JSON compatibility/serialization
 An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
@@ -143,7 +133,7 @@ and Maps to Strings for external storage or transmission.
 The Array() and Map() type conversion functions can be used to convert a String containing
 an Array constructor or a Map constructor back to an Array or a Map object.
 
-See [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang) and [examples/json.plang](examples/json.plang) for more details.
+See [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang) and [examples/json.plang](../examples/json.plang) for more details.
 
 ## The Plang Language (so far)
 ### Type-checking
@@ -412,7 +402,7 @@ An `Array` is a collection of values. Array elements can be any type. *TODO: Opt
 For more details see:
 
 * [Array operations](#array-operations)
-* [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang)
+* [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang)
 
 The `Array()` type conversion function can be used to convert the following:
 
@@ -430,7 +420,7 @@ values can be any type. *TODO: Optional interface syntax to ensure that maps con
 For more details see:
 
 * [Map operations](#map-operations)
-* [examples/arrays_and_maps.plang](examples/arrays_and_maps.plang)
+* [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang)
 
 The `Map()` type conversion function can be used to convert the following:
 
@@ -787,7 +777,7 @@ Creating an array and accessing an element:
      "green"
 
 #### map
-See the documentation for the builtin [map](#map-3) function.
+See the documentation for the builtin [map](#map-2) function.
 
 #### filter
 See the documentation for the builtin [filter](#filter-1) function.
