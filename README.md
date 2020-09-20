@@ -287,14 +287,11 @@ arguments in any order:
 
     new_creature(damage = 25, health = 125, armor = 75, name = "a troll")
 
-Another advantage of named arguments comes into play when you want to omit some arguments. With
-positional arguments, if you wanted to set specific arguments you'd also need to set each
-each prior argument, defeating the purpose of the default arguments.
+Suppose you want to omit some arguments. With positional arguments, you'd also need to pass
+any prior arguments in the parameter list. But with named arguments you can simply name the
+arguments you care about and let the default arguments fill in any omitted parameters.
 
-With named arguments you can simply specify the arguments you care about and let the
-default arguments do their job for the rest:
-
-    new_creature(armor = 200, damage = 100)
+    new_creature(armor = 200, damage = 100) # name and armor set to default values
 
 ### Closures
 The following snippet:
@@ -324,7 +321,7 @@ type annotations, the variable will infer its type from the value assigned.
      String
      "hello"
 
-However, once a variable has been given a value, the variable may not be assigned a value of
+Once a variable has been given a value, the variable may not be assigned a value of
 a different type. This enforces the consistency of the variable's type.
 
     > var a = "hi"; a = 5
