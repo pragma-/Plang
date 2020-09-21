@@ -6,11 +6,8 @@
 use warnings;
 use strict;
 
-BEGIN {
-    use File::Basename;
-    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
-    unshift @INC, "$home";
-}
+use FindBin qw($RealBin);
+use lib "$RealBin/.";
 
 # use Plang
 use Plang::Interpreter;
@@ -18,7 +15,7 @@ use Plang::Interpreter;
 # plang() can be used as:
 #   $ret = plang 'fn square(x) x * x; square(7)';  # interpret a string
 # or
-#   $ret = plang;  # interpet stdin; e.g. `$ ./plang <<< '2 * 3'` or `$ ./plang < program.p`
+#   $ret = plang;  # interpet stdin; e.g. `$ ./plang <<< '2 * 3'` or `$ ./plang < script.plang`
 sub plang {
     my ($text) = @_;
 

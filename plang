@@ -5,12 +5,8 @@
 use warnings;
 use strict;
 
-# allow loading .pm modules from this script's directory
-BEGIN {
-    use File::Basename;
-    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
-    unshift @INC, "$home";
-}
+use FindBin qw($RealBin);
+use lib "$RealBin/.";
 
 use Data::Dumper;
 use Plang::Interpreter;
@@ -54,9 +50,9 @@ sub plang_dbg {
 
     # dump the $result data structure
     if ($dumptokens or grep { $_ eq 'AST' } @debug_tags) {
-        $Data::Dumper::Terse = 1;
+        $Data::Dumper::Terse  = 1;
         $Data::Dumper::Indent = 1;
-        $Data::Dumper::Useqq = 1;
+        $Data::Dumper::Useqq  = 1;
 
         print Dumper ($result), "\n";
     }
