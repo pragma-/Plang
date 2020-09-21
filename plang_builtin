@@ -1,0 +1,93 @@
+#!/usr/bin/env perl
+
+# example Plang interpreter script with a simple
+# built-in function demonstration
+
+use warnings;
+use strict;
+
+use FindBin qw($RealBin);
+use lib "$RealBin/.";
+
+# use Plang
+use Plang::Interpreter;
+
+# The plang() subroutine can used to interpret a string or the STDIN stream.
+#
+# A string:
+#
+#   $ret = plang 'fn square(x) x * x; square(7)';
+#
+# STDIN stream:
+#
+#   $ret = plang;
+
+sub plang {
+    my ($text) = @_;
+
+    # create Plang object
+    my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG});
+
+    add_builtins($plang);
+
+    if (defined $text and length $text) {
+        # if a string argument was provided, interpret the string
+        return $plang->interpret_string($text);
+    } else {
+        # otherwise interpret the standard input stream
+        return $plang->interpret_stream(*STDIN);
+    }
+}
+
+# interpret plang script and exit using returned value
+
+my $ret = plang("@ARGV") // 0;
+exit int $ret;
+
+sub add_builtins {
+    my ($plang) = @_;
+
+    # example of adding a simple builtin function
+    $plang->add_builtin_function('greet',        # function name
+        [                                        # parameter list
+            [['TYPE', 'String'], 'name', undef], # parameter type, name and default argument
+        ],                                       # end parameter list
+        ['TYPE', 'Null'],                        # return type
+        \&builtin_greet,                         # function subref
+        \&validate_greet);                       # optional compile-time checking
+}
+
+# example type-checking/validation of builtin function
+# (this is invoked only at compile-time)
+sub validate_greet {
+    my ($plang, $context, $name, $arguments) = @_;
+
+    # here we could do further type/semantic checking if necessary,
+    # but what we don't do is the actual I/O that builtin_greet() does.
+
+    return [['TYPE', 'Null'], undef];
+}
+
+# example builtin function
+# (this is invoked only at run-time)
+sub builtin_greet {
+    my ($plang, $context, $name, $arguments) = @_;
+
+    # this is the run-time version of greet(), opposed to the
+    # previous compile-time version, and so we perform the
+    # actual I/O or side-effects -- in this case, we simply
+    # print a greeting message to stdout
+
+    my $arg_name = $arguments->[0];
+
+    # we know that $arg_name is a String because thats how we defined the
+    # parameter. The type-checker won't let this function execute if
+    # something other than a String was passed. Ergo, we know it's safe
+    # to use value of $arg_name directly without first checking the
+    # type ($arg_name->[0]).
+
+    print "Hello there, $arg_name->[1]!\n";
+
+    # return null
+    return [['TYPE', 'Null'], undef];
+}

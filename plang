@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 
-# example Plang interpreter start-up script
+# Plang interpreter start-up script
+#
+# see the `plang_simple` script for a much less complex version
 
 use warnings;
 use strict;
