@@ -3,11 +3,8 @@
 use warnings;
 use strict;
 
-BEGIN {
-    use File::Basename;
-    my $home = -l __FILE__ ? dirname readlink __FILE__ : dirname __FILE__;
-    unshift @INC, "$home/..";
-}
+use FindBin qw($RealBin);
+use lib "$RealBin/../lib";
 
 use utf8;
 STDOUT->autoflush(1);

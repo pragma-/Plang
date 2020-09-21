@@ -7,7 +7,7 @@ use warnings;
 use strict;
 
 use FindBin qw($RealBin);
-use lib "$RealBin/.";
+use lib "$RealBin/../lib";
 
 # use Plang
 use Plang::Interpreter;
