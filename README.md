@@ -83,7 +83,7 @@ You may set the `DEBUG` environment variable to certain values to enable various
 
 ### REPL
 The [`plang_repl`](script/plang_repl) script can be used to start a REPL session.
-It is strongly recommend to use the `rlwrap` command-line utility for command history.
+It is recommended to use the `rlwrap` command-line utility for command history.
 
     $ rlwrap script/plang_repl
      Plang REPL. Type `.help` for help. `.quit` to exit.
