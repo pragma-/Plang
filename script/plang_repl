@@ -1,0 +1,107 @@
+#!/usr/bin/env perl
+
+# simple Plang REPL script: interprets lines of input from STDIN and
+# preserves environment between each line.
+#
+# Recommend using the `rlwrap` program for command history:
+#
+#    $ rlwrap ./plang_repl
+
+use warnings;
+use strict;
+
+# allow loading .pm relative to script location
+use FindBin qw($RealBin);
+use lib "$RealBin/../lib";
+
+use Text::ParseWords qw/shellwords/;
+
+# use Plang
+use Plang::Interpreter;
+
+# create Plang object
+my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG}, embedded => 1);
+
+# print welcome message
+print "Plang REPL. Type `.help` for help. `.quit` to exit.\n";
+
+# some internal commands
+# TODO: .save, .load, .clear, etc
+my %commands = (
+    '.quit' => {
+        func => \&cmd_quit,
+        help => 'Exits Plang REPL.',
+    },
+    '.help' => {
+        func => \&cmd_help,
+        help => 'Provides help.',
+    },
+);
+
+# start REPL loop
+repl_loop('> ');
+
+# main repl loop
+sub repl_loop {
+    my ($prompt) = @_;
+
+    while (1) {
+        print $prompt;
+        defined (my $input = <STDIN>) or print "Good-bye.\n" and exit;
+        next if process_command($input);
+
+        my $result = eval { $plang->interpret_string($input, repl => 1) };
+
+        if ($@) {
+            print $@, "\n";
+        } else {
+            print $plang->{interpreter}->output_value($result, repl => 1), "\n";
+        }
+    }
+}
+
+# check for an internal command
+sub process_command {
+    my ($input) = @_;
+
+    my @command = shellwords $input;
+    return 0 if not @command;
+
+    my ($cmd, @args) = @command;
+
+    if (exists $commands{$cmd}) {
+        return $commands{$cmd}->{'func'}->(@args);
+    }
+
+    return 0;
+}
+
+# internal commands
+
+sub cmd_quit {
+    exit;
+}
+
+sub cmd_help {
+    my (@args) = @_;
+
+    if (not @args) {
+        print "Available commands:\n";
+
+        foreach my $command (sort keys %commands) {
+            printf "%-10s :: %s\n", $command, $commands{$command}->{help};
+        }
+
+        return 1;
+    }
+
+    my $command = shift @args;
+
+    if (not exists $commands{$command}) {
+        print "No such command `$command`.";
+        return 1;
+    }
+
+    print $commands{$command}->{help}, "\n";
+    return 1;
+}

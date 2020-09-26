@@ -210,8 +210,8 @@ sub handle_parse_errors {
 }
 
 sub validate {
-    my ($self, $ast) = @_;
-    return $self->{validator}->validate($ast);
+    my ($self, $ast, %opt) = @_;
+    return $self->{validator}->validate($ast, %opt);
 }
 
 sub interpret {
@@ -220,7 +220,7 @@ sub interpret {
     my $errors = $self->handle_parse_errors;
     die $errors if defined $errors;
 
-    $errors = $self->validate($self->{ast});
+    $errors = $self->validate($self->{ast}, %opt);
 
     if ($errors) {
         if (not $self->{embedded}) {

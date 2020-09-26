@@ -442,7 +442,7 @@ sub function_definition {
                 $self->error($new_context, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value");
             }
 
-            $value = [$type, undef];
+            $value = [$type, 0];
         } else {
             $got_default_value = 1;
 
@@ -1008,8 +1008,8 @@ sub handle_statement_result {
 
 # validate the program
 sub validate {
-    my ($self, $ast) = @_;
-    $self->run($ast);
+    my ($self, $ast, %opt) = @_;
+    $self->run($ast, %opt);
     return;
 }
 

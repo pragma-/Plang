@@ -20,6 +20,9 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 <details><summary>Click to show Table of Contents</summary>
 
 <!-- md-toc-begin -->
+* [Table of contents](#table-of-contents)
+* [Running Plang](#running-plang)
+  * [REPL](#repl)
 * [Gradually typed](#gradually-typed)
   * [Optional type annotations](#optional-type-annotations)
   * [Explicit type conversion](#explicit-type-conversion)
@@ -60,6 +63,16 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 <!-- md-toc-end -->
 
 </details>
+
+## Running Plang
+### REPL
+The [`plang_repl`](script/plang_repl) script can be used to start a REPL session.
+It is strongly recommend to use the `rlwrap` command-line utility for command history.
+
+    $ rlwrap script/plang_repl
+     Plang REPL. Type `.help` for help. `.quit` to exit.
+     > var a = 42
+      [Integer] 42
 
 ## Gradually typed
 Plang is gradually typed with optional nominal type annotations. Plang allows
