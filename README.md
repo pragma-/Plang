@@ -22,6 +22,7 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 <!-- md-toc-begin -->
 * [Table of contents](#table-of-contents)
 * [Running Plang](#running-plang)
+  * [Command-line](#command-line)
   * [REPL](#repl)
 * [Gradually typed](#gradually-typed)
   * [Optional type annotations](#optional-type-annotations)
@@ -65,6 +66,21 @@ Here is a short overview of Plang. For more details see [the documentation](doc/
 </details>
 
 ## Running Plang
+### Command-line
+You may use the [`plang`](script/plang) script to interpret Plang scripts. Currently, it strictly reads from standard input.
+
+To interpret a file:
+
+    $ script/plang < examples/closures.plang
+     1 2 3 1 4 2
+
+To interpret a string:
+
+    $ script/plang <<< '1 + 2'
+     3
+
+You may set the `DEBUG` environment variable to certain values to enable various debugging output. [Read more.](doc/README.md#debug-environment-variable)
+
 ### REPL
 The [`plang_repl`](script/plang_repl) script can be used to start a REPL session.
 It is strongly recommend to use the `rlwrap` command-line utility for command history.
