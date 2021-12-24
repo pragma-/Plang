@@ -14,6 +14,8 @@ use base 'Exporter';
 our @EXPORT_OK = qw/Program/; # start-rule
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 
+use Plang::Constants::Instructions ':all';
+
 sub error {
     my ($parser, $err_msg, $consume_to) = @_;
     chomp $err_msg;
@@ -23,9 +25,9 @@ sub error {
     if (defined (my $token = $parser->current_or_last_token)) {
         my $line = $token->[2]->{line};
         my $col  = $token->[2]->{col};
-        $parser->add_error("Error: $err_msg at line $line, col $col.");
+        $parser->add_error("Parse error: $err_msg at line $line, col $col.");
     } else {
-        $parser->add_error("Error: $err_msg");
+        $parser->add_error("Parse error: $err_msg");
     }
 
     $parser->consume_to($consume_to);
@@ -119,7 +121,7 @@ sub alternate_statement {
         if ($result) {
             $parser->consume('TERM');
             $parser->advance;
-            return ['STMT', $result];
+            return [INSTR_STMT, $result];
         }
     }
 }
@@ -127,7 +129,7 @@ sub alternate_statement {
 # Statement ::= StatementGroup
 #             | VariableDeclaration
 #             | FunctionDefinition
-#             | ReturnExpression
+#             | ReturnStatement
 #             | NextStatement
 #             | LastStatement
 #             | WhileStatement
@@ -152,7 +154,7 @@ sub Statement {
 
         if ($statement_group) {
             $parser->advance;
-            return ['STMT', $statement_group];
+            return [INSTR_STMT, $statement_group];
         }
     }
 
@@ -163,7 +165,7 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'Statement: FunctionDefinition'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&ReturnExpression,    'Statement: ReturnExpression'));
+    return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,    'Statement: ReturnStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&NextStatement,       'Statement: NextStatement'));
@@ -207,12 +209,12 @@ sub Statement {
     {
         if ($parser->consume('TERM')) {
             $parser->advance;
-            return ['NOP', undef];
+            return [INSTR_NOP, undef];
         }
     }
 
     $parser->advance;
-    return ['NOP', undef];
+    return [INSTR_NOP, undef];
 }
 
 # StatementGroup ::= L_BRACE Statement* R_BRACE
@@ -230,7 +232,7 @@ sub StatementGroup {
             my $statement = Statement($parser);
             return if $parser->errored;
 
-            if ($statement and $statement->[0] ne 'NOP') {
+            if ($statement and $statement->[0] != INSTR_NOP) {
                 push @statements, $statement;
                 next;
             }
@@ -240,7 +242,7 @@ sub StatementGroup {
         }
 
         $parser->advance;
-        return ['STMT_GROUP', \@statements];
+        return [INSTR_STMT_GROUP, \@statements];
     }
 
   STATEMENT_GROUP_FAIL:
@@ -277,7 +279,7 @@ sub VariableDeclaration {
             return if $parser->errored;
 
             $parser->advance;
-            return ['VAR', $type, $name, $initializer];
+            return [INSTR_VAR, $type, $name, $initializer];
         }
     }
 
@@ -338,7 +340,7 @@ sub MapConstructor {
             }
 
             $parser->advance;
-            return ['MAPINIT', \@map];
+            return [INSTR_MAPINIT, \@map];
         }
     }
 
@@ -369,7 +371,7 @@ sub ArrayConstructor {
             }
 
             $parser->advance;
-            return ['ARRAYINIT', \@array];
+            return [INSTR_ARRAYINIT, \@array];
         }
     }
 
@@ -558,7 +560,7 @@ sub FunctionDefinition {
 
                 if ($statement_group) {
                     $parser->advance;
-                    return ['FUNCDEF', $return_type, $name, $identlist, $statement_group->[1]];
+                    return [INSTR_FUNCDEF, $return_type, $name, $identlist, $statement_group->[1]];
                 }
             }
 
@@ -570,7 +572,7 @@ sub FunctionDefinition {
 
                 if ($statement) {
                     $parser->advance;
-                    return ['FUNCDEF', $return_type, $name, $identlist, [$statement]];
+                    return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$statement]];
                 }
             }
 
@@ -626,11 +628,11 @@ sub IdentifierList {
     $parser->backtrack;
 }
 
-# ReturnExpression ::= KEYWORD_return Statement
-sub ReturnExpression {
+# ReturnStatement ::= KEYWORD_return Statement
+sub ReturnStatement {
     my ($parser) = @_;
 
-    $parser->try('ReturnExpression');
+    $parser->try('ReturnStatement');
 
     {
         if ($parser->consume('KEYWORD_return')) {
@@ -638,7 +640,7 @@ sub ReturnExpression {
             return if $parser->errored;
 
             $parser->advance;
-            return ['RET', $statement];
+            return [INSTR_RET, $statement];
         }
     }
 
@@ -654,7 +656,7 @@ sub NextStatement {
     {
         if ($parser->consume('KEYWORD_next')) {
             $parser->advance;
-            return ['NEXT', undef];
+            return [INSTR_NEXT, undef];
         }
     }
 
@@ -670,7 +672,7 @@ sub LastStatement {
     {
         if ($parser->consume('KEYWORD_last')) {
             $parser->advance;
-            return ['LAST', undef];
+            return [INSTR_LAST, undef];
         }
     }
 
@@ -708,7 +710,7 @@ sub WhileStatement {
             }
 
             $parser->advance;
-            return ['WHILE', $expr, $body];
+            return [INSTR_WHILE, $expr, $body];
         }
     }
 
@@ -748,7 +750,7 @@ sub IfExpression {
             }
 
             $parser->advance;
-            return ['IF', $expr, $body, $else];
+            return [INSTR_IF, $expr, $body, $else];
         }
     }
 
@@ -776,7 +778,7 @@ sub ExistsStatement {
         if ($parser->consume('KEYWORD_exists')) {
             my $map = MapConstructor($parser);
             return if $parser->errored;
-            return ['EXISTS', $map] if $map;
+            return [INSTR_EXISTS, $map] if $map;
 
             my $statement = Statement($parser);
             return if $parser->errored;
@@ -786,7 +788,7 @@ sub ExistsStatement {
             }
 
             $parser->advance;
-            return ['EXISTS', $statement->[1]];
+            return [INSTR_EXISTS, $statement->[1]];
         }
     }
 
@@ -803,7 +805,7 @@ sub DeleteExpression {
         if ($parser->consume('KEYWORD_delete')) {
             my $map = MapConstructor($parser);
             return if $parser->errored;
-            return ['DELETE', $map] if $map;
+            return [INSTR_DELETE, $map] if $map;
 
             my $statement = Statement($parser);
             return if $parser->errored;
@@ -813,7 +815,7 @@ sub DeleteExpression {
             }
 
             $parser->advance;
-            return ['DELETE', $statement->[1]];
+            return [INSTR_DELETE, $statement->[1]];
         }
     }
 
@@ -830,7 +832,7 @@ sub KeysExpression {
         if ($parser->consume('KEYWORD_keys')) {
             my $map = MapConstructor($parser);
             return if $parser->errored;
-            return ['KEYS', $map] if $map;
+            return [INSTR_KEYS, $map] if $map;
 
             my $statement = Statement($parser);
             return if $parser->errored;
@@ -840,7 +842,7 @@ sub KeysExpression {
             }
 
             $parser->advance;
-            return ['KEYS', $statement->[1]];
+            return [INSTR_KEYS, $statement->[1]];
         }
     }
 
@@ -857,7 +859,7 @@ sub ValuesExpression {
         if ($parser->consume('KEYWORD_values')) {
             my $map = MapConstructor($parser);
             return if $parser->errored;
-            return ['VALUES', $map] if $map;
+            return [INSTR_VALUES, $map] if $map;
 
             my $statement = Statement($parser);
             return if $parser->errored;
@@ -867,7 +869,7 @@ sub ValuesExpression {
             }
 
             $parser->advance;
-            return ['VALUES', $statement->[1]];
+            return [INSTR_VALUES, $statement->[1]];
         }
     }
 
@@ -890,7 +892,7 @@ sub RangeExpression {
 
             if ($to) {
                 $parser->advance;
-                return ['RANGE', $from, $to];
+                return [INSTR_RANGE, $from, $to];
             }
         }
     }
@@ -1045,15 +1047,15 @@ sub Prefix {
     return $array if $array;
 
     if ($token = $parser->consume('KEYWORD_null')) {
-        return ['LITERAL', ['TYPE', 'Null'], undef];
+        return [INSTR_LITERAL, ['TYPE', 'Null'], undef];
     }
 
     if ($token = $parser->consume('KEYWORD_true')) {
-        return ['LITERAL', ['TYPE', 'Boolean'], 1];
+        return [INSTR_LITERAL, ['TYPE', 'Boolean'], 1];
     }
 
     if ($token = $parser->consume('KEYWORD_false')) {
-        return ['LITERAL', ['TYPE', 'Boolean'], 0];
+        return [INSTR_LITERAL, ['TYPE', 'Boolean'], 0];
     }
 
     if ($token = $parser->consume('INT')) {
@@ -1061,15 +1063,15 @@ sub Prefix {
             $token->[1] = oct $token->[1];
         }
 
-        return ['LITERAL', ['TYPE', 'Integer'], $token->[1] + 0];
+        return [INSTR_LITERAL, ['TYPE', 'Integer'], $token->[1] + 0];
     }
 
     if ($token = $parser->consume('FLT')) {
-        return ['LITERAL', ['TYPE', 'Real'], $token->[1] + 0];
+        return [INSTR_LITERAL, ['TYPE', 'Real'], $token->[1] + 0];
     }
 
     if ($token = $parser->consume('HEX')) {
-        return ['LITERAL', ['TYPE', 'Number'], hex $token->[1]];
+        return [INSTR_LITERAL, ['TYPE', 'Number'], hex $token->[1]];
     }
 
     # special case types as identifiers here
@@ -1077,17 +1079,17 @@ sub Prefix {
     if (defined $token and $token->[0] =~ /TYPE_(.*)/) {
         my $ident = $1;
         $parser->consume;
-        return ['IDENT', $ident];
+        return [INSTR_IDENT, $ident];
     }
 
     if ($token = $parser->consume('IDENT')) {
-        return ['IDENT', $token->[1]];
+        return [INSTR_IDENT, $token->[1]];
     }
 
     if ($token = $parser->consume('SQUOTE_STRING_I')) {
         $token->[1] =~ s/^\$//;
         $token->[1] =~ s/^\'|\'$//g;
-        return ['STRING_I', $token->[1]];
+        return [INSTR_STRING_I, $token->[1]];
     }
 
     sub expand_escapes {
@@ -1106,35 +1108,35 @@ sub Prefix {
     if ($token = $parser->consume('DQUOTE_STRING_I')) {
         $token->[1] =~ s/^\$//;
         $token->[1] =~ s/^\"|\"$//g;
-        return ['STRING_I', expand_escapes($token->[1])];
+        return [INSTR_STRING_I, expand_escapes($token->[1])];
     }
 
     if ($token = $parser->consume('SQUOTE_STRING')) {
         $token->[1] =~ s/^\'|\'$//g;
-        return ['LITERAL', ['TYPE', 'String'], expand_escapes($token->[1])];
+        return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
     }
 
     if ($token = $parser->consume('DQUOTE_STRING')) {
         $token->[1] =~ s/^\"|\"$//g;
-        return ['LITERAL', ['TYPE', 'String'], expand_escapes($token->[1])];
+        return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
     }
 
     if ($parser->consume('MINUS_MINUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
         return expected($parser, 'Expression') if not defined $expr;
-        return ['PREFIX_SUB', $expr];
+        return [INSTR_PREFIX_SUB, $expr];
     }
 
     if ($parser->consume('PLUS_PLUS')) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
         return expected($parser, 'Expression') if not defined $expr;
-        return ['PREFIX_ADD', $expr];
+        return [INSTR_PREFIX_ADD, $expr];
     }
 
-    return $expr if $expr = UnaryOp($parser, 'BANG',   'NOT');
-    return $expr if $expr = UnaryOp($parser, 'MINUS',  'NEG');
-    return $expr if $expr = UnaryOp($parser, 'PLUS',   'POS');
-    return $expr if $expr = UnaryOp($parser, 'NOT',    'NOT');
+    return $expr if $expr = UnaryOp($parser, 'BANG',  INSTR_NOT);
+    return $expr if $expr = UnaryOp($parser, 'MINUS', INSTR_NEG);
+    return $expr if $expr = UnaryOp($parser, 'PLUS',  INSTR_POS);
+    return $expr if $expr = UnaryOp($parser, 'NOT',   INSTR_NOT);
 
     if ($token = $parser->consume('L_PAREN')) {
         my $expr = Expression($parser);
@@ -1169,36 +1171,36 @@ sub Infix {
             return expected($parser, '<else> statement in conditional <if> ? <then> : <else> operator');
         }
 
-        return ['COND', $left, $then, $else];
+        return [INSTR_COND, $left, $then, $else];
     }
 
     # binary operators
-    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         'ACCESS',     'ACCESS');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   'POW',        'EXPONENT',     1);
-    return $expr if $expr = BinaryOp($parser, $left, 'CARET',       'POW',        'EXPONENT',     1);
-    return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     'REM',        'EXPONENT');
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR',        'MUL',        'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       'DIV',        'PRODUCT');
-    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        'ADD',        'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       'SUB',        'SUM');
-    return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       'STRIDX',     'STRING');
-    return $expr if $expr = BinaryOp($parser, $left, 'CARET_CARET', 'STRCAT',     'STRING');
-    return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  'GTE',        'RELATIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     'LTE',        'RELATIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     'GT',         'RELATIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'LESS',        'LT',         'RELATIONAL');
-    return $expr if $expr = BinaryOp($parser, $left, 'NOT_EQ',      'NEQ',        'EQUALITY');
-    return $expr if $expr = BinaryOp($parser, $left, 'AMP_AMP',     'AND',        'LOGICAL_AND');
-    return $expr if $expr = BinaryOp($parser, $left, 'PIPE_PIPE',   'OR',         'LOGICAL_OR');
-    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          'EQ',         'EQUALITY');
-    return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      'ASSIGN',     'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'PLUS_EQ',     'ADD_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'MINUS_EQ',    'SUB_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'STAR_EQ',     'MUL_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'SLASH_EQ',    'DIV_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'DOT_EQ',      'CAT_ASSIGN', 'ASSIGNMENT',   1);
-    return $expr if $expr = BinaryOp($parser, $left, 'AND',         'AND',        'LOW_AND');
-    return $expr if $expr = BinaryOp($parser, $left, 'OR',          'OR',         'LOW_OR');
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT',         INSTR_ACCESS,     'ACCESS');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_STAR',   INSTR_POW,        'EXPONENT',     1);
+    return $expr if $expr = BinaryOp($parser, $left, 'CARET',       INSTR_POW,        'EXPONENT',     1);
+    return $expr if $expr = BinaryOp($parser, $left, 'PERCENT',     INSTR_REM,        'EXPONENT');
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR',        INSTR_MUL,        'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH',       INSTR_DIV,        'PRODUCT');
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS',        INSTR_ADD,        'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS',       INSTR_SUB,        'SUM');
+    return $expr if $expr = BinaryOp($parser, $left, 'TILDE',       INSTR_STRIDX,     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'CARET_CARET', INSTR_STRCAT,     'STRING');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER_EQ',  INSTR_GTE,        'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS_EQ',     INSTR_LTE,        'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'GREATER',     INSTR_GT,         'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'LESS',        INSTR_LT,         'RELATIONAL');
+    return $expr if $expr = BinaryOp($parser, $left, 'NOT_EQ',      INSTR_NEQ,        'EQUALITY');
+    return $expr if $expr = BinaryOp($parser, $left, 'AMP_AMP',     INSTR_AND,        'LOGICAL_AND');
+    return $expr if $expr = BinaryOp($parser, $left, 'PIPE_PIPE',   INSTR_OR,         'LOGICAL_OR');
+    return $expr if $expr = BinaryOp($parser, $left, 'EQ',          INSTR_EQ,         'EQUALITY');
+    return $expr if $expr = BinaryOp($parser, $left, 'ASSIGN',      INSTR_ASSIGN,     'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'PLUS_EQ',     INSTR_ADD_ASSIGN, 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'MINUS_EQ',    INSTR_SUB_ASSIGN, 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'STAR_EQ',     INSTR_MUL_ASSIGN, 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'SLASH_EQ',    INSTR_DIV_ASSIGN, 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'DOT_EQ',      INSTR_CAT_ASSIGN, 'ASSIGNMENT',   1);
+    return $expr if $expr = BinaryOp($parser, $left, 'AND',         INSTR_AND,        'LOW_AND');
+    return $expr if $expr = BinaryOp($parser, $left, 'OR',          INSTR_OR,         'LOW_OR');
 
     return Postfix($parser, $left, $precedence);
 }
@@ -1208,12 +1210,12 @@ sub Postfix {
 
     # post-increment
     if ($parser->consume('PLUS_PLUS')) {
-        return ['POSTFIX_ADD', $left];
+        return [INSTR_POSTFIX_ADD, $left];
     }
 
     # post-decrement
     if ($parser->consume('MINUS_MINUS')) {
-        return ['POSTFIX_SUB', $left];
+        return [INSTR_POSTFIX_SUB, $left];
     }
 
     # function call
@@ -1233,7 +1235,7 @@ sub Postfix {
             return expected($parser, 'expression or closing ")" for function call argument list');
         }
 
-        return ['CALL', $left, $arguments];
+        return [INSTR_CALL, $left, $arguments];
     }
 
     # array/map access
@@ -1249,7 +1251,7 @@ sub Postfix {
             return expected($parser, 'closing ] bracket');
         }
 
-        return ['ACCESS', $left, $stmt];
+        return [INSTR_ACCESS, $left, $stmt];
     }
 
     # no postfix

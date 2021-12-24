@@ -18,10 +18,9 @@ use Plang::Validator;
 use Plang::AstInterpreter;
 
 sub new {
-    my ($proto, %conf) = @_;
-    my $class = ref($proto) || $proto;
+    my ($class, %args) = @_;
     my $self  = bless {}, $class;
-    $self->initialize(%conf);
+    $self->initialize(%args);
     return $self;
 }
 

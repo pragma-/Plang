@@ -8,101 +8,196 @@
 
 package Plang::Validator;
 
+use parent 'Plang::AstInterpreter';
+
 use warnings;
 use strict;
 
-use parent 'Plang::AstInterpreter';
-
 use Data::Dumper;
 
+use Plang::Constants::Instructions ':all';
+
+sub initialize {
+    my ($self, %conf) = @_;
+
+    $self->SUPER::initialize(%conf);
+
+    # validate these main instructions
+    $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
+    $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
+    $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
+    $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
+    $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
+    $self->{instr_dispatch}->[INSTR_VALUES]      = \&keyword_values;
+    $self->{instr_dispatch}->[INSTR_COND]        = \&conditional;
+    $self->{instr_dispatch}->[INSTR_WHILE]       = \&keyword_while;
+    $self->{instr_dispatch}->[INSTR_NEXT]        = \&keyword_next;
+    $self->{instr_dispatch}->[INSTR_LAST]        = \&keyword_last;
+    $self->{instr_dispatch}->[INSTR_IF]          = \&keyword_if;
+    $self->{instr_dispatch}->[INSTR_ASSIGN]      = \&assignment;
+    $self->{instr_dispatch}->[INSTR_ADD_ASSIGN]  = \&add_assign;
+    $self->{instr_dispatch}->[INSTR_SUB_ASSIGN]  = \&sub_assign;
+    $self->{instr_dispatch}->[INSTR_MUL_ASSIGN]  = \&mul_assign;
+    $self->{instr_dispatch}->[INSTR_DIV_ASSIGN]  = \&div_assign;
+    $self->{instr_dispatch}->[INSTR_CAT_ASSIGN]  = \&cat_assign;
+    $self->{instr_dispatch}->[INSTR_FUNCDEF]     = \&function_definition;
+    $self->{instr_dispatch}->[INSTR_CALL]        = \&function_call;
+    $self->{instr_dispatch}->[INSTR_RET]         = \&keyword_return;
+    $self->{instr_dispatch}->[INSTR_PREFIX_ADD]  = \&prefix_increment;
+    $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
+    $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
+    $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
+    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+
+    # validate these unary operators
+    $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
+    $self->{instr_dispatch}->[INSTR_NEG] = \&unary_op;
+    $self->{instr_dispatch}->[INSTR_POS] = \&unary_op;
+
+    # validate these binary operators
+    $self->{instr_dispatch}->[INSTR_POW]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_REM]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_MUL]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_DIV]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_ADD]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_SUB]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_STRCAT] = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_STRIDX] = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_GTE]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_LTE]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_GT]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+}
+
+sub error {
+    my ($self, $context, $err_msg) = @_;
+    chomp $err_msg;
+    $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
+    die "Validator error: $err_msg\n";
+}
+
 sub unary_op {
-    my ($self, $context, $data, $op, $debug_msg) = @_;
+    my ($self, $instr, $context, $data) = @_;
 
-    if ($data->[0] eq $op) {
-        my $value  = $self->statement($context, $data->[1]);
+    my $value = $self->statement($context, $data->[1]);
 
-        if ($self->{debug} and $debug_msg) {
-            my $type = $self->{types}->to_string($value->[0]);
-            $debug_msg =~ s/\$a/$value->[1] ($type)/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
-        }
-
-        if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0])) {
-            return $value;
-        }
-
-        if ($self->{types}->is_arithmetic($value->[0])) {
-            if (exists $self->{eval_unary_op_Number}->{$op}) {
-                my $result = $self->{eval_unary_op_Number}->{$op}->($value->[1]);
-
-                if ($self->{types}->is_subtype($value->[0], $result->[0])) {
-                    $result->[0] = $value->[0];
-                }
-
-                return $result;
-            }
-        }
-
-        $self->error($context, "cannot apply unary operator $op to type " . $self->{types}->to_string($value->[0]) . "\n");
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0])) {
+        return $value;
     }
 
-    return;
+    if ($self->{types}->is_arithmetic($value->[0])) {
+        my $result;
+
+        if ($instr == INSTR_NOT) {
+            $result = [['TYPE', 'Boolean'], int ! $value->[1]];
+        } elsif ($instr == INSTR_NEG) {
+            $result = [['TYPE', 'Number'], - $value->[1]];
+        } elsif ($instr == INSTR_POS) {
+            $result = [['TYPE', 'Number'], + $value->[1]];
+        } else {
+            $self->error($context, "Unknown unary operator $instr");
+        }
+
+        if ($self->{types}->is_subtype($value->[0], $result->[0])) {
+            $result->[0] = $value->[0];
+        }
+
+        return $result;
+    }
+
+    $self->error($context, "cannot apply unary operator $pretty_instr[$instr] to type " . $self->{types}->to_string($value->[0]) . "\n");
 }
 
 sub binary_op {
-    my ($self, $context, $data, $op, $debug_msg) = @_;
+    my ($self, $instr, $context, $data) = @_;
 
-    if ($data->[0] eq $op) {
-        my $left_value  = $self->statement($context, $data->[1]);
-        my $right_value = $self->statement($context, $data->[2]);
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
 
-        if ($self->{debug} and $debug_msg) {
-            my $left_type = $self->{types}->to_string($left_value->[0]);
-            my $right_type = $self->{types}->to_string($right_value->[0]);
-            $debug_msg =~ s/\$a/$left_value->[1] ($left_type)/g;
-            $debug_msg =~ s/\$b/$right_value->[1] ($right_type)/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n") if $self->{debug};
-        }
-
-        if ($self->{types}->is_equal(['TYPE', 'Any'], $left_value->[0])) {
-            return $left_value;
-        }
-
-        if ($self->{types}->is_equal(['TYPE', 'Any'], $right_value->[0])) {
-            return $right_value;
-        }
-
-        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-            if (exists $self->{eval_binary_op_String}->{$op}) {
-                return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
-            }
-        }
-
-        if (not $self->{types}->is_arithmetic($left_value->[0])) {
-            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left_value->[0]));
-        }
-
-        if (not $self->{types}->is_arithmetic($right_value->[0])) {
-            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right_value->[0]));
-        }
-
-        if ($self->{types}->check($left_value->[0], $right_value->[0]) or $self->{types}->check($right_value->[0], $left_value->[0])) {
-            if (exists $self->{eval_binary_op_Number}->{$op}) {
-                my $result    = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
-                my $promotion = $self->{types}->get_promoted_type($left_value->[0], $right_value->[0]);
-
-                if ($self->{types}->is_subtype($promotion, $result->[0])) {
-                    $result->[0] = $promotion;
-                }
-
-                return $result;
-            }
-        }
-
-        $self->error($context, "cannot apply binary operator $op (have types " . $self->{types}->to_string($left_value->[0]) . " and " . $self->{types}->to_string($right_value->[0]) . ")");
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
+        return $left;
     }
 
-    return;
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $right->[0])) {
+        return $right;
+    }
+
+    # String operations
+
+    if ($self->{types}->check(['TYPE', 'String'], $left->[0])
+            or $self->{types}->check(['TYPE', 'String'], $right->[0])) {
+
+        if ($self->{types}->check(['TYPE', 'Number'], $left->[0])) {
+            $left->[1] = chr $left->[1];
+        }
+
+        if ($self->{types}->check(['TYPE', 'Number'], $right->[0])) {
+            $right->[1] = chr $right->[1];
+        }
+
+        return [['TYPE', 'Boolean'],  $left->[1]   eq  $right->[1]]         if $instr == INSTR_EQ;
+        return [['TYPE', 'Boolean'],  $left->[1]   ne  $right->[1]]         if $instr == INSTR_NEQ;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) == -1]  if $instr == INSTR_LT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) ==  1]  if $instr == INSTR_GT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) <=  0]  if $instr == INSTR_LTE;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) >=  0]  if $instr == INSTR_GTE;
+        return [['TYPE', 'String'],   $left->[1]    .  $right->[1]]         if $instr == INSTR_STRCAT;
+        return [['TYPE', 'Integer'], index $left->[1], $right->[1]]         if $instr == INSTR_STRIDX;
+    }
+
+    # Number operations
+
+    if (not $self->{types}->is_arithmetic($left->[0])) {
+        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($left->[0]));
+    }
+
+    if (not $self->{types}->is_arithmetic($right->[0])) {
+        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($right->[0]));
+    }
+
+    if ($self->{types}->check($left->[0], $right->[0]) or $self->{types}->check($right->[0], $left->[0])) {
+        my $result;
+
+        if ($instr == INSTR_EQ) {
+            $result = [['TYPE', 'Boolean'], $left->[1] == $right->[1]];
+        } elsif ($instr == INSTR_NEQ) {
+            $result = [['TYPE', 'Boolean'], $left->[1] != $right->[1]];
+        } elsif ($instr == INSTR_ADD) {
+            $result = [['TYPE', 'Number'],  $left->[1]  + $right->[1]];
+        } elsif ($instr == INSTR_SUB) {
+            $result = [['TYPE', 'Number'],  $left->[1]  - $right->[1]];
+        } elsif ($instr == INSTR_MUL) {
+            $result = [['TYPE', 'Number'],  $left->[1]  * $right->[1]];
+        } elsif ($instr == INSTR_DIV) {
+            $result = [['TYPE', 'Number'],  $left->[1]  / $right->[1]];
+        } elsif ($instr == INSTR_REM) {
+            $result = [['TYPE', 'Number'],  $left->[1]  % $right->[1]];
+        } elsif ($instr == INSTR_POW) {
+            $result = [['TYPE', 'Number'],  $left->[1] ** $right->[1]];
+        } elsif ($instr == INSTR_LT) {
+            $result = [['TYPE', 'Boolean'], $left->[1]  < $right->[1]];
+        } elsif ($instr == INSTR_LTE) {
+            $result = [['TYPE', 'Boolean'], $left->[1] <= $right->[1]];
+        } elsif ($instr == INSTR_GT) {
+            $result = [['TYPE', 'Boolean'], $left->[1]  > $right->[1]];
+        } elsif ($instr == INSTR_GTE) {
+            $result = [['TYPE', 'Boolean'], $left->[1] >= $right->[1]];
+        } else {
+            $self->error($context, "Unknown binary operator $instr");
+        }
+
+        my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
+
+        if ($self->{types}->is_subtype($promotion, $result->[0])) {
+            $result->[0] = $promotion;
+        }
+
+        return $result;
+    }
+
+    $self->error($context, "cannot apply binary operator $pretty_instr[$instr] (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
 }
 
 sub is_truthy {
@@ -120,10 +215,10 @@ sub is_truthy {
 sub type_check_prefix_postfix_op {
     my ($self, $context, $data, $op) = @_;
 
-    if ($data->[1]->[0] eq 'IDENT' or $data->[1]->[0] eq 'ACCESS' && $data->[1]->[1]->[0] eq 'IDENT') {
+    if ($data->[1]->[0] == INSTR_IDENT or $data->[1]->[0] == INSTR_ACCESS && $data->[1]->[1]->[0] == INSTR_IDENT) {
         # desugar x.y to x['y']
-        if (defined $data->[2] and $data->[2]->[0] eq 'IDENT') {
-            $data->[2] = ['LITERAL', ['TYPE', 'String'], $data->[2]->[1]];
+        if (defined $data->[2] and $data->[2]->[0] == INSTR_IDENT) {
+            $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
         }
 
         my $var = $self->statement($context, $data->[1]);
@@ -135,7 +230,7 @@ sub type_check_prefix_postfix_op {
         $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($var->[0]));
     }
 
-    if ($data->[1]->[0] eq 'LITERAL') {
+    if ($data->[1]->[0] == INSTR_LITERAL) {
         $self->error($context, "cannot apply $op to a " . $self->{types}->to_string($data->[1]->[1]) . " literal");
     }
 
@@ -172,7 +267,7 @@ sub type_check_op_assign {
     my $left  = $data->[1];
     my $right = $data->[2];
 
-    if ($left->[0] eq 'LITERAL') {
+    if ($left->[0] == INSTR_LITERAL) {
         $self->error($context, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal");
     }
 
@@ -284,7 +379,7 @@ sub map_constructor {
     my $hashref = {};
 
     foreach my $entry (@$map) {
-        if ($entry->[0]->[0] eq 'IDENT') {
+        if ($entry->[0]->[0] == INSTR_IDENT) {
             my $var = $self->get_variable($context, $entry->[0]->[1]);
 
             if (not defined $var) {
@@ -314,7 +409,7 @@ sub keyword_exists {
     my ($self, $context, $data) = @_;
 
     # check for key in map
-    if ($data->[1]->[0] eq 'ACCESS') {
+    if ($data->[1]->[0] == INSTR_ACCESS) {
         my $var = $self->statement($context, $data->[1]->[1]);
 
         # map index
@@ -342,7 +437,7 @@ sub keyword_delete {
     my ($self, $context, $data) = @_;
 
     # delete one key in map
-    if ($data->[1]->[0] eq 'ACCESS') {
+    if ($data->[1]->[0] == INSTR_ACCESS) {
         my $var = $self->statement($context, $data->[1]->[1]);
 
         # map index
@@ -362,7 +457,7 @@ sub keyword_delete {
     }
 
     # delete all keys in map
-    if ($data->[1]->[0] eq 'IDENT') {
+    if ($data->[1]->[0] == INSTR_IDENT) {
         my $var = $self->get_variable($context, $data->[1]->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
@@ -464,7 +559,7 @@ sub function_definition {
         $result = $self->statement($new_context, $statement);
 
         # handle a returned value
-        if ($statement->[0] eq 'RET') {
+        if ($statement->[0] == INSTR_RET) {
             push @return_types, $result->[0];
         }
     }
@@ -513,7 +608,7 @@ sub process_function_call_arguments {
 
     for (my $i = 0; $i < @$arguments; $i++) {
         my $arg = $arguments->[$i];
-        if ($arg->[0] eq 'ASSIGN') {
+        if ($arg->[0] == INSTR_ASSIGN) {
             # named argument
             if (not defined $parameters->[$i]->[2]) {
                 # ensure positional arguments are filled first
@@ -523,7 +618,7 @@ sub process_function_call_arguments {
             my $named_arg = $arguments->[$i]->[1];
             my $value     = $arguments->[$i]->[2];
 
-            if ($named_arg->[0] eq 'IDENT') {
+            if ($named_arg->[0] == INSTR_IDENT) {
                 my $ident = $named_arg->[1];
 
                 my $found = 0;
@@ -602,7 +697,7 @@ sub function_call {
     my $func;
     my $name;
 
-    if ($target->[0] eq 'IDENT') {
+    if ($target->[0] == INSTR_IDENT) {
         $name = $target->[1];
         $func = $self->get_variable($context, $name);
 
@@ -673,7 +768,7 @@ sub function_call {
     $new_context->{current_function} = $name;
     foreach my $statement (@$statements) {
         $return_value = $self->statement($new_context, $statement->[1]);
-        last if $statement->[1]->[0] eq 'RET';
+        last if $statement->[1]->[0] == INSTR_RET;
     }
 
     # handle the return value/type
@@ -798,8 +893,8 @@ sub access_notation {
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
         # desugar x.y to x['y']
-        if ($data->[2]->[0] eq 'IDENT') {
-            $data->[2] = ['LITERAL', ['TYPE', 'String'], $data->[2]->[1]];
+        if ($data->[2]->[0] == INSTR_IDENT) {
+            $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
         }
 
         my $key = $self->statement($context, $data->[2]);
@@ -825,7 +920,7 @@ sub access_notation {
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
         my $value = $self->statement($context, $data->[2]->[1]);
 
-        if ($value->[0] eq 'RANGE') {
+        if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
             my $to = $value->[2];
             return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
@@ -846,7 +941,7 @@ sub assignment {
     my $right_value = $self->statement($context, $data->[2]);
 
     # lvalue variable
-    if ($left_value->[0] eq 'IDENT') {
+    if ($left_value->[0] == INSTR_IDENT) {
         my $var = $self->get_variable($context, $left_value->[1]);
         $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
         $self->set_variable($context, $left_value->[1], $right_value);
@@ -854,13 +949,13 @@ sub assignment {
     }
 
     # lvalue array/map access
-    if ($left_value->[0] eq 'ACCESS') {
+    if ($left_value->[0] == INSTR_ACCESS) {
         my $var = $self->statement($context, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             # desugar x.y to x['y']
-            if ($left_value->[2]->[0] eq 'IDENT') {
-                $left_value->[2] = ['LITERAL', ['TYPE', 'String'], $left_value->[2]->[1]];
+            if ($left_value->[2]->[0] == INSTR_IDENT) {
+                $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2]->[1]];
             }
 
             my $key = $self->statement($context, $left_value->[2]);
@@ -889,7 +984,7 @@ sub assignment {
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
             my $value = $self->statement($context, $left_value->[2]->[1]);
 
-            if ($value->[0] eq 'RANGE') {
+            if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
                 my $to   = $value->[2];
 
@@ -979,7 +1074,7 @@ sub array_index_notation {
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
         my $value = $self->statement($context, $data->[2]->[1]);
 
-        if ($value->[0] eq 'RANGE') {
+        if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
             my $to = $value->[2];
 
@@ -1010,7 +1105,7 @@ sub handle_statement_result {
 sub validate {
     my ($self, $ast, %opt) = @_;
     $self->run($ast, %opt);
-    return;
+    return; # explicit return so we do not return value of run()
 }
 
 1;

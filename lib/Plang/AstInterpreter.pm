@@ -9,11 +9,12 @@ use strict;
 
 use Data::Dumper;
 
+use Plang::Constants::Instructions ':all';
+
 sub new {
-    my ($proto, %conf) = @_;
-    my $class = ref($proto) || $proto;
+    my ($class, %args) = @_;
     my $self  = bless {}, $class;
-    $self->initialize(%conf);
+    $self->initialize(%args);
     return $self;
 }
 
@@ -46,46 +47,84 @@ sub initialize {
 
     $self->{repl_context}   = undef; # persistent repl context
 
-    $self->{eval_unary_op_Number} = {
-        'NOT' => sub { [['TYPE', 'Boolean'], int ! $_[0]] },
-        'NEG' => sub { [['TYPE', 'Number'],      - $_[0]] },
-        'POS' => sub { [['TYPE', 'Number'],      + $_[0]] },
-    };
-
     $self->{types} = $conf{types} // die 'Missing types';
 
-    $self->{eval_binary_op_Number} = {
-        'POW' => sub { [['TYPE', 'Number'],  $_[0] ** $_[1]] },
-        'REM' => sub { [['TYPE', 'Number'],  $_[0]  % $_[1]] },
-        'MUL' => sub { [['TYPE', 'Number'],  $_[0]  * $_[1]] },
-        'DIV' => sub { [['TYPE', 'Number'],  $_[0]  / $_[1]] },
-        'ADD' => sub { [['TYPE', 'Number'],  $_[0]  + $_[1]] },
-        'SUB' => sub { [['TYPE', 'Number'],  $_[0]  - $_[1]] },
-        'GTE' => sub { [['TYPE', 'Boolean'], $_[0] >= $_[1]] },
-        'LTE' => sub { [['TYPE', 'Boolean'], $_[0] <= $_[1]] },
-        'GT'  => sub { [['TYPE', 'Boolean'], $_[0]  > $_[1]] },
-        'LT'  => sub { [['TYPE', 'Boolean'], $_[0]  < $_[1]] },
-        'EQ'  => sub { [['TYPE', 'Boolean'], $_[0] == $_[1]] },
-        'NEQ' => sub { [['TYPE', 'Boolean'], $_[0] != $_[1]] },
-    };
+    $self->{instr_dispatch} = [];
 
-    $self->{eval_binary_op_String} = {
-        'EQ'     => sub { [['TYPE', 'Boolean'],  $_[0]  eq $_[1]] },
-        'NEQ'    => sub { [['TYPE', 'Boolean'],  $_[0]  ne $_[1]] },
-        'LT'     => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) == -1] },
-        'GT'     => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) ==  1] },
-        'LTE'    => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) <=  0] },
-        'GTE'    => sub { [['TYPE', 'Boolean'], ($_[0] cmp $_[1]) >=  0] },
-        'STRCAT' => sub { [['TYPE', 'String'],   $_[0]   . $_[1]] },
-        'STRIDX' => sub { [['TYPE', 'Integer'], index $_[0], $_[1]] },
-    };
+    # main instructions
+    $self->{instr_dispatch}->[INSTR_NOP]         = \&null_statement;
+    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&statement_group;
+    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&stmt_literal;
+    $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
+    $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
+    $self->{instr_dispatch}->[INSTR_ARRAYINIT]   = \&array_constructor;
+    $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
+    $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
+    $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
+    $self->{instr_dispatch}->[INSTR_VALUES]      = \&keyword_values;
+    $self->{instr_dispatch}->[INSTR_COND]        = \&conditional;
+    $self->{instr_dispatch}->[INSTR_WHILE]       = \&keyword_while;
+    $self->{instr_dispatch}->[INSTR_NEXT]        = \&keyword_next;
+    $self->{instr_dispatch}->[INSTR_LAST]        = \&keyword_last;
+    $self->{instr_dispatch}->[INSTR_IF]          = \&keyword_if;
+    $self->{instr_dispatch}->[INSTR_AND]         = \&logical_and;
+    $self->{instr_dispatch}->[INSTR_OR]          = \&logical_or;
+    $self->{instr_dispatch}->[INSTR_ASSIGN]      = \&assignment;
+    $self->{instr_dispatch}->[INSTR_ADD_ASSIGN]  = \&add_assign;
+    $self->{instr_dispatch}->[INSTR_SUB_ASSIGN]  = \&sub_assign;
+    $self->{instr_dispatch}->[INSTR_MUL_ASSIGN]  = \&mul_assign;
+    $self->{instr_dispatch}->[INSTR_DIV_ASSIGN]  = \&div_assign;
+    $self->{instr_dispatch}->[INSTR_CAT_ASSIGN]  = \&cat_assign;
+    $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
+    $self->{instr_dispatch}->[INSTR_FUNCDEF]     = \&function_definition;
+    $self->{instr_dispatch}->[INSTR_CALL]        = \&function_call;
+    $self->{instr_dispatch}->[INSTR_RET]         = \&keyword_return;
+    $self->{instr_dispatch}->[INSTR_PREFIX_ADD]  = \&prefix_increment;
+    $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
+    $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
+    $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
+    $self->{instr_dispatch}->[INSTR_RANGE]       = \&range_operator;
+    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+
+    # unary operators
+    $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
+    $self->{instr_dispatch}->[INSTR_NEG] = \&unary_op;
+    $self->{instr_dispatch}->[INSTR_POS] = \&unary_op;
+
+    # binary operators
+    $self->{instr_dispatch}->[INSTR_POW]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_REM]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_MUL]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_DIV]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_ADD]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_SUB]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_STRCAT] = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_STRIDX] = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_GTE]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_LTE]    = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_GT]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
+    $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+}
+
+sub dispatch_instruction {
+    my ($self, $instr, $context, $data) = @_;
+
+    # main instructions
+    if ($instr < INSTR_NOT) {
+        return $self->{instr_dispatch}->[$instr]->($self, $context, $data);
+    }
+
+    # unary and binary operators
+    return $self->{instr_dispatch}->[$instr]->($self, $instr, $context, $data);
 }
 
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
     $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
-    die "Error: $err_msg\n";
+    die "Runtime error: $err_msg\n";
 }
 
 sub new_context {
@@ -178,7 +217,7 @@ sub function_call {
     my $arguments = $data->[2];
     my $func;
 
-    if ($target->[0] eq 'IDENT') {
+    if ($target->[0] == INSTR_IDENT) {
         $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
 
@@ -216,7 +255,7 @@ sub function_call {
     # invoke the function
     foreach my $stmt (@$statements) {
         $result = $self->statement($new_context, $stmt);
-        last if $stmt->[0] eq 'RET';
+        last if $stmt->[0] == INSTR_RET;
     }
 
     $self->{recursion}--;
@@ -255,7 +294,7 @@ sub map_constructor {
     my $hashref = {};
 
     foreach my $entry (@$map) {
-        if ($entry->[0]->[0] eq 'IDENT') {
+        if ($entry->[0]->[0] == INSTR_IDENT) {
             my $var = $self->get_variable($context, $entry->[0]->[1]);
             $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
             next;
@@ -300,7 +339,7 @@ sub keyword_delete {
     my ($self, $context, $data) = @_;
 
     # delete one key in map
-    if ($data->[1]->[0] eq 'ACCESS') {
+    if ($data->[1]->[0] == INSTR_ACCESS) {
         my $var = $self->statement($context, $data->[1]->[1]);
         my $key = $self->statement($context, $data->[1]->[2]);
 
@@ -310,7 +349,7 @@ sub keyword_delete {
     }
 
     # delete all keys in map
-    if ($data->[1]->[0] eq 'IDENT') {
+    if ($data->[1]->[0] == INSTR_IDENT) {
         my $var = $self->get_variable($context, $data->[1]->[1]);
         $var->[1] = {};
         return $var;
@@ -372,8 +411,8 @@ sub keyword_while {
 
         my $result = $self->statement($context, $data->[2]);
 
-        next if $result->[0] eq 'NEXT';
-        last if $result->[0] eq 'LAST';
+        next if $result->[0] == INSTR_NEXT;
+        last if $result->[0] == INSTR_LAST;
     }
 
     return [['TYPE', 'Null'], undef];
@@ -488,7 +527,7 @@ sub range_operator {
     $to   = $self->statement($context, $to);
     $from = $self->statement($context, $from);
 
-    return ['RANGE', $to, $from];
+    return [INSTR_RANGE, $to, $from];
 }
 
 # lvalue assignment
@@ -499,14 +538,14 @@ sub assignment {
     my $right_value = $self->statement($context, $data->[2]);
 
     # lvalue variable
-    if ($left_value->[0] eq 'IDENT') {
+    if ($left_value->[0] == INSTR_IDENT) {
         my $var = $self->get_variable($context, $left_value->[1]);
         $self->set_variable($context, $left_value->[1], $right_value);
         return $right_value;
     }
 
     # lvalue array/map access
-    if ($left_value->[0] eq 'ACCESS') {
+    if ($left_value->[0] == INSTR_ACCESS) {
         my $var = $self->statement($context, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
@@ -526,7 +565,7 @@ sub assignment {
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
             my $value = $self->statement($context, $left_value->[2]->[1]);
 
-            if ($value->[0] eq 'RANGE') {
+            if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
                 my $to   = $value->[2];
 
@@ -585,7 +624,7 @@ sub access_notation {
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
         my $value = $self->statement($context, $data->[2]->[1]);
 
-        if ($value->[0] eq 'RANGE') {
+        if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
             my $to = $value->[2];
             return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
@@ -599,58 +638,91 @@ sub access_notation {
 }
 
 sub unary_op {
-    my ($self, $context, $data, $op, $debug_msg) = @_;
+    my ($self, $instr, $context, $data) = @_;
 
-    if ($data->[0] eq $op) {
-        my $value = $self->statement($context, $data->[1]);
+    my $value = $self->statement($context, $data->[1]);
 
-        if ($self->{debug} and $debug_msg) {
-            $debug_msg =~ s/\$a/$value->[1] ($value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n");
-        }
+    my $result;
 
-        my $result = $self->{eval_unary_op_Number}->{$op}->($value->[1]);
-
-        if ($self->{types}->is_subtype($value->[0], $result->[0])) {
-            $result->[0] = $value->[0];
-        }
-
-        return $result;
+    if ($instr == INSTR_NOT) {
+        $result = [['TYPE', 'Boolean'], int ! $value->[1]];
+    } elsif ($instr == INSTR_NEG) {
+        $result = [['TYPE', 'Number'], - $value->[1]];
+    } elsif ($instr == INSTR_POS) {
+        $result = [['TYPE', 'Number'], + $value->[1]];
     }
 
-    return;
+    if ($self->{types}->is_subtype($value->[0], $result->[0])) {
+        $result->[0] = $value->[0];
+    }
+
+    return $result;
 }
 
 sub binary_op {
-    my ($self, $context, $data, $op, $debug_msg) = @_;
+    my ($self, $instr, $context, $data) = @_;
 
-    if ($data->[0] eq $op) {
-        my $left_value  = $self->statement($context, $data->[1]);
-        my $right_value = $self->statement($context, $data->[2]);
+    my $left  = $self->statement($context, $data->[1]);
+    my $right = $self->statement($context, $data->[2]);
 
-        if ($self->{debug} and $debug_msg) {
-            $debug_msg =~ s/\$a/$left_value->[1] ($left_value->[0])/g;
-            $debug_msg =~ s/\$b/$right_value->[1] ($right_value->[0])/g;
-            $self->{dprint}->('OPERS', "$debug_msg\n");
+    # String operations
+    if ($self->{types}->check(['TYPE', 'String'], $left->[0])
+            or $self->{types}->check(['TYPE', 'String'], $right->[0])) {
+
+        if ($self->{types}->check(['TYPE', 'Number'], $left->[0])) {
+            $left->[1] = chr $left->[1];
         }
 
-        if ($self->{types}->check(['TYPE', 'String'], $left_value->[0]) or $self->{types}->check(['TYPE', 'String'], $right_value->[0])) {
-            $left_value->[1]  = chr $left_value->[1]  if $self->{types}->check(['TYPE', 'Number'], $left_value->[0]);
-            $right_value->[1] = chr $right_value->[1] if $self->{types}->check(['TYPE', 'Number'], $right_value->[0]);
-            return $self->{eval_binary_op_String}->{$op}->($left_value->[1], $right_value->[1]);
+        if ($self->{types}->check(['TYPE', 'Number'], $right->[0])) {
+            $right->[1] = chr $right->[1];
         }
 
-        my $result    = $self->{eval_binary_op_Number}->{$op}->($left_value->[1], $right_value->[1]);
-        my $promotion = $self->{types}->get_promoted_type($left_value->[0], $right_value->[0]);
-
-        if ($self->{types}->is_subtype($promotion, $result->[0])) {
-            $result->[0] = $promotion;
-        }
-
-        return $result;
+        return [['TYPE', 'Boolean'],  $left->[1]   eq  $right->[1]]         if $instr == INSTR_EQ;
+        return [['TYPE', 'Boolean'],  $left->[1]   ne  $right->[1]]         if $instr == INSTR_NEQ;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) == -1]  if $instr == INSTR_LT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) ==  1]  if $instr == INSTR_GT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) <=  0]  if $instr == INSTR_LTE;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) >=  0]  if $instr == INSTR_GTE;
+        return [['TYPE', 'String'],   $left->[1]    .  $right->[1]]         if $instr == INSTR_STRCAT;
+        return [['TYPE', 'Integer'], index $left->[1], $right->[1]]         if $instr == INSTR_STRIDX;
     }
 
-    return;
+    # Number operations
+    my $result;
+
+    if ($instr == INSTR_EQ) {
+        $result = [['TYPE', 'Boolean'], $left->[1] == $right->[1]];
+    } elsif ($instr == INSTR_NEQ) {
+        $result = [['TYPE', 'Boolean'], $left->[1] != $right->[1]];
+    } elsif ($instr == INSTR_ADD) {
+        $result = [['TYPE', 'Number'],  $left->[1]  + $right->[1]];
+    } elsif ($instr == INSTR_SUB) {
+        $result = [['TYPE', 'Number'],  $left->[1]  - $right->[1]];
+    } elsif ($instr == INSTR_MUL) {
+        $result = [['TYPE', 'Number'],  $left->[1]  * $right->[1]];
+    } elsif ($instr == INSTR_DIV) {
+        $result = [['TYPE', 'Number'],  $left->[1]  / $right->[1]];
+    } elsif ($instr == INSTR_REM) {
+        $result = [['TYPE', 'Number'],  $left->[1]  % $right->[1]];
+    } elsif ($instr == INSTR_POW) {
+        $result = [['TYPE', 'Number'],  $left->[1] ** $right->[1]];
+    } elsif ($instr == INSTR_LT) {
+        $result = [['TYPE', 'Boolean'], $left->[1]  < $right->[1]];
+    } elsif ($instr == INSTR_LTE) {
+        $result = [['TYPE', 'Boolean'], $left->[1] <= $right->[1]];
+    } elsif ($instr == INSTR_GT) {
+        $result = [['TYPE', 'Boolean'], $left->[1]  > $right->[1]];
+    } elsif ($instr == INSTR_GTE) {
+        $result = [['TYPE', 'Boolean'], $left->[1] >= $right->[1]];
+    }
+
+    my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
+
+    if ($self->{types}->is_subtype($promotion, $result->[0])) {
+        $result->[0] = $promotion;
+    }
+
+    return $result;
 }
 
 sub identifier {
@@ -673,79 +745,30 @@ sub null_statement {
 
 sub statement_group {
     my ($self, $context, $data) = @_;
-    my $new_context = $self->new_context($context);
-    return $self->interpret_ast($new_context, $data->[1]);
+    return $self->interpret_ast($self->new_context($context), $data->[1]);
 }
 
 sub statement {
     my ($self, $context, $data) = @_;
+
     return if not $data;
 
-    my $ins = $data->[0];
     $Data::Dumper::Indent = 0;
     $self->{dprint}->('STMT', "stmt: " . Dumper($data) . "\n") if $self->{debug};
 
-    return $self->null_statement($context, $data)       if $ins eq 'NOP';
-    return $self->statement($context, $data->[1])       if $ins eq 'STMT';
-    return $self->statement_group($context, $data)      if $ins eq 'STMT_GROUP';
-    return $self->stmt_literal($context, $data)         if $ins eq 'LITERAL';
-    return $self->variable_declaration($context, $data) if $ins eq 'VAR';
-    return $self->map_constructor($context, $data)      if $ins eq 'MAPINIT';
-    return $self->array_constructor($context, $data)    if $ins eq 'ARRAYINIT';
-    return $self->keyword_exists($context, $data)       if $ins eq 'EXISTS';
-    return $self->keyword_delete($context, $data)       if $ins eq 'DELETE';
-    return $self->keyword_keys($context, $data)         if $ins eq 'KEYS';
-    return $self->keyword_values($context, $data)       if $ins eq 'VALUES';
-    return $self->conditional($context, $data)          if $ins eq 'COND';
-    return $self->keyword_while($context, $data)        if $ins eq 'WHILE';
-    return $self->keyword_next($context, $data)         if $ins eq 'NEXT';
-    return $self->keyword_last($context, $data)         if $ins eq 'LAST';
-    return $self->keyword_if($context, $data)           if $ins eq 'IF';
-    return $self->logical_and($context, $data)          if $ins eq 'AND';
-    return $self->logical_or($context, $data)           if $ins eq 'OR';
-    return $self->assignment($context, $data)           if $ins eq 'ASSIGN';
-    return $self->add_assign($context, $data)           if $ins eq 'ADD_ASSIGN';
-    return $self->sub_assign($context, $data)           if $ins eq 'SUB_ASSIGN';
-    return $self->mul_assign($context, $data)           if $ins eq 'MUL_ASSIGN';
-    return $self->div_assign($context, $data)           if $ins eq 'DIV_ASSIGN';
-    return $self->cat_assign($context, $data)           if $ins eq 'CAT_ASSIGN';
-    return $self->identifier($context, $data)           if $ins eq 'IDENT';
-    return $self->function_definition($context, $data)  if $ins eq 'FUNCDEF';
-    return $self->function_call($context, $data)        if $ins eq 'CALL';
-    return $self->keyword_return($context, $data)       if $ins eq 'RET';
-    return $self->prefix_increment($context, $data)     if $ins eq 'PREFIX_ADD';
-    return $self->prefix_decrement($context, $data)     if $ins eq 'PREFIX_SUB';
-    return $self->postfix_increment($context, $data)    if $ins eq 'POSTFIX_ADD';
-    return $self->postfix_decrement($context, $data)    if $ins eq 'POSTFIX_SUB';
-    return $self->range_operator($context, $data)       if $ins eq 'RANGE';
-    return $self->access_notation($context, $data)      if $ins eq 'ACCESS';
+    my $ins = $data->[0];
 
-    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])] if $ins eq 'STRING_I';
+    return $data if $ins !~ /^\d+$/;
 
-    # unary operators
-    my $value;
-    return $value if defined ($value = $self->unary_op($context, $data, 'NOT', '!/not $a'));
-    return $value if defined ($value = $self->unary_op($context, $data, 'NEG', '- $a'));
-    return $value if defined ($value = $self->unary_op($context, $data, 'POS', '+ $a'));
+    if ($ins == INSTR_STMT) {
+        return $self->statement($context, $data->[1]);
+    }
 
-    # binary operators
-    return $value if defined ($value = $self->binary_op($context, $data, 'POW', '$a ** $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'REM', '$a % $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'MUL', '$a * $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'DIV', '$a / $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'ADD', '$a + $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'SUB', '$a - $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'STRCAT', '$a . $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'STRIDX', '$a ~ $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GTE', '$a >= $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LTE', '$a <= $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'GT',  '$a > $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'LT',  '$a < $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'EQ',  '$a == $b'));
-    return $value if defined ($value = $self->binary_op($context, $data, 'NEQ', '$a != $b'));
+    if ($ins == INSTR_STRING_I) {
+        return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
+    }
 
-    # unknown instruction
-    return $data;
+    return $self->dispatch_instruction($ins, $context, $data);
 }
 
 sub is_truthy {
@@ -1153,7 +1176,7 @@ sub function_builtin_Map {
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
 
-        if ($mapinit->[0] ne 'MAPINIT') {
+        if ($mapinit->[0] != INSTR_MAPINIT) {
             $self->error($context, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
         }
 
@@ -1181,7 +1204,7 @@ sub function_builtin_Array {
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
 
-        if ($mapinit->[0] ne 'ARRAYINIT') {
+        if ($mapinit->[0] != INSTR_ARRAYINIT) {
             $self->error($context, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
         }
 
@@ -1272,22 +1295,24 @@ sub array_to_string {
 # TODO: do this more efficiently
 sub output_string_literal {
     my ($self, $text) = @_;
+
     $Data::Dumper::Indent = 0;
     $Data::Dumper::Terse  = 1;
     $Data::Dumper::Useqq  = 1;
 
     $text = Dumper ($text);
     $text =~ s/\\([\@\$\%])/$1/g;
+
     return $text;
 }
 
 sub output_value {
     my ($self, $value, %opts) = @_;
 
-    my $result = "";
+    my $result = '';;
 
     # identifiers
-    if ($value->[0] eq 'IDENT') {
+    if ($value->[0] == INSTR_IDENT) {
         return $value->[1];
     }
 
@@ -1410,13 +1435,13 @@ sub interpret_ast {
         foreach my $node (@$ast) {
             my $instruction = $node->[0];
 
-            if ($instruction eq 'STMT') {
+            if ($instruction == INSTR_STMT) {
                 $result = $self->statement($context, $node->[1]);
                 $result = $self->handle_statement_result($result) if defined $result;
 
                 if (defined $result) {
                     $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
-                    return $result if $result->[0] eq 'LAST' or $result->[0] eq 'NEXT';
+                    return $result if $result->[0] == INSTR_LAST or $result->[0] == INSTR_NEXT;
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }
