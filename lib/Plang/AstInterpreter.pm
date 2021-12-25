@@ -393,12 +393,12 @@ sub keyword_return {
 
 sub keyword_next {
     my ($self, $context, $data) = @_;
-    return ['NEXT', undef];
+    return [INSTR_NEXT, undef];
 }
 
 sub keyword_last {
     my ($self, $context, $data) = @_;
-    return ['LAST', undef];
+    return [INSTR_LAST, undef];
 }
 
 sub keyword_while {
@@ -1431,22 +1431,25 @@ sub interpret_ast {
 
     # try
     my $last_statement_result = eval {
+
         my $result;
+
         foreach my $node (@$ast) {
             my $instruction = $node->[0];
 
             if ($instruction == INSTR_STMT) {
                 $result = $self->statement($context, $node->[1]);
-                $result = $self->handle_statement_result($result) if defined $result;
 
                 if (defined $result) {
+                    $result = $self->handle_statement_result($result);
                     $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
-                    return $result if $result->[0] == INSTR_LAST or $result->[0] == INSTR_NEXT;
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
                 }
             }
         }
+
+        $result //= [['TYPE', 'Null'], undef];
 
         return $result;
     };
@@ -1460,9 +1463,8 @@ sub interpret_ast {
 # handles one statement result
 sub handle_statement_result {
     my ($self, $result, $print_any) = @_;
-    $print_any ||= 0;
 
-    return if not defined $result;
+    $print_any ||= 0;
 
     $self->{dprint}->('RESULT', "handle result: " . Dumper($result) . "\n") if $self->{debug};
 

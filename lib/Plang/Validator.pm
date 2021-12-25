@@ -23,6 +23,7 @@ sub initialize {
     $self->SUPER::initialize(%conf);
 
     # validate these main instructions
+    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&statement_group;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
     $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
     $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
@@ -198,6 +199,16 @@ sub binary_op {
     }
 
     $self->error($context, "cannot apply binary operator $pretty_instr[$instr] (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
+}
+
+sub statement_group {
+    my ($self, $context, $data) = @_;
+
+    my $new_context = $self->new_context($context);
+
+    $new_context->{while_loop} = $context->{while_loop};
+
+    return $self->interpret_ast($new_context, $data->[1]);
 }
 
 sub is_truthy {
@@ -867,22 +878,36 @@ sub keyword_while {
     my ($self, $context, $data) = @_;
 
     # validate conditional
-    my $result = $self->statement($context, $data->[1]);
+    $self->statement($context, $data->[1]);
+
+    $context->{while_loop} = 1;
 
     # validate statements
-    $result = $self->statement($context, $data->[2]);
+    $self->statement($context, $data->[2]);
+
+    delete $context->{while_loop};
 
     return [['TYPE', 'Null'], undef];
 }
 
 sub keyword_next {
     my ($self, $context, $data) = @_;
-    $self->error($context, "cannot use `next` outside of loop");
+
+    if (not $context->{while_loop}) {
+        $self->error($context, "cannot use `next` outside of loop");
+    }
+
+    return [['TYPE', 'Null'], undef];
 }
 
 sub keyword_last {
     my ($self, $context, $data) = @_;
-    $self->error($context, "cannot use `last` outside of loop");
+
+    if (not $context->{while_loop}) {
+        $self->error($context, "cannot use `last` outside of loop");
+    }
+
+    return [['TYPE', 'Null'], undef];
 }
 
 # rvalue array/map access
