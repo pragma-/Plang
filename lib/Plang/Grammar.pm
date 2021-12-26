@@ -22,7 +22,7 @@ sub error {
 
     $consume_to ||= 'TERM';
 
-    if (defined (my $token = $parser->current_or_last_token)) {
+    if (defined (my $token = $parser->current_token)) {
         my $line = $token->[2]->{line};
         my $col  = $token->[2]->{col};
         $parser->add_error("Parse error: $err_msg at line $line, col $col.");
@@ -58,7 +58,7 @@ sub expected {
 
     $parser->{indent}-- if $parser->{debug};
 
-    if (defined (my $token = $parser->current_or_last_token)) {
+    if (defined (my $token = $parser->current_token)) {
         my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
         return error($parser, "Expected $expected but got $name");
     } else {
@@ -76,7 +76,7 @@ sub Program {
 
     my $MAX_ERRORS = 3; # TODO make this customizable
     my $errors;
-    my $failed = 0;
+
     while (defined $parser->next_token('peek')) {
         $parser->clear_error;
 
@@ -87,20 +87,7 @@ sub Program {
             next;
         }
 
-        if (not $statement or $statement->[0] eq 'NOP') {
-            if (++$failed >= 2) {
-                my $token = $parser->current_or_last_token;
-                if (defined $token) {
-                    my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
-                    return error($parser, "Unexpected $name");
-                } else {
-                    return error($parser, "Unexpected EOF");
-                }
-            }
-        }
-
-
-        if ($statement and $statement->[0] ne 'NOP') {
+        if ($statement and $statement->[0] != INSTR_NOP) {
             push @statements, $statement;
         }
     }
@@ -165,7 +152,7 @@ sub Statement {
     return $result if defined ($result = alternate_statement($parser, \&FunctionDefinition,  'Statement: FunctionDefinition'));
     return if $parser->errored;
 
-    return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,    'Statement: ReturnStatement'));
+    return $result if defined ($result = alternate_statement($parser, \&ReturnStatement,     'Statement: ReturnStatement'));
     return if $parser->errored;
 
     return $result if defined ($result = alternate_statement($parser, \&NextStatement,       'Statement: NextStatement'));
@@ -213,8 +200,8 @@ sub Statement {
         }
     }
 
-    $parser->advance;
-    return [INSTR_NOP, undef];
+    $parser->backtrack;
+    return undef;
 }
 
 # StatementGroup ::= L_BRACE Statement* R_BRACE
@@ -453,6 +440,7 @@ sub TypeLiteral {
     return $type if $type;
 
     my $token = $parser->next_token('peek');
+    return if not $token;
 
     if ($token->[0] =~ /^TYPE_(.*)/) {
         my $type = $1;
@@ -512,6 +500,7 @@ sub TypeFunctionReturn {
     my ($parser) = @_;
 
     my $token = $parser->next_token('peek');
+    return if not $token;
 
     if ($token->[0] eq 'R_ARROW') {
         $parser->consume;
@@ -717,7 +706,7 @@ sub WhileStatement {
     $parser->backtrack;
 }
 
-# IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement (KEYWORD_else Statement)?
+# IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement KEYWORD_else Statement
 sub IfExpression {
     my ($parser) = @_;
 
@@ -743,10 +732,15 @@ sub IfExpression {
                 return expected($parser, "statement body for `if` statement");
             }
 
-            my $else;
-            if ($parser->consume('KEYWORD_else')) {
-                $else = Statement($parser);
-                return if $parser->errored;
+            if (not $parser->consume('KEYWORD_else')) {
+                return expected($parser, "`else` branch for `if` condition expression");
+            }
+
+            my $else = Statement($parser);
+            return if $parser->errored;
+
+            if (not $else) {
+                return expected($parser, "statement body for `else` branch of `if` condition expression");
             }
 
             $parser->advance;
@@ -905,6 +899,7 @@ sub UnexpectedKeyword {
     my ($parser) = @_;
 
     my $token = $parser->next_token('peek');
+    return if not $token;
 
     if ($token->[0] =~ m/^KEYWORD_(.*)$/) {
         return error($parser, "unexpected keyword `$1`");
