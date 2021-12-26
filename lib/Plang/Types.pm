@@ -175,6 +175,10 @@ sub check {
 
     # a list of types
     if ($guard->[0] eq 'TYPEUNION') {
+        if ($type->[0] eq 'TYPEUNION') {
+            return $self->is_equal($guard, $type);
+        }
+
         foreach my $g (@{$guard->[1]}) {
             return 1 if $self->check($g, $type);
         }
@@ -280,7 +284,7 @@ sub is_equal {
         return 0 if $type2->[0] ne 'TYPEUNION';
         return 0 if @{$type1->[1]} != @{$type2->[1]};
 
-        for (my $i = 0; $i <= @{$type1->[1]}; ++$i) {
+        for (my $i = 0; $i < @{$type1->[1]}; ++$i) {
             return 0 if not $self->is_equal($type1->[1]->[$i], $type2->[1]->[$i]);
         }
 
@@ -316,7 +320,6 @@ sub is_equal {
     }
 
     die "unknown type\n";
-    return 0;
 }
 
 
@@ -351,7 +354,8 @@ sub unite {
 
 sub make_typeunion {
     my ($self, $types) = @_;
-    return ['TYPEUNION', $types];
+    my @sorted = sort { $a->[1] cmp $b->[1] } @$types;
+    return ['TYPEUNION', \@sorted];
 }
 
 1;

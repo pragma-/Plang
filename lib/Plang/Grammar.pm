@@ -422,7 +422,8 @@ sub Type {
         }
 
         if (@$typeunion > 1) {
-            return ['TYPEUNION', $typeunion];
+            my @sorted = sort { $a->[1] cmp $b->[1] } @$typeunion;
+            return ['TYPEUNION', \@sorted];
         } else {
             return $type;
         }
