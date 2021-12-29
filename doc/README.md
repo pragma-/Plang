@@ -7,6 +7,7 @@ This README describes what is implemented so far.
 * [Running Plang in the Bash shell](#running-plang-in-the-bash-shell)
   * [DEBUG environment variable](#debug-environment-variable)
 * [Embedding Plang](#embedding-plang)
+* [Running the Unit Tests](#running-the-unit-tests)
 * [Example Plang scripts](#example-plang-scripts)
 * [JSON compatibility/serialization](#json-compatibilityserialization)
 * [The Plang Language (so far)](#the-plang-language-so-far)
@@ -75,7 +76,7 @@ This README describes what is implemented so far.
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
-You may use the [`plang`](../plang) executable to interpret Plang scripts. Currently, it
+You may use the [`plang`](../script/plang) executable to interpret Plang scripts. Currently, it
 strictly reads from standard input.
 
     Usage: plang [--dumptokens]
@@ -113,8 +114,34 @@ Plang is designed to be embedded into larger Perl applications. Here's how you c
 do that.
 
 I will get around to documenting this soon. In the meantime, take a look at [this
-unit-test script](../test/unit_tests.pl) for a simple example. For a more advanced example, see
- [PBot's Plang plugin.](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm)
+unit-test script](../script/runtests) and
+ [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm) for
+general idea of how to go about it.
+
+## Running the Unit Tests
+There are a number of unit tests in the [`test`](../test/) directory that may be invoked
+by the [`runtests`](../script/runtests) script.
+
+The `runtests` script may be invoked without arguments to run all the tests. Alternatively, you
+can specify which tests to run by passing a list of file paths.
+
+    $ ./script/runtests test/operators.pt test/closures.pt
+    Running 2 test files: ..........
+    Pass: 10; Fail: 0
+
+A test failure looks like this:
+
+    $ ./script/runtests test/bad_test.pt
+    Running 1 test file: XX.....
+    Pass: 5; Fail: 2
+    ----------------------------------------------------------------------
+    FAIL bad_test.pt: arithmetic
+           Expected: [["TYPE","Integer"],21]
+                Got: [["TYPE","Integer"],42]
+    ----------------------------------------------------------------------
+    FAIL bad_test.pt: exponent literals
+           Expected: [["TYPE","Real"],1100]
+                Got: [["TYPE","Real"],1200]
 
 ## Example Plang scripts
 [Check out some examples!](../examples/)

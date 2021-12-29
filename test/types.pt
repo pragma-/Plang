@@ -1,0 +1,9 @@
+test_eq(type(fn null), 'Function () -> Null');
+
+fn f(a: Number, b: String) -> Boolean true
+test_eq(type(f), 'Function (Number, String) -> Boolean')
+
+test_eq(type(1==1), 'Boolean')
+test_eq(type("hi"), 'String')
+test_eq(type(42), 'Integer')
+test_eq(type(null), 'Null')

@@ -1,0 +1,12 @@
+# semi-colons and commas are largely optional
+# (but recommended, this test just proves that they
+# can still be omitted for these cases)
+fn test
+  (x y)       # no comma
+{
+  var a = x   # no semi-colons here
+  a + y       # or here
+}
+
+var r = test(2 3)     # returns 5 (yep no comma)
+test_eq(r, 5)

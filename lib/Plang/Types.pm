@@ -52,9 +52,6 @@ sub initialize {
     $self->add('Number', 'Real');
     $self->add('Number', 'Integer');
 
-    # subtype of Real
-    $self->add('Real', 'Integer');
-
     # subtype of Function
     $self->add('Function', 'Builtin');
 

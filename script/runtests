@@ -1,0 +1,178 @@
+#!/usr/bin/env perl
+
+use v5.16;
+
+use warnings;
+use strict;
+
+use FindBin qw($RealBin);
+use lib "$RealBin/../lib";
+
+STDOUT->autoflush(1);
+
+my $test_file;   # current test filename
+my @passed;      # passed tests
+my @failed;      # failed tests
+
+my $output;      # stdout output from Plang program
+
+# create our $plang object in embedded mode
+use Plang::Interpreter;
+my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
+
+# override the Plang builtin `print` function so we can collect
+# the output for testing, instead of printing it
+$plang->add_builtin_function('print',
+    # these are the parameters we want: `expr` and `end`.
+    # `expr` has no default value; `end` has default value [String, "\n"]
+    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [['TYPE', 'String'], "\n"]]],
+    # the type of value print() returns
+    ['TYPE', 'Null'],
+    # subref to our function that will override the `print` function
+    \&print_override,
+    \&print_validator);
+
+# our overridden `print` function
+sub print_override {
+    my ($plang, $context, $name, $arguments) = @_;
+    my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    $output .= "$expr$end"; # append the print output to our $output
+    return [['TYPE', 'Null'], undef];
+}
+
+# validation of print() function (type-checking, etc)
+sub print_validator {
+    return [['TYPE', 'Null'], undef];
+}
+
+# add a `dprint` function so we can print debug messages during tests (since print is overridden)
+$plang->add_builtin_function('dprint',
+    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [['TYPE', 'String'], "\n"]]],
+    ['TYPE', 'Null'],
+    \&func_dprint,
+    \&func_dprint_validator);
+
+sub func_dprint {
+    my ($plang, $context, $name, $arguments) = @_;
+    my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    print "$expr$end";
+    return [['TYPE', 'Null'], undef];
+}
+
+sub func_dprint_validator {
+    return [['TYPE', 'Null'], undef];
+}
+
+# test equality
+# takes three arguments: expected:Any, got:Any, test_name:String=""
+# tests if `expected` is equal to `got`
+$plang->add_builtin_function('test_eq',
+    [[['TYPE', 'Any'], 'expected', undef], [['TYPE', 'Any'], 'got', undef], [['TYPE', 'String'], 'test_name', [['TYPE', 'String'], '']]],
+    ['TYPE', 'Boolean'],
+    \&test_eq_func,
+    \&test_eq_validator);
+
+sub test_eq_func {
+    my ($plang, $context, $name, $arguments) = @_;
+
+    my ($expected, $got) = ($arguments->[0], $arguments->[1]);
+    my $test = $arguments->[2]->[1];
+
+    if ($plang->identical_objects($expected, $got)) {
+        push @passed, [$test_file, $test, $expected, $got];
+        print '.';
+        return [['TYPE', 'Boolean'], 1];
+    } else {
+        push @failed, [$test_file, $test, $expected, $got];
+        print 'X';
+        return [['TYPE', 'Boolean'], 0];
+    }
+}
+
+sub test_eq_validator {
+    return [['TYPE', 'Boolean'], 0];
+}
+
+# test stdout
+# takes two arguments: expected:String, test_name:String=""
+# tests if expected stdout output matches expected output
+$plang->add_builtin_function('test_stdout',
+    [[['TYPE', 'String'], 'expected', undef], [['TYPE', 'String'], 'test_name', [['TYPE', 'String'], '']]],
+    ['TYPE', 'Boolean'],
+    \&test_stdout_func,
+    \&test_stdout_validator);
+
+sub test_stdout_func {
+    my ($plang, $context, $name, $arguments) = @_;
+
+    my $expected = $plang->output_value($arguments->[0]);
+    my $got      = $output;
+    my $test     = $arguments->[1]->[1];
+
+    $output = ''; # reset output for next test
+
+    if ($expected eq $got) {
+        push @passed, [$test_file, $test, $expected, $output];
+        print '.';
+        return [['TYPE', 'Boolean'], 1];
+    } else {
+        push @failed, [$test_file, $test, $expected, $output];
+        print 'X';
+        return [['TYPE', 'Boolean'], 0];
+    }
+}
+
+sub test_stdout_validator {
+    return [['TYPE', 'Boolean'], 0];
+}
+
+my @selected_tests;
+
+if (@ARGV) {
+    # select specific tests
+    @selected_tests = @ARGV;
+} else {
+    # select all tests
+    @selected_tests = glob "$RealBin/../test/*.pt";
+}
+
+print "Running ", scalar @selected_tests, " test file", @selected_tests == 1 ? '' : 's',  ": ";
+
+use Encode;
+
+foreach my $test (@selected_tests) {
+    open my $fh, '<', $test or die "Failed to open $test: $!";
+    my $code = do { local $/; <$fh> };
+    close $fh;
+
+    $code = decode('UTF-8', $code);
+
+    $output = '';
+    $test_file = $test;
+
+    eval { $plang->interpret_string($code) };
+
+    if ($@) {
+        push @failed, [$test_file, 'EXCEPTION', '', $@];
+        print 'X';
+    }
+}
+
+print "\nPass: ", scalar @passed, "; Fail: ", scalar @failed, "\n";
+
+unless ($ENV{QUIET}) {
+    use Data::Dumper;
+    $Data::Dumper::Indent = 0;
+    $Data::Dumper::Terse  = 1;
+    $Data::Dumper::Useqq  = 1;
+
+    foreach my $failure (@failed) {
+        print '-' x 70, "\n";
+        print "FAIL $failure->[0]: $failure->[1]\n";
+        print "       Expected: ", Dumper($failure->[2]), "\n";
+        print "            Got: ", Dumper($failure->[3]), "\n";
+    }
+}
+
+exit 1 if @failed;
+exit 0;

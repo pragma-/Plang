@@ -1,0 +1,10 @@
+test_eq(1 + 4 * 3 + 2 * 4, 21, "arithmetic")
+
+test_eq(1e2 + 1e3, 1100.0, "exponent literals")
+
+test_eq(1e-4, 0.0001, "negative exponent literal")
+
+test_eq("hi" && 42, 42, "logical and")
+test_eq("" && 42, "", "logical and")
+test_eq("" || 42, 42, "logical or")
+test_eq(1 == 1, true, "equality")

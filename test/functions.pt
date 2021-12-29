@@ -1,0 +1,34 @@
+fn square(x) x * x
+var a = 5
+test_eq($"square of {a} = {square(a)}", 'square of 5 = 25')
+
+fn add(a, b = 10) a + b
+test_eq(add(5), 15, "default argument")
+
+test_eq((fn (a, b) a + b)(1, 2), 3, "invoke anonymous function one-liner");
+
+var adder = fn (a, b) a + b
+test_eq(adder(10, 20), 30, "assign anonymous function")
+
+test_eq((fn 42)(), 42, "anonymous function no params")
+
+var f1 = fn 5 + 5
+test_eq(f1(), 10, "anonymous function no params")
+
+var f2 = fn (a, b) a + b
+test_eq(f2(10, 20), 30, "anonymous functions two params")
+
+fn curriedAdd(x) fn add(y) x + y
+test_eq(curriedAdd(3)(4), 7, "curried function")
+
+var f3 = fn (x) fn (y) x + y
+test_eq(f3(3)(4), 7, "anonymous curried function")
+
+fn force(f) f()
+
+var lazy1 = fn 1 + 1
+test_eq(force(lazy1), 2, "lazy evaluation")
+
+fn id(x) x
+var lazy2 = fn 1 + id(2)
+test_eq(force(lazy2), 3, "lazy evaluation")

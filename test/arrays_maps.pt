@@ -1,0 +1,36 @@
+var player = { "name": "Grok", "health": 100, "iq": 75 }
+test_eq(player["iq"],  75, "map entry")
+
+var map1 = {}
+map1["color"] = "blue"
+test_eq($"The color is {map1['color']}!", 'The color is blue!', "map interpolation")
+
+var map2 = {"x": 42}; ++map2["x"]; map2["x"] += 5
+test_eq(map2["x"] + 1, 49, "map arithmetic")
+
+var map3 = {'x': {'y': 42}}
+test_eq(map3['x']['y'], 42, "nested map")
+
+var map4 = {}; map4["x"] = {"y": 42}
+test_eq(map4["x"]["y"], 42, "assign anonymous Map to another Map key")
+
+var map5 = {"say_hi": fn "hi", "say_bye": fn "bye"}
+test_eq(map5["say_bye"](), 'bye', "functions as map value")
+
+var map6 = {"hi": [1, "bye"]}
+test_eq(map6["hi"][1], 'bye', "array as map element")
+
+var array1 = ["red", "blue", 3, 4]
+test_eq(array1[1], 'blue', "array element")
+
+var array2 = [[1,2], [3, 4], [5,6]]
+test_eq(array2[2][1], 6, "nested arrays")
+
+var array3 = [fn "hi", fn "bye"]
+test_eq(array3[1](), 'bye', "functions as array element")
+
+var array4 = [1, 2, 3, 4]
+test_eq(array4[-1], 4, "index backwards")
+
+var array5 = ["hi", "bye", {"foo": 42}]
+test_eq(array5[2]["foo"], 42, "map as array element")

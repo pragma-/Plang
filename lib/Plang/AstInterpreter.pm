@@ -1225,6 +1225,35 @@ sub validate_builtin_Array {
     return $self->function_builtin_Array($context, $name, $arguments);
 }
 
+sub identical_objects {
+    my ($self, $obj1, $obj2) = @_;
+
+    return 0 if not $self->{types}->is_equal($obj1->[0], $obj2->[0]);
+
+    if ($self->{types}->is_subtype(['TYPE', 'String'], $obj1->[0])) {
+        return $obj1->[1] eq $obj2->[1];
+    } elsif ($self->{types}->is_subtype(['TYPE', 'Null'], $obj1->[0])) {
+        return 1;
+    } elsif ($self->{types}->is_subtype(['TYPE', 'Number'], $obj1->[0])) {
+        return $obj1->[1] == $obj2->[1];
+    } elsif ($self->{types}->is_subtype(['TYPE', 'Function'], $obj1->[0])) {
+        return 0;
+    } elsif ($self->{types}->is_subtype(['TYPE', 'Map'], $obj1->[0])) {
+        # TODO
+    } elsif ($self->{types}->is_subtype(['TYPE', 'Array'], $obj1->[0])) {
+        my @a1 = @{$obj1->[1]};
+        my @a2 = @{$obj2->[1]};
+
+        return 0 if @a1 != @a2;
+
+        for (my $i = 0; $i < @a1; $i++) {
+            return 0 if !$self->identical_objects($a1[$i], $a2[$i]);
+        }
+    } else {
+        return $obj1->[1] == $obj2->[1];
+    }
+}
+
 # TODO: do this much more efficiently
 sub parse_string {
     my ($self, $string) = @_;
