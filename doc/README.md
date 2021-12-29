@@ -6,6 +6,7 @@ This README describes what is implemented so far.
 <!-- md-toc-begin -->
 * [Running Plang in the Bash shell](#running-plang-in-the-bash-shell)
   * [DEBUG environment variable](#debug-environment-variable)
+  * [REPL](#REPL)
 * [Embedding Plang](#embedding-plang)
 * [Running the Unit Tests](#running-the-unit-tests)
 * [Example Plang scripts](#example-plang-scripts)
@@ -108,6 +109,19 @@ Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, 
     $ DEBUG=OPERS,VARS ./plang <<< '1 + 2'  # debug messages only for tags `OPERS` and `VARS`
 <!-- -->
     $ DEBUG=ALL ./plang <<< '1 + 2'         # all debug messages
+
+### REPL
+The [`plang_repl`](../bin/plang_repl) script can be used to start a REPL session.
+It is recommended to use the `rlwrap` command-line utility for command history.
+
+    $ rlwrap script/plang_repl
+     Plang REPL. Type `.help` for help. `.quit` to exit.
+     > "Hi!"
+      [String] Hi!
+     > var a = 42
+      [Integer] 42
+     > a + 10
+      [Integer] 52
 
 ## Embedding Plang
 Plang is designed to be embedded into larger Perl applications. Here's how you can
