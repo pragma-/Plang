@@ -300,7 +300,7 @@ Type | Subtypes
 [Boolean](#Boolean) | -
 [Number](#Number) | [Integer](#Integer), [Real](#Real)
 [Integer](#Integer) | -
-[Real](#Real) | [Integer](#Integer)
+[Real](#Real) | -
 [String](#String) | -
 [Array](#Array) | -
 [Map](#Map) | -
