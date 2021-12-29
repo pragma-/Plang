@@ -10,7 +10,6 @@ This README describes what is implemented so far.
 * [Embedding Plang](#embedding-plang)
 * [Running the Unit Tests](#running-the-unit-tests)
 * [Example Plang scripts](#example-plang-scripts)
-* [JSON compatibility/serialization](#json-compatibilityserialization)
 * [The Plang Language (so far)](#the-plang-language-so-far)
   * [Type-checking](#type-checking)
     * [Optional type annotations](#optional-type-annotations)
@@ -74,6 +73,7 @@ This README describes what is implemented so far.
       * [map](#map-2)
       * [filter](#filter-1)
     * [Type conversion](#type-conversion-1)
+  * [JSON compatibility/serialization](#json-compatibilityserialization)
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
@@ -159,22 +159,6 @@ A test failure looks like this:
 
 ## Example Plang scripts
 [Check out some examples!](../examples/)
-
-## JSON compatibility/serialization
-An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
-
-A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
-
-This syntax is compatible with JSON. This allows easy and convenient serialization of
-Plang data structures for data-exchange and interoperability.
-
-The String() [type conversion function](#type-conversion) can be used to convert or serialize Arrays
-and Maps to Strings for external storage or transmission.
-
-The Array() and Map() type conversion functions can be used to convert a String containing
-an Array constructor or a Map constructor back to an Array or a Map object.
-
-See [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang) and [examples/json.plang](../examples/json.plang) for more details.
 
 ## The Plang Language (so far)
 ### Type-checking
@@ -1000,3 +984,19 @@ In other words, it takes two parameters and returns an `Array`. The first parame
 
 #### Type conversion
 See [Types](#types).
+
+### JSON compatibility/serialization
+An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
+
+A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
+
+This syntax is compatible with JSON. This allows easy and convenient serialization of
+Plang data structures for data-exchange and interoperability.
+
+The String() [type conversion function](#type-conversion) can be used to convert or serialize Arrays
+and Maps to Strings for external storage or transmission.
+
+The Array() and Map() type conversion functions can be used to convert a String containing
+an Array constructor or a Map constructor back to an Array or a Map object.
+
+See [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang) and [examples/json.plang](../examples/json.plang) for more details.
