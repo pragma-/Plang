@@ -76,7 +76,7 @@ This README describes what is implemented so far.
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
-You may use the [`plang`](../script/plang) executable to interpret Plang scripts. Currently, it
+You may use the [`plang`](../bin/plang) executable to interpret Plang scripts. Currently, it
 strictly reads from standard input.
 
     Usage: plang [--dumptokens]
@@ -114,24 +114,24 @@ Plang is designed to be embedded into larger Perl applications. Here's how you c
 do that.
 
 I will get around to documenting this soon. In the meantime, take a look at [this
-unit-test script](../script/runtests) and
+unit-test script](../bin/runtests) and
  [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm) for
 general idea of how to go about it.
 
 ## Running the Unit Tests
 There are a number of unit tests in the [`test`](../test/) directory that may be invoked
-by the [`runtests`](../script/runtests) script.
+by the [`runtests`](../bin/runtests) script.
 
 The `runtests` script may be invoked without arguments to run all the tests. Alternatively, you
 can specify which tests to run by passing a list of file paths.
 
-    $ ./script/runtests test/operators.pt test/closures.pt
+    $ ./bin/runtests test/operators.pt test/closures.pt
     Running 2 test files: ..........
     Pass: 10; Fail: 0
 
 A test failure looks like this:
 
-    $ ./script/runtests test/bad_test.pt
+    $ ./bin/runtests test/bad_test.pt
     Running 1 test file: XX.....
     Pass: 5; Fail: 2
     ----------------------------------------------------------------------
