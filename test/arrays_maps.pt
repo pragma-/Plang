@@ -4,18 +4,23 @@ test_eq(player["iq"],  75, "map entry")
 var map1 = {}
 map1["color"] = "blue"
 test_eq($"The color is {map1['color']}!", 'The color is blue!', "map interpolation")
+# XXX test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation (dot)")
 
 var map2 = {"x": 42}; ++map2["x"]; map2["x"] += 5
 test_eq(map2["x"] + 1, 49, "map arithmetic")
+test_eq(map2.x + 1, 49, "map arithmetic (dot)")
 
 var map3 = {'x': {'y': 42}}
 test_eq(map3['x']['y'], 42, "nested map")
+test_eq(map3.x.y, 42, "nested map (dot)")
 
 var map4 = {}; map4["x"] = {"y": 42}
 test_eq(map4["x"]["y"], 42, "assign anonymous Map to another Map key")
+test_eq(map4.x.y, 42, "assign anonymous Map to another Map key (dot)")
 
 var map5 = {"say_hi": fn "hi", "say_bye": fn "bye"}
 test_eq(map5["say_bye"](), 'bye', "functions as map value")
+test_eq(map5.say_bye(), 'bye', "functions as map value (dot)")
 
 var map6 = {"hi": [1, "bye"]}
 test_eq(map6["hi"][1], 'bye', "array as map element")
@@ -34,3 +39,25 @@ test_eq(array4[-1], 4, "index backwards")
 
 var array5 = ["hi", "bye", {"foo": 42}]
 test_eq(array5[2]["foo"], 42, "map as array element")
+test_eq(array5[2].foo, 42, "map as array element (dot)")
+
+fn exit_function print("exit called")
+
+# the braces aren't necessary here, but this is what it would look like
+fn move(direction) {
+    print($"moving {direction}")
+}
+
+var functions = {
+    'exit'  : exit_function
+    'help'  : fn { print("help called") }
+    'north' : fn { move('north') }
+    'south' : fn { move('south') }
+}
+
+functions.exit()   # prints exit called
+functions.help()   # prints help called
+functions.north()  # prints moving north
+functions.south()  # prints moving south
+
+test_stdout("exit called\nhelp called\nmoving north\nmoving south\n", "map of functions")
