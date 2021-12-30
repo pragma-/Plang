@@ -78,6 +78,10 @@ var maps = {
 
 print(maps['wizard']['iq'])  # prints 200
 
+# alternativelyy:
+
+print(maps.wizard.iq) # also prints 200
+
 # To add another anonymous Map to the Map:
 maps['dragon'] = { 'health': 500, 'iq': 150 }
 
@@ -92,13 +96,13 @@ fn move(direction) {
 }
 
 var functions = {
-    'exit'  : exit_function,
-    'help'  : fn { print("help called") },
+    'exit'  : exit_function
+    'help'  : fn { print("help called") }
     'north' : fn { move('north') }
     'south' : fn { move('south') }
 }
 
-functions['exit']()   # prints exit called
-functions['help']()   # prints help called
-functions['north']()  # prints moving north
-functions['south']()  # prints moving south
+functions.exit()   # prints exit called
+functions.help()   # prints help called
+functions.north()  # prints moving north
+functions.south()  # prints moving south
