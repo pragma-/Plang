@@ -1,10 +1,14 @@
 var player = { "name": "Grok", "health": 100, "iq": 75 }
 test_eq(player["iq"],  75, "map entry")
+test_eq(player.iq,  75, "map entry (dot)")
 
 var map1 = {}
 map1["color"] = "blue"
 test_eq($"The color is {map1['color']}!", 'The color is blue!', "map interpolation")
 # XXX test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation (dot)")
+
+map1.foobar = "baz"
+test_eq($"The foobar is {map1['foobar']}!", "The foobar is baz!", "map key assignment (dot)")
 
 var map2 = {"x": 42}; ++map2["x"]; map2["x"] += 5
 test_eq(map2["x"] + 1, 49, "map arithmetic")
@@ -24,6 +28,7 @@ test_eq(map5.say_bye(), 'bye', "functions as map value (dot)")
 
 var map6 = {"hi": [1, "bye"]}
 test_eq(map6["hi"][1], 'bye', "array as map element")
+test_eq(map6.hi[1], 'bye', "array as map element (dot)")
 
 var array1 = ["red", "blue", 3, 4]
 test_eq(array1[1], 'blue', "array element")
