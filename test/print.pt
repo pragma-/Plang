@@ -1,2 +1,13 @@
 print("hello", " ") print("world")
 test_stdout("hello world\n")
+
+print("a") print("b") print("c")
+test_stdout("a\nb\nc\n")
+
+var sep = ", "
+
+print("foo", sep)
+print("bar", sep)
+print("baz")
+
+test_stdout("foo, bar, baz\n")
