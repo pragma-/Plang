@@ -112,11 +112,11 @@ sub test_stdout_func {
     $output = ''; # reset output for next test
 
     if ($expected eq $got) {
-        push @passed, [$test_file, $test, $expected, $output];
+        push @passed, [$test_file, $test, $expected, $got];
         print '.';
         return [['TYPE', 'Boolean'], 1];
     } else {
-        push @failed, [$test_file, $test, $expected, $output];
+        push @failed, [$test_file, $test, $expected, $got];
         print 'X';
         return [['TYPE', 'Boolean'], 0];
     }
