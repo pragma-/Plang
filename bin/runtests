@@ -150,11 +150,31 @@ foreach my $test (@selected_tests) {
     $output = '';
     $test_file = $test;
 
+    my $expected_error;
+
+    if ($test_file =~ /_err/) {
+        if ($code =~ /^\s*#\s*(.*error.*)$/ism) {
+            $expected_error = $1;
+        } else {
+            $expected_error = "Unspecified error";
+        }
+    }
+
     eval { $plang->interpret_string($code) };
 
-    if ($@) {
-        push @failed, [$test_file, 'EXCEPTION', '', $@];
-        print 'X';
+    if (my $exception = $@) {
+        if (defined $expected_error) {
+            if ($exception eq $expected_error) {
+                push @passed, [$test_file, 'EXCEPTION', $expected_error, $exception];
+                print '.';
+            } else {
+                push @failed, [$test_file, 'EXCEPTION', $expected_error, $exception];
+                print 'X';
+            }
+        } else {
+            push @failed, [$test_file, 'EXCEPTION', 'No exception', $exception];
+            print 'X';
+        }
     }
 }
 

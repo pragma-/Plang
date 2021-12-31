@@ -1,0 +1,5 @@
+fn curriedAdd(x) fn add(y) x + y
+
+curriedAdd(3)(4)(5)
+
+# Validator error: cannot invoke `7` as a function (have type Integer)
