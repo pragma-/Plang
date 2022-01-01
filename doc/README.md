@@ -77,10 +77,9 @@ This README describes what is implemented so far.
 <!-- md-toc-end -->
 
 ## Running Plang in the Bash shell
-You may use the [`plang`](../bin/plang) executable to interpret Plang scripts. Currently, it
-strictly reads from standard input.
+You may use the [`plang`](../bin/plang) executable to interpret Plang scripts.
 
-    Usage: plang [--dumptokens]
+    Usage: plang ([code] | STDIN)
 
 To interpret a Plang file:
 
@@ -88,16 +87,14 @@ To interpret a Plang file:
 
 To interpret a string of Plang code:
 
-    $ ./plang <<< '"Hello world!"'
-      "Hello world!"
+    $ ./plang 'fn add(a, b) a + b; add(3, 7)'
+      10
+
+    $ ./plang <<< '4+5'
+      9
 
 Plang automatically prints the value of the last statement of the program. To prevent this,
 use the `null` keyword (or construct any statement that doesn't yield a value) as the last statement.
-
-You can pass `--dumptokens` as a command-line argument to display a flat-list
-of all the tokens as they are encountered.
-
-    $ ./plang --dumptokens < test/lexer_input.txt  # test the lexer
 
 ### DEBUG environment variable
 You can set the `DEBUG` environment variable to enable debugging output.

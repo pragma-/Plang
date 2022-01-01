@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
-# Plang interpreter start-up script
+# example Plang interpreter script
 #
-# see the `plang_simple` script for a much less complex version
+# see the `plang_builtin` script for a demonstration of adding a builtin function
 
 use warnings;
 use strict;
@@ -10,73 +10,28 @@ use strict;
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 
-use Data::Dumper;
+# use Plang
 use Plang::Interpreter;
 
-print "This script reads from standard input.\n" and exit if @ARGV;
+# The plang() subroutine can used to interpret a string or the STDIN stream,
+# depending on whether a string argument was passed or not.
 
-# debug tags from $DEBUG environment variable
-my $debug = $ENV{DEBUG} // 0;
-my @debug_tags = split /,/, $debug;
+sub plang {
+    my ($text) = @_;
 
-# Grammar rule: DumpToken ::= *
-sub DumpToken {
-    my ($parser) = @_;
-    return $parser->next_token;
+    # create Plang object
+    my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG});
+
+    if (defined $text and length $text) {
+        # if a string argument was provided, interpret the string
+        return $plang->interpret_string($text);
+    } else {
+        # otherwise interpret the standard input stream
+        return $plang->interpret_stream(*STDIN);
+    }
 }
 
-sub plang_dbg {
-    my $plang = Plang::Interpreter->new(embedded => 0, debug => $debug);
+# interpret plang script and exit using returned value
 
-    # if --dumptokens was specified on command-line, use the DumpToken rule
-    # otherwise use the Program rule
-    my $dumptokens = 0;
-    if (grep { $_ eq '--dumptokens' } @ARGV) {
-        # generates all the tokens as a flat list
-        $plang->{parser}->clear_rules;
-        $plang->{parser}->add_rule(\&DumpToken);
-        $dumptokens = 1;
-    }
-
-    # iterate over lines of standard input
-    my $input_iter = sub { <STDIN> };
-
-    # iterate over tokens
-    my $token_iter = $plang->{lexer}->tokens($input_iter);
-
-    # parse the input into $result
-    my $result = $plang->{parser}->parse($token_iter);
-
-    # were there any parse errors? print them and exit
-    $plang->handle_parse_errors;
-
-    # dump the $result data structure
-    if ($dumptokens or grep { $_ eq 'AST' } @debug_tags) {
-        $Data::Dumper::Terse  = 1;
-        $Data::Dumper::Indent = 1;
-        $Data::Dumper::Useqq  = 1;
-
-        print Dumper ($result), "\n";
-    }
-
-    # unless --dumptokens was specified on the command-line, interpret the AST
-    # and exit with the return value.
-    return 0 if $dumptokens;
-
-    # validate the program
-    my $errors = $plang->{validator}->validate($result);
-
-    if ($errors) {
-        print STDERR $errors->[1];
-        exit 1;
-    }
-
-    # interpret the program
-    return $plang->{interpreter}->run($result);
-}
-
-# our return value/exit code
-my $ret = plang_dbg() // 0;
-
-no warnings;
-exit $ret;
+my $ret = plang("@ARGV") // 0;
+exit int $ret;
