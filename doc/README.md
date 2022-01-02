@@ -883,7 +883,7 @@ The `Map()` type conversion function can be used to convert the following:
 
 From Type | With Value | Resulting Map Value
 --- | --- | ---
-String | A String containing a [Map constructor](#map) | the constructed Map
+String | A String containing a [Map constructor](#map-1) | the constructed Map
 Map | any value | that value
 
 ##### Function
@@ -957,10 +957,10 @@ Creating an array and accessing an element:
      "green"
 
 #### map
-See the documentation for the builtin [map](#map-2) function.
+See the documentation for the builtin [map](#map) function.
 
 #### filter
-See the documentation for the builtin [filter](#filter-1) function.
+See the documentation for the builtin [filter](#filter) function.
 
 ### Map operations
 #### Creating and accessing maps
@@ -1031,7 +1031,7 @@ the empty map.
 ### JSON compatibility/serialization
 An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
 
-A [Map constructor](#map) is something like `{"name": "Bob", "age": 32}`.
+A [Map constructor](#map-1) is something like `{"name": "Bob", "age": 32}`.
 
 This syntax is compatible with JSON. This allows easy and convenient serialization of
 Plang data structures for data-exchange and interoperability.
