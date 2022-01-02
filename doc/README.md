@@ -4,7 +4,6 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 This README describes what is implemented so far.
 
 <!-- md-toc-begin -->
-* [Plang](#plang)
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
     * [REPL](#repl)
@@ -80,6 +79,9 @@ This README describes what is implemented so far.
 ## Running Plang
 You may use the [`plang`](../bin/plang) executable to interpret Plang scripts.
 
+Plang automatically prints the value of the final expression in the program. To prevent this,
+use the `null` keyword (or construct any expression that evaluates to `null`) as the final expression.
+
     Usage: plang ([code] | STDIN)
 
 To interpret a Plang file:
@@ -103,9 +105,6 @@ To interpret directly from STDIN:
         print("Hello, world!")
         ^D
       Hello, world!
-
-Plang automatically prints the value of the final expression in the program. To prevent this,
-use the `null` keyword (or construct any expression that evaluates to `null`) as the final expression.
 
 ### DEBUG environment variable
 You can set the `DEBUG` environment variable to enable debugging output.
@@ -134,8 +133,9 @@ It is recommended to use the `rlwrap` command-line utility for command history.
       [Integer] 52
 
 ## Embedding Plang
-Plang is designed to be embedded into larger Perl applications. I will get around to documenting
-this soon. In the meantime, take a look at [this unit-test script](../bin/runtests) and
+Plang is designed to be embedded into larger Perl applications.
+
+I will get around to documenting this soon. In the meantime, take a look at [this unit-test script](../bin/runtests) and
  [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm) for
 general idea of how to go about it.
 
@@ -177,7 +177,7 @@ Path | Description
 [`doc/`](../doc/) | Plang documentation.
 [`examples`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
 [`lib/Plang/AstInterpreter.pm`](../lib/Plang/AstInterpreter.pm) | At this early stage, Plang is a simple AST interpreter.
-[`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. `use Plang::Interpreter` to embed Plang into your Perl scripts.
+[`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
 [`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
 [`lib/Plang/Parser.pm`](../lib/Plang/Parser.pm) | Generic abstract backtracking parser class that accepts a list of parse rules.
 [`lib/Plang/ParseRules.pm`](../lib/Plang/ParseRules.pm) | Recursive-descent rules to parse a stream of tokens into an AST.
@@ -189,7 +189,7 @@ Path | Description
 ## The Plang Language (so far)
 
 Plang is an expression-oriented language with optional type annotations.
-Every thing in Plang evaluates to a value that can be used in an expression.
+Everything in Plang evaluates to a value that can be used in an expression.
 
 ### Identifiers
     Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
