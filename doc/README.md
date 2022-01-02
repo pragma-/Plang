@@ -4,7 +4,7 @@ Plang is in early development stage. There will be bugs. There will be abrupt de
 This README describes what is implemented so far.
 
 <details><summary>Click to show table of contents</summary>
-<!-- md-toc-begin -->
+
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
     * [REPL](#repl)
@@ -75,7 +75,7 @@ This README describes what is implemented so far.
       * [exists](#exists)
       * [delete](#delete)
     * [JSON compatibility/serialization](#json-compatibilityserialization)
-<!-- md-toc-end -->
+
 </details>
 
 ## Running Plang
