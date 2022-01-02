@@ -733,7 +733,7 @@ Type | Subtypes
 [Real](#Real) | -
 [String](#String) | -
 [Array](#Array) | -
-[Map](#Map) | -
+[Map](#map-1) | -
 [Function](#Function) | [Builtin](#Builtin)
 [Builtin](#Builtin) | -
 
