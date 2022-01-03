@@ -177,7 +177,7 @@ Path | Description
 [`bin/plang_repl`](../bin/plang_repl) | Read-evaluate-print-loop with persistent environment. Use this to play with Plang.
 [`bin/runtests`](../bin/runtests) | Verifies that Plang is working correctly by running the tests in the [`test`](../test) directory.
 [`doc/`](../doc/) | Plang documentation.
-[`examples`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
+[`examples/`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
 [`lib/Plang/AstInterpreter.pm`](../lib/Plang/AstInterpreter.pm) | At this early stage, Plang is a simple AST interpreter.
 [`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
 [`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
@@ -186,7 +186,7 @@ Path | Description
 [`lib/Plang/Validator.pm`](../lib/Plang/Validator.pm) | Compile-time type-checking and semantic validation. Does some syntax desugaring.
 [`lib/Plang/Types.pm`](../lib/Plang/Types.pm) | Plang's simple yet evolving and growing type system.
 [`lib/Plang/Constants/`](../lib/Plang/Constants/) | Integer constants identifying various tokens, keywords and instructions.
-[`test`](../test) | Plang test programs.
+[`test/`](../test) | Plang test programs.
 
 ## The Plang Language (so far)
 
