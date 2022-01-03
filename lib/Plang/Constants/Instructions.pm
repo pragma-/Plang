@@ -12,8 +12,7 @@ my $n = 0; # easier rearranging/insertion/removal of instructions
 
 my %constants = (
 	INSTR_NOP => $n++,
-	INSTR_STMT => $n++,
-	INSTR_STMT_GROUP => $n++,
+	INSTR_EXPR_GROUP => $n++,
 	INSTR_LITERAL => $n++,
 	INSTR_VAR => $n++,
 	INSTR_MAPINIT => $n++,

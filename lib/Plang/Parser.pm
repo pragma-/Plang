@@ -224,13 +224,13 @@ sub consume {
 
     $self->{dprint}->('PARSER', "Looking for " . $pretty_token[$wanted] . "\n") if $debug;
 
-    if ($token->[0] eq $wanted) {
-        $self->{dprint}->('PARSER', "got it (" . $self->{clean}->($token->[1]) . ") <--\n") if $debug;
+    if ($token->[0] == $wanted) {
+        $self->{dprint}->('PARSER', "Got it (" . $self->{clean}->($token->[1]) . ")\n") if $debug;
         $self->{current_token}++;
         return $token;
     }
 
-    $self->{dprint}->('PARSER', "got " . $pretty_token[$token->[0]] . " instead\n") if $debug;
+    $self->{dprint}->('PARSER', "Got " . $pretty_token[$token->[0]] . " instead\n") if $debug;
     return;
 }
 

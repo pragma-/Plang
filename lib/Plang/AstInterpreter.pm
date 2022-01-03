@@ -52,9 +52,9 @@ sub initialize {
     $self->{instr_dispatch} = [];
 
     # main instructions
-    $self->{instr_dispatch}->[INSTR_NOP]         = \&null_statement;
-    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&expression_group;
-    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&stmt_literal;
+    $self->{instr_dispatch}->[INSTR_NOP]         = \&null_op;
+    $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
+    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
     $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
     $self->{instr_dispatch}->[INSTR_ARRAYINIT]   = \&array_constructor;
@@ -110,6 +110,10 @@ sub initialize {
 
 sub dispatch_instruction {
     my ($self, $instr, $context, $data) = @_;
+
+    if ($self->{debug}) {
+        $self->{dprint}->('INSTR', "Dispatching instruction $pretty_instr[$instr]\n");
+    }
 
     # main instructions
     if ($instr < INSTR_NOT) {
@@ -233,10 +237,10 @@ sub function_call {
         $func = $self->evaluate($context, $target);
     }
 
-    my $closure    = $func->[1]->[0];
-    my $ret_type   = $func->[1]->[1];
-    my $parameters = $func->[1]->[2];
-    my $statements = $func->[1]->[3];
+    my $closure     = $func->[1]->[0];
+    my $ret_type    = $func->[1]->[1];
+    my $parameters  = $func->[1]->[2];
+    my $expressions = $func->[1]->[3];
 
     # wedge closure in between current scope and previous scope
     my $new_context = $self->new_context($closure);
@@ -253,9 +257,9 @@ sub function_call {
     my $result;
 
     # invoke the function
-    foreach my $stmt (@$statements) {
-        $result = $self->evaluate($new_context, $stmt);
-        last if $stmt->[0] == INSTR_RET;
+    foreach my $expression (@$expressions) {
+        $result = $self->evaluate($new_context, $expression);
+        last if $expression->[0] == INSTR_RET;
     }
 
     $self->{recursion}--;
@@ -266,10 +270,10 @@ sub function_call {
 sub function_definition {
     my ($self, $context, $data) = @_;
 
-    my $ret_type   = $data->[1];
-    my $name       = $data->[2];
-    my $parameters = $data->[3];
-    my $statements = $data->[4];
+    my $ret_type    = $data->[1];
+    my $name        = $data->[2];
+    my $parameters  = $data->[3];
+    my $expressions = $data->[4];
 
     my $param_types = [];
 
@@ -277,7 +281,7 @@ sub function_definition {
         push @$param_types, $param->[0];
     }
 
-    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $statements]];
+    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $expressions]];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
@@ -388,7 +392,7 @@ sub keyword_values {
 
 sub keyword_return {
     my ($self, $context, $data) = @_;
-    return $self->evaluate($context, $data->[1]->[1]);
+    return $self->evaluate($context, $data->[1]);
 }
 
 sub keyword_next {
@@ -494,7 +498,6 @@ sub conditional {
     return $self->keyword_if($context, $data);
 }
 
-# if statement
 sub keyword_if {
     my ($self, $context, $data) = @_;
 
@@ -563,7 +566,7 @@ sub assignment {
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->evaluate($context, $left_value->[2]->[1]);
+            my $value = $self->evaluate($context, $left_value->[2]);
 
             if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
@@ -622,7 +625,7 @@ sub access_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->evaluate($context, $data->[2]->[1]);
+        my $value = $self->evaluate($context, $data->[2]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -732,43 +735,20 @@ sub identifier {
     return $var;
 }
 
-sub stmt_literal {
+sub literal {
     my ($self, $context, $data) = @_;
     my $type  = $data->[1];
     my $value = $data->[2];
     return [$type, $value];
 }
 
-sub null_statement {
+sub null_op {
     return [['TYPE', 'Null'], undef];
 }
 
 sub expression_group {
     my ($self, $context, $data) = @_;
     return $self->execute($self->new_context($context), $data->[1]);
-}
-
-sub evaluate {
-    my ($self, $context, $data) = @_;
-
-    return if not $data;
-
-    $Data::Dumper::Indent = 0;
-    $self->{dprint}->('STMT', "stmt: " . Dumper($data) . "\n") if $self->{debug};
-
-    my $ins = $data->[0];
-
-    return $data if $ins !~ /^\d+$/;
-
-    if ($ins == INSTR_STMT) {
-        return $self->evaluate($context, $data->[1]);
-    }
-
-    if ($ins == INSTR_STRING_I) {
-        return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
-    }
-
-    return $self->dispatch_instruction($ins, $context, $data);
 }
 
 sub is_truthy {
@@ -1254,16 +1234,13 @@ sub identical_objects {
     }
 }
 
-# TODO: do this much more efficiently
+use Plang::Interpreter;
+
 sub parse_string {
     my ($self, $string) = @_;
-
-    use Plang::Interpreter;
-    my $interpreter = Plang::Interpreter->new;
+    my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
     my $program = $interpreter->parse_string($string);
-    my $statements = $program->[0]->[1];
-
-    return $statements;
+    return $program->[0]->[1];
 }
 
 sub interpolate_string {
@@ -1434,12 +1411,12 @@ sub run {
         $self->set_variable($context, $builtin, [$type, $data]);
     }
 
-    # grab our program's statements
+    # grab our program's expressions
     my $program    = $ast->[0];
-    my $statements = $program->[1];
+    my $expressions = $program->[1];
 
-    # interpret the statements
-    my $result = $self->execute($context, $statements);
+    # interpret the expressions
+    my $result = $self->execute($context, $expressions);
 
     # return result to parent program if we're embedded
     return $result if $self->{embedded};
@@ -1447,35 +1424,43 @@ sub run {
     # return success if there's no result to print
     return if not defined $result;
 
-    # handle final statement (print last value of program if not Null)
+    # handle final expression (print last value of program if not Null)
     return $self->handle_expression_result($result, 1);
 }
 
 sub execute {
     my ($self, $context, $ast) = @_;
 
-    $Data::Dumper::Indent = 0;
-
-    $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n") if $self->{debug};
+    if ($self->{debug}) {
+        $Data::Dumper::Indent = 0;
+        $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n") if $self->{debug};
+        $Data::Dumper::Indent = 1;
+    }
 
     # try
     my $last_expression_result = eval {
-
         my $result;
 
         foreach my $node (@$ast) {
             my $instruction = $node->[0];
 
-            if ($instruction == INSTR_STMT_GROUP) {
+            if ($instruction == INSTR_EXPR_GROUP) {
                 return $self->execute($context, $node->[1]);
-            } elsif ($instruction == INSTR_STMT) {
-                $result = $self->evaluate($context, $node->[1]);
+            } else {
+                $result = $self->evaluate($context, $node);
 
                 if (defined $result) {
                     $result = $self->handle_expression_result($result);
-                    $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
+
+                    if ($self->{debug}) {
+                        $Data::Dumper::Indent = 0;
+                        $self->{dprint}->('AST', "Expression result: " . Dumper($result) . "\n");
+                        $Data::Dumper::Indent = 1;
+                    }
                 } else {
-                    $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
+                    if ($self->{debug}) {
+                        $self->{dprint}->('AST', "Expression result: none\n");
+                    }
                 }
             }
         }
@@ -1491,7 +1476,29 @@ sub execute {
     return $last_expression_result;
 }
 
-# handles one statement result
+sub evaluate {
+    my ($self, $context, $data) = @_;
+
+    return if not $data;
+
+    if ($self->{debug}) {
+        $Data::Dumper::Indent = 0;
+        $self->{dprint}->('EXPR', "expr: " . Dumper($data) . "\n");
+        $Data::Dumper::Indent = 1;
+    }
+
+    my $ins = $data->[0];
+
+    return $data if $ins !~ /^\d+$/;
+
+    if ($ins == INSTR_STRING_I) {
+        return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
+    }
+
+    return $self->dispatch_instruction($ins, $context, $data);
+}
+
+# handles one expression result
 sub handle_expression_result {
     my ($self, $result, $print_any) = @_;
 

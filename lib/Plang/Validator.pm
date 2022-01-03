@@ -23,7 +23,7 @@ sub initialize {
     $self->SUPER::initialize(%conf);
 
     # validate these main instructions
-    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&statement_group;
+    $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
     $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
     $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
@@ -201,7 +201,7 @@ sub binary_op {
     $self->error($context, "cannot apply binary operator $pretty_instr[$instr] (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
 }
 
-sub statement_group {
+sub expression_group {
     my ($self, $context, $data) = @_;
 
     my $new_context = $self->new_context($context);
@@ -246,7 +246,7 @@ sub type_check_prefix_postfix_op {
     }
 
     if (ref ($data->[1]->[0]) ne 'ARRAY') {
-        $self->error($context, "cannot apply $op to instruction " . $data->[1]->[0]);
+        $self->error($context, "cannot apply $op to instruction " . $pretty_instr[$data->[1]->[0]]);
     }
 
     $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($data->[1]->[0]));
@@ -512,11 +512,11 @@ sub function_definition {
     my $ret_type   = $data->[1];
     my $name       = $data->[2];
     my $parameters = $data->[3];
-    my $statements = $data->[4];
+    my $expressions = $data->[4];
 
     my $param_types = [];
     my $func_type   = ['TYPEFUNC', 'Function', $param_types, $ret_type];
-    my $func_data   = [$context, $ret_type, $parameters, $statements];
+    my $func_data   = [$context, $ret_type, $parameters, $expressions];
     my $func        = [$func_type, $func_data];
 
     if ($name eq '#anonymous') {
@@ -566,11 +566,11 @@ sub function_definition {
 
     $new_context->{current_function} = $name;
 
-    foreach my $statement (@$statements) {
-        $result = $self->evaluate($new_context, $statement);
+    foreach my $expression (@$expressions) {
+        $result = $self->evaluate($new_context, $expression);
 
         # handle a returned value
-        if ($statement->[0] == INSTR_RET) {
+        if ($expression->[0] == INSTR_RET) {
             push @return_types, $result->[0];
         }
     }
@@ -757,7 +757,7 @@ sub function_call {
     my $closure     = $func->[1]->[0];
     my $return_type = $func->[1]->[1];
     my $parameters  = $func->[1]->[2];
-    my $statements  = $func->[1]->[3];
+    my $expressions  = $func->[1]->[3];
     my $return_value;
 
     my $new_context = $self->new_context($closure);
@@ -777,9 +777,9 @@ sub function_call {
 
     # invoke the function
     $new_context->{current_function} = $name;
-    foreach my $statement (@$statements) {
-        $return_value = $self->evaluate($new_context, $statement->[1]);
-        last if $statement->[1]->[0] == INSTR_RET;
+    foreach my $expression (@$expressions) {
+        $return_value = $self->evaluate($new_context, $expression);
+        last if $expression->[0] == INSTR_RET;
     }
 
     # handle the return value/type
@@ -843,7 +843,7 @@ sub keyword_return {
         $self->error($context, "cannot use `return` outside of function");
     }
 
-    return $self->evaluate($context, $data->[1]->[1]);
+    return $self->evaluate($context, $data->[1]);
 }
 
 sub conditional {
@@ -882,7 +882,7 @@ sub keyword_while {
 
     $context->{while_loop} = 1;
 
-    # validate statements
+    # validate expressions
     $self->evaluate($context, $data->[2]);
 
     delete $context->{while_loop};
@@ -943,7 +943,7 @@ sub access_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->evaluate($context, $data->[2]->[1]);
+        my $value = $self->evaluate($context, $data->[2]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -1007,7 +1007,7 @@ sub assignment {
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->evaluate($context, $left_value->[2]->[1]);
+            my $value = $self->evaluate($context, $left_value->[2]);
 
             if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
@@ -1051,7 +1051,7 @@ sub assignment {
         $self->error($context, "cannot assign to postfix [] on type " . $self->{types}->to_string($var->[0]));
     }
 
-    # a statement
+    # an expression
     my $eval = $self->evaluate($context, $data->[1]);
     $self->error($context, "cannot assign to non-lvalue type " . $self->{types}->to_string($eval->[0]));
 }

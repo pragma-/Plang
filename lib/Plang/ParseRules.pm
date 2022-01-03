@@ -54,7 +54,7 @@ sub expected {
 }
 
 my %prettier_token = (
-    TOKEN_TERM,  'statement terminator',
+    TOKEN_TERM,  'expression terminator',
     TOKEN_IDENT, 'identifier',
 );
 
@@ -69,52 +69,23 @@ sub pretty_value {
     return $value;
 }
 
-sub alternate_statement {
-    my ($parser, $subref, $debug_msg) = @_;
-
-    $parser->alternate($debug_msg);
-
-    {
-        my $result = $subref->($parser);
-
-        if ($result) {
-            $parser->consume(TOKEN_TERM);
-            $parser->advance;
-            return [INSTR_STMT, $result];
-        }
-    }
-}
-
-sub consume_keyword {
-    my ($parser, $keyword) = @_;
-
-    my $token = $parser->next_token('peek');
-
-    if ($token->[0] == TOKEN_KEYWORD && $token->[1] eq $keyword) {
-        $parser->consume(TOKEN_KEYWORD);
-        return $token;
-    }
-
-    return;
-}
-
 # start-rule:
-# Program ::= Statement*
+# Program ::= Expression*
 sub Program {
     my ($parser) = @_;
 
-    $parser->try('Program: Statement*');
-    my @statements;
+    $parser->try('Program: Expression*');
+    my @expressions;
 
     my $MAX_ERRORS = 3; # TODO make this customizable
     my $errors;
 
     while (defined $parser->next_token('peek')) {
         eval {
-            my $statement = Statement($parser);
+            my $expression = Expression($parser);
 
-            if ($statement and $statement->[0] != INSTR_NOP) {
-                push @statements, $statement;
+            if ($expression and $expression->[0] != INSTR_NOP) {
+                push @expressions, $expression;
             }
         };
 
@@ -125,118 +96,30 @@ sub Program {
     }
 
     $parser->advance;
-    return @statements ? ['PRGM', \@statements] : undef;
-}
-
-my @statement_dispatcher;
-$statement_dispatcher[TOKEN_L_BRACE] = \&StatementGroup;
-#$statement_dispatcher[TOKEN_KEYWORD] = \&StatementKeyword;
-
-# Statement ::= StatementGroup
-#             | VariableDeclaration
-#             | FunctionDefinition
-#             | ReturnStatement
-#             | NextStatement
-#             | LastStatement
-#             | WhileStatement
-#             | IfExpression
-#             | ElseWithoutIf
-#             | ExistsExpression
-#             | DeleteExpression
-#             | KeysExpression
-#             | ValuesExpression
-#             | Expression TERM
-#             | UnexpectedKeyword
-#             | TERM
-sub Statement {
-    my ($parser) = @_;
-
-    $parser->try('Statement: ...');
-
-    # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
-
-    # get token's dispatcher
-    my $dispatcher = $statement_dispatcher[$token->[0]];
-
-    # attempt to dispatch token
-    if (defined $dispatcher) {
-        my $result = $dispatcher->($parser);
-        return $result if defined $result;
-    }
-
-    # no dispatch for token, handle edge cases
-
-    my $result;
-    return $result if defined ($result = alternate_statement($parser, \&Expression,        'Statement: Expression'));
-    return $result if defined ($result = alternate_statement($parser, \&UnexpectedKeyword, 'Statement: UnexpectedKeyword'));
-
-    $parser->alternate('Statement: TERM');
-
-    {
-        if ($parser->consume(TOKEN_TERM)) {
-            $parser->advance;
-            return [INSTR_NOP, undef];
-        }
-    }
-
-    $parser->backtrack;
-    return;
-}
-
-# StatementGroup ::= L_BRACE Statement* R_BRACE
-sub StatementGroup {
-    my ($parser) = @_;
-
-    $parser->try('StatementGroup: L_BRACE Statement R_BRACE');
-
-    {
-        goto STATEMENT_GROUP_FAIL if not $parser->consume(TOKEN_L_BRACE);
-
-        my @statements;
-
-        while (1) {
-            my $statement = Statement($parser);
-
-            if ($statement and $statement->[0] != INSTR_NOP) {
-                push @statements, $statement;
-                next;
-            }
-
-            last if $parser->consume(TOKEN_R_BRACE);
-            goto STATEMENT_GROUP_FAIL;
-        }
-
-        $parser->advance;
-        return [INSTR_STMT_GROUP, \@statements];
-    }
-
-  STATEMENT_GROUP_FAIL:
-    $parser->backtrack;
+    return @expressions ? ['PRGM', \@expressions] : undef;
 }
 
 my @keyword_dispatcher;
-$keyword_dispatcher[KEYWORD_VAR]    = \&VariableDeclaration;
-$keyword_dispatcher[KEYWORD_FN]     = \&FunctionDefinition;
-$keyword_dispatcher[KEYWORD_RETURN] = \&ReturnStatement;
-$keyword_dispatcher[KEYWORD_NEXT]   = \&NextStatement;
-$keyword_dispatcher[KEYWORD_LAST]   = \&LastStatement;
-$keyword_dispatcher[KEYWORD_WHILE]  = \&WhileStatement;
-$keyword_dispatcher[KEYWORD_IF]     = \&IfExpression;
-$keyword_dispatcher[KEYWORD_ELSE]   = \&ElseWithoutIf;
-$keyword_dispatcher[KEYWORD_EXISTS] = \&ExistsStatement;
-$keyword_dispatcher[KEYWORD_DELETE] = \&DeleteExpression;
-$keyword_dispatcher[KEYWORD_KEYS]   = \&KeysExpression;
-$keyword_dispatcher[KEYWORD_VALUES] = \&ValuesExpression;
 $keyword_dispatcher[KEYWORD_NULL]   = \&KeywordNull;
 $keyword_dispatcher[KEYWORD_TRUE]   = \&KeywordTrue;
 $keyword_dispatcher[KEYWORD_FALSE]  = \&KeywordFalse;
+$keyword_dispatcher[KEYWORD_FN]     = \&KeywordFn;
+$keyword_dispatcher[KEYWORD_RETURN] = \&KeywordReturn;
+$keyword_dispatcher[KEYWORD_WHILE]  = \&KeywordWhile;
+$keyword_dispatcher[KEYWORD_NEXT]   = \&KeywordNext;
+$keyword_dispatcher[KEYWORD_LAST]   = \&KeywordLast;
+$keyword_dispatcher[KEYWORD_IF]     = \&KeywordIf;
+$keyword_dispatcher[KEYWORD_ELSE]   = \&ElseWithoutIf;
+$keyword_dispatcher[KEYWORD_EXISTS] = \&KeywordExists;
+$keyword_dispatcher[KEYWORD_DELETE] = \&KeywordDelete;
+$keyword_dispatcher[KEYWORD_KEYS]   = \&KeywordKeys;
+$keyword_dispatcher[KEYWORD_VALUES] = \&KeywordValues;
+$keyword_dispatcher[KEYWORD_VAR]    = \&KeywordVar;
 
-sub StatementKeyword {
+sub Keyword {
     my ($parser) = @_;
 
-    $parser->try('StatementKeyword');
+    $parser->try('Keyword');
 
     # peek at upcoming token
     my $token = $parser->next_token('peek');
@@ -251,188 +134,335 @@ sub StatementKeyword {
 
         if (defined $result) {
             $parser->advance;
-            return [INSTR_STMT, $result];
+            return $result;
         }
     }
 
     error($parser, "Unknown keyword `$token->[1]`");
 }
 
+# error about unexpected keywords
+sub UnexpectedKeyword {
+    my ($parser) = @_;
+
+    my $token = $parser->next_token('peek');
+    return if not $token;
+
+    # if a keyword is found outside of Keyword() then it is unexpected
+    if ($token->[0] == TOKEN_KEYWORD) {
+        error($parser, "unexpected keyword `$token->[1]`");
+    }
+
+    return;
+}
+
+sub consume_keyword {
+    my ($parser, $keyword) = @_;
+
+    my $token = $parser->consume(TOKEN_KEYWORD);
+
+    if (!defined $token) {
+        return;
+    }
+
+    if ($token->[1] eq $keyword) {
+        return $token;
+    }
+
+    return;
+}
+
+# KeywordNull ::= "null"
 sub KeywordNull {
     my ($parser) = @_;
 
     $parser->try('KeywordNull');
 
-    {
-
-        if (consume_keyword($parser, 'null')) {
-            return [['TYPE', 'Null'], undef];
-        }
-
+    if (consume_keyword($parser, 'null')) {
+        $parser->advance;
+        return [['TYPE', 'Null'], undef];
     }
 
     $parser->backtrack;
-
-    return;
 }
 
+# KeywordTrue ::= "true"
 sub KeywordTrue {
     my ($parser) = @_;
 
     $parser->try('KeywordTrue');
 
-    {
-
-        if (consume_keyword($parser, 'true')) {
-            return [['TYPE', 'Boolean'], 1];
-        }
-
+    if (consume_keyword($parser, 'true')) {
+        $parser->advance;
+        return [['TYPE', 'Boolean'], 1];
     }
 
     $parser->backtrack;
-
-    return;
 }
 
+# KeywordFalse ::= "false"
 sub KeywordFalse {
     my ($parser) = @_;
 
     $parser->try('KeywordFalse');
 
-    {
-
-        if (consume_keyword($parser, 'false')) {
-            return [['TYPE', 'Boolean'], 0];
-        }
-
+    if (consume_keyword($parser, 'false')) {
+        $parser->advance;
+        return [['TYPE', 'Boolean'], 0];
     }
 
     $parser->backtrack;
+}
+
+# KeywordReturn ::= "return" Expression?
+sub KeywordReturn {
+    my ($parser) = @_;
+
+    $parser->try('KeywordReturn');
+
+    if (consume_keyword($parser, 'return')) {
+        my $expression = Expression($parser);
+        $parser->advance;
+        return [INSTR_RET, $expression];
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordWhile ::= "while" "(" Expression ")" Expression
+sub KeywordWhile {
+    my ($parser) = @_;
+
+    $parser->try('KeywordWhile');
+
+    {
+        if (consume_keyword($parser, 'while')) {
+            if (not $parser->consume(TOKEN_L_PAREN)) {
+                expected($parser, "'(' after `while` keyword");
+            }
+
+            my $expr = Expression($parser);
+
+            if (not $expr) {
+                expected($parser, "expression for `while` condition");
+            }
+
+            if (not $parser->consume(TOKEN_R_PAREN)) {
+                expected($parser, "')' after `while` condition expression");
+            }
+
+            my $body = Expression($parser);
+
+            if (not $body) {
+                expected($parser, "expression for `while` loop body");
+            }
+
+            $parser->advance;
+            return [INSTR_WHILE, $expr, $body];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordNext ::= "next"
+sub KeywordNext {
+    my ($parser) = @_;
+
+    $parser->try('KeywordNext');
+
+    {
+        if (consume_keyword($parser, 'next')) {
+            $parser->advance;
+            return [INSTR_NEXT, undef];
+        }
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordLast ::= "last" Expression?
+sub KeywordLast {
+    my ($parser) = @_;
+
+    $parser->try('KeywordLast');
+
+    if (consume_keyword($parser, 'last')) {
+        my $expression = Expression($parser);
+        $parser->advance;
+        return [INSTR_LAST, $expression];
+    }
+
+    $parser->backtrack;
+}
+
+
+# KeywordIf ::= "if" Expression "then" Expression "else" Expression
+sub KeywordIf {
+    my ($parser) = @_;
+
+    $parser->try('KeywordIf');
+
+    if (consume_keyword($parser, 'if')) {
+        my $expr = Expression($parser);
+
+        if (not $expr) {
+            expected($parser, "expression for `if` condition");
+        }
+
+        if (not consume_keyword($parser, 'then')) {
+            expected($parser, "`then` after `if` condition");
+        }
+
+        my $body = Expression($parser);
+
+        if (not $body) {
+            expected($parser, "expression for `then` branch of `if` expression");
+        }
+
+        if (not consume_keyword($parser, 'else')) {
+            expected($parser, "`else` branch for `if` expression");
+        }
+
+        my $else = Expression($parser);
+
+        if (not $else) {
+            expected($parser, "expression for `else` branch of `if` expression");
+        }
+
+        $parser->advance;
+        return [INSTR_IF, $expr, $body, $else];
+    }
+
+    $parser->backtrack;
+}
+
+# error about an `else` without an `if`
+sub ElseWithoutIf {
+    my ($parser) = @_;
+
+    # if an `else` is consumed outside of IfExpression() then it is a stray `else`
+    if (consume_keyword($parser, 'else')) {
+        error($parser, "`else` without matching `if`");
+    }
 
     return;
 }
 
-# VariableDeclaration ::= KEYWORD_var IDENT (":" Type)? Initializer?
-sub VariableDeclaration {
+# KeywordExists ::= "exists" Expression
+sub KeywordExists {
     my ($parser) = @_;
 
-    $parser->try('VariableDeclaration');
+    $parser->try('KeywordExists');
 
     {
+        if (consume_keyword($parser, 'exists')) {
+            my $expression = Expression($parser);
 
-        if (consume_keyword($parser, 'var')) {
-            my $token = $parser->consume(TOKEN_IDENT);
-
-            if (not $token) {
-                expected($parser, 'identifier for variable name');
+            if (not $expression or not defined $expression->[1]) {
+                expected($parser, "expression after exists keyword");
             }
 
-            my $name = $token->[1];
+            $parser->advance;
+            return [INSTR_EXISTS, $expression->[1]];
+        }
+    }
 
-            my $type;
-            if ($parser->consume(TOKEN_COLON)) {
-                $type = Type($parser);
+    $parser->backtrack;
+}
 
-                if (not $type) {
-                    expected($parser, "type after \":\" for variable `$name`");
-                }
-            }
+# KeywordDelete ::= "delete" Expression
+sub KeywordDelete {
+    my ($parser) = @_;
+
+    $parser->try('KeywordDelete');
+
+    if (consume_keyword($parser, 'delete')) {
+        my $expression = Expression($parser);
+
+        if (not $expression or not defined $expression->[1]) {
+            expected($parser, "expression after delete keyword");
+        }
+
+        $parser->advance;
+        return [INSTR_DELETE, $expression->[1]];
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordKeys ::= "keys" Expression
+sub KeywordKeys {
+    my ($parser) = @_;
+
+    $parser->try('KeywordKeys');
+
+    if (consume_keyword($parser, 'keys')) {
+        my $expression = Expression($parser);
+
+        if (not $expression or not defined $expression->[1]) {
+            expected($parser, "expression after keys keyword");
+        }
+
+        $parser->advance;
+        return [INSTR_KEYS, $expression->[1]];
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordValues ::= KEYWORD_values Expression
+sub KeywordValues {
+    my ($parser) = @_;
+
+    $parser->try('KeywordValues');
+
+    if (consume_keyword($parser, 'values')) {
+        my $expression = Expression($parser);
+
+        if (not $expression or not defined $expression->[1]) {
+            expected($parser, "expression after values keyword");
+        }
+
+        $parser->advance;
+        return [INSTR_VALUES, $expression->[1]];
+    }
+
+    $parser->backtrack;
+}
+
+# KeywordVar ::= "var" IDENT (":" Type)? Initializer?
+sub KeywordVar {
+    my ($parser) = @_;
+
+    $parser->try('KeywordVar');
+
+    if (consume_keyword($parser, 'var')) {
+        my $token = $parser->consume(TOKEN_IDENT);
+
+        if (not $token) {
+            expected($parser, 'identifier for variable name');
+        }
+
+        my $name = $token->[1];
+
+        my $type;
+        if ($parser->consume(TOKEN_COLON)) {
+            $type = Type($parser);
 
             if (not $type) {
-                $type = ['TYPE', 'Any'];
+                expected($parser, "type after \":\" for variable `$name`");
             }
-
-            my $initializer = Initializer($parser);
-
-            $parser->advance;
-            return [INSTR_VAR, $type, $name, $initializer];
         }
-    }
 
-    $parser->backtrack;
-}
-
-# MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
-#         String ::= DQUOTE_STRING | SQUOTE_STRING
-sub MapConstructor {
-    my ($parser) = @_;
-
-    $parser->try('MapConstructor');
-
-    {
-        if ($parser->consume(TOKEN_L_BRACE)) {
-            my @map;
-            while (1) {
-                my $parsedkey = $parser->consume(TOKEN_DQUOTE_STRING)
-                             || $parser->consume(TOKEN_SQUOTE_STRING)
-                             || $parser->consume(TOKEN_IDENT);
-
-                if ($parsedkey) {
-                    my $mapkey;
-
-                    if ($parsedkey->[0] == TOKEN_DQUOTE_STRING) {
-                        $parsedkey->[1] =~ s/^"|"$//g;
-                        $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
-                    } elsif ($parsedkey->[0] == TOKEN_SQUOTE_STRING) {
-                        $parsedkey->[1] =~ s/^'|'$//g;
-                        $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
-                    } else {
-                        $mapkey = $parsedkey;
-                    }
-
-                    if (not $parser->consume(TOKEN_COLON)) {
-                        expected($parser, '":" after map key');
-                    }
-
-                    my $expr = Expression($parser);
-
-                    if (not $expr) {
-                        expected($parser, 'expression for map value');
-                    }
-
-                    $parser->consume(TOKEN_COMMA);
-
-                    push @map, [$mapkey, $expr];
-                    next;
-                }
-
-                last if $parser->consume(TOKEN_R_BRACE);
-                expected($parser, 'map entry or `}` in map initializer');
-            }
-
-            $parser->advance;
-            return [INSTR_MAPINIT, \@map];
+        if (not $type) {
+            $type = ['TYPE', 'Any'];
         }
-    }
 
-    $parser->backtrack;
-}
+        my $initializer = Initializer($parser);
 
-# ArrayConstructor ::= "[" (Expression ","?)* "]"
-sub ArrayConstructor {
-    my ($parser) = @_;
-
-    $parser->try('ArrayConstructor');
-
-    {
-        if ($parser->consume(TOKEN_L_BRACKET)) {
-            my @array;
-            while (1) {
-                my $expr = Expression($parser);
-
-                if ($expr) {
-                    $parser->consume(TOKEN_COMMA);
-                    push @array, $expr;
-                    next;
-                }
-
-                last if $parser->consume(TOKEN_R_BRACKET);
-                expected($parser, 'expression or `]` in array initializer');
-            }
-
-            $parser->advance;
-            return [INSTR_ARRAYINIT, \@array];
-        }
+        $parser->advance;
+        return [INSTR_VAR, $type, $name, $initializer];
     }
 
     $parser->backtrack;
@@ -444,18 +474,25 @@ sub Initializer {
 
     $parser->try('Initializer');
 
-    {
-        if ($parser->consume(TOKEN_ASSIGN)) {
-            # try an expression
-            my $expr = Expression($parser);
+    if ($parser->consume(TOKEN_ASSIGN)) {
+        my $expr;
 
-            if ($expr) {
-                $parser->advance;
-                return $expr;
-            }
+        $expr = MapConstructor($parser);
 
-            expected($parser, 'expression for initializer');
+        if ($expr) {
+            $parser->advance;
+            return $expr;
         }
+
+        # try an expression
+        $expr = Expression($parser);
+
+        if ($expr) {
+            $parser->advance;
+            return $expr;
+        }
+
+        expected($parser, 'expression for initializer');
     }
 
     $parser->backtrack;
@@ -471,32 +508,32 @@ sub Type {
 
     $parser->try('Type');
 
-    {
-        my $typeunion = [];
+    my $typeunion = [];
 
-        my $type = TypeLiteral($parser);
-        goto TYPE_FAIL if not $type;
+    my $type = TypeLiteral($parser);
+    goto TYPE_FAIL if not $type;
 
-        while (1) {
-            push @$typeunion, $type;
+    while (1) {
+        push @$typeunion, $type;
 
-            if (not $parser->consume(TOKEN_PIPE)) {
-                last;
-            }
-
-            $type = TypeLiteral($parser);
-
-            if (not $type) {
-                expected($parser, 'type after "|"');
-            }
+        if (not $parser->consume(TOKEN_PIPE)) {
+            last;
         }
 
-        if (@$typeunion > 1) {
-            my @sorted = sort { $a->[1] cmp $b->[1] } @$typeunion;
-            return ['TYPEUNION', \@sorted];
-        } else {
-            return $type;
+        $type = TypeLiteral($parser);
+
+        if (not $type) {
+            expected($parser, 'type after "|"');
         }
+    }
+
+    $parser->advance;
+
+    if (@$typeunion > 1) {
+        my @sorted = sort { $a->[1] cmp $b->[1] } @$typeunion;
+        return ['TYPEUNION', \@sorted];
+    } else {
+        return $type;
     }
 
   TYPE_FAIL:
@@ -583,55 +620,37 @@ sub TypeFunctionReturn {
     return;
 }
 
-# FunctionDefinition ::= KEYWORD_fn IDENT? IdentifierList? ("->" Type)? (StatementGroup | Statement)
-sub FunctionDefinition {
+# KeywordFn ::= "fn" IDENT? IdentifierList? ("->" Type)? ExpressionGroup | Expression)
+sub KeywordFn {
     my ($parser) = @_;
 
-    $parser->try('FunctionDefinition');
+    $parser->try('KeywordFn');
 
-    {
-        if (consume_keyword($parser, 'fn')) {
-            my $token = $parser->consume(TOKEN_IDENT);
-            my $name  = $token ? $token->[1] : '#anonymous';
+    if (consume_keyword($parser, 'fn')) {
+        my $token = $parser->consume(TOKEN_IDENT);
+        my $name  = $token ? $token->[1] : '#anonymous';
 
-            my $identlist = IdentifierList($parser);
+        my $identlist = IdentifierList($parser);
 
-            $identlist = [] if not defined $identlist;
+        $identlist = [] if not defined $identlist;
 
-            my $return_type;
-            if ($parser->consume(TOKEN_R_ARROW)) {
-                $return_type = Type($parser);
-            }
-
-            $return_type = ['TYPE', 'Any'] if not defined $return_type;
-
-            $parser->try('FunctionDefinition body: StatementGroup');
-
-            {
-                my $statement_group = StatementGroup($parser);
-
-                if ($statement_group) {
-                    $parser->advance;
-                    return [INSTR_FUNCDEF, $return_type, $name, $identlist, $statement_group->[1]];
-                }
-            }
-
-            $parser->alternate('FunctionDefinition body: Statement');
-
-            {
-                my $statement = Statement($parser);
-
-                if ($statement) {
-                    $parser->advance;
-                    return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$statement]];
-                }
-            }
-
-            expected($parser, "Statement or StatementGroup for body of function $name");
+        my $return_type;
+        if ($parser->consume(TOKEN_R_ARROW)) {
+            $return_type = Type($parser);
         }
+
+        $return_type = ['TYPE', 'Any'] if not defined $return_type;
+
+        my $expression = Expression($parser);
+
+        if ($expression) {
+            $parser->advance;
+            return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$expression]];
+        }
+
+        expected($parser, "Expression for body of function $name");
     }
 
-  FUNCDEF_FAIL:
     $parser->backtrack;
 }
 
@@ -641,294 +660,124 @@ sub IdentifierList {
 
     $parser->try('IdentifierList');
 
-    {
-        goto IDENTLIST_FAIL if not $parser->consume(TOKEN_L_PAREN);
+    goto IDENTLIST_FAIL if not $parser->consume(TOKEN_L_PAREN);
 
-        my $identlist = [];
-        while (1) {
-            if (my $token = $parser->consume(TOKEN_IDENT)) {
-                my $name = $token->[1];
+    my $identlist = [];
+    while (1) {
+        if (my $token = $parser->consume(TOKEN_IDENT)) {
+            my $name = $token->[1];
 
-                my $type;
-                if ($parser->consume(TOKEN_COLON)) {
-                    $type = Type($parser);
+            my $type;
+            if ($parser->consume(TOKEN_COLON)) {
+                $type = Type($parser);
 
-                    if (not $type) {
-                        expected($parser, "type after \":\" for parameter `$name`");
-                    }
+                if (not $type) {
+                    expected($parser, "type after \":\" for parameter `$name`");
                 }
-
-                $type = ['TYPE', 'Any'] if not $type;
-
-                my $initializer = Initializer($parser);
-                push @{$identlist}, [$type, $name, $initializer];
-                $parser->consume(TOKEN_COMMA);
-                next;
             }
 
-            last if $parser->consume(TOKEN_R_PAREN);
-            goto IDENTLIST_FAIL;
+            $type = ['TYPE', 'Any'] if not $type;
+
+            my $initializer = Initializer($parser);
+            push @{$identlist}, [$type, $name, $initializer];
+            $parser->consume(TOKEN_COMMA);
+            next;
         }
 
-        $parser->advance;
-        return $identlist;
+        last if $parser->consume(TOKEN_R_PAREN);
+        goto IDENTLIST_FAIL;
     }
+
+    $parser->advance;
+    return $identlist;
 
   IDENTLIST_FAIL:
     $parser->backtrack;
 }
 
-# ReturnStatement ::= KEYWORD_return Statement
-sub ReturnStatement {
+# MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
+#         String ::= DQUOTE_STRING | SQUOTE_STRING
+sub MapConstructor {
     my ($parser) = @_;
 
-    $parser->try('ReturnStatement');
+    $parser->try('MapConstructor');
 
-    {
-        if (consume_keyword($parser, 'return')) {
-            my $statement = Statement($parser);
-            $parser->advance;
-            return [INSTR_RET, $statement];
-        }
-    }
+    if ($parser->consume(TOKEN_L_BRACE)) {
+        my @map;
+        while (1) {
+            my $parsedkey = $parser->consume(TOKEN_DQUOTE_STRING)
+            || $parser->consume(TOKEN_SQUOTE_STRING)
+            || $parser->consume(TOKEN_IDENT);
 
-    $parser->backtrack;
-}
+            if ($parsedkey) {
+                my $mapkey;
 
-# NextStatement ::= KEYWORD_next
-sub NextStatement {
-    my ($parser) = @_;
+                if ($parsedkey->[0] == TOKEN_DQUOTE_STRING) {
+                    $parsedkey->[1] =~ s/^"|"$//g;
+                    $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
+                } elsif ($parsedkey->[0] == TOKEN_SQUOTE_STRING) {
+                    $parsedkey->[1] =~ s/^'|'$//g;
+                    $mapkey = [['TYPE', 'String'], $parsedkey->[1]];
+                } else {
+                    $mapkey = $parsedkey;
+                }
 
-    $parser->try('NextStatement');
+                if (not $parser->consume(TOKEN_COLON)) {
+                    expected($parser, '":" after map key');
+                }
 
-    {
-        if (consume_keyword($parser, 'next')) {
-            $parser->advance;
-            return [INSTR_NEXT, undef];
-        }
-    }
+                my $expr = Expression($parser);
 
-    $parser->backtrack;
-}
+                if (not $expr) {
+                    expected($parser, 'expression for map value');
+                }
 
-# LastStatement ::= KEYWORD_last
-sub LastStatement {
-    my ($parser) = @_;
+                $parser->consume(TOKEN_COMMA);
 
-    $parser->try('LastStatement');
-
-    {
-        if (consume_keyword($parser, 'last')) {
-            $parser->advance;
-            return [INSTR_LAST, undef];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# WhileStatement ::= KEYWORD_while "(" Expression ")" Statement
-sub WhileStatement {
-    my ($parser) = @_;
-
-    $parser->try('WhileStatement');
-
-    {
-        if (consume_keyword($parser, 'while')) {
-            if (not $parser->consume(TOKEN_L_PAREN)) {
-                expected($parser, "'(' after `while` keyword");
+                push @map, [$mapkey, $expr];
+                next;
             }
 
+            last if $parser->consume(TOKEN_R_BRACE);
+            expected($parser, 'map entry or `}` in map initializer');
+        }
+
+        $parser->advance;
+        return [INSTR_MAPINIT, \@map];
+    }
+
+    $parser->backtrack;
+}
+
+# ArrayConstructor ::= "[" (Expression ","?)* "]"
+sub ArrayConstructor {
+    my ($parser) = @_;
+
+    $parser->try('ArrayConstructor');
+
+    if ($parser->consume(TOKEN_L_BRACKET)) {
+        my @array;
+        while (1) {
             my $expr = Expression($parser);
 
-            if (not $expr) {
-                expected($parser, "expression for `while` condition");
+            if ($expr) {
+                $parser->consume(TOKEN_COMMA);
+                push @array, $expr;
+                next;
             }
 
-            if (not $parser->consume(TOKEN_R_PAREN)) {
-                expected($parser, "')' after `while` condition expression");
-            }
-
-            my $body = Statement($parser);
-
-            if (not $body) {
-                expected($parser, "statement body for `while` loop");
-            }
-
-            $parser->advance;
-            return [INSTR_WHILE, $expr, $body];
+            last if $parser->consume(TOKEN_R_BRACKET);
+            expected($parser, 'expression or `]` in array initializer');
         }
+
+        $parser->advance;
+        return [INSTR_ARRAYINIT, \@array];
     }
 
     $parser->backtrack;
 }
 
-# IfExpression ::= KEYWORD_if Expression KEYWORD_then Statement KEYWORD_else Statement
-sub IfExpression {
-    my ($parser) = @_;
-
-    $parser->try('IfExpression');
-
-    {
-        if (consume_keyword($parser, 'if')) {
-            my $expr = Expression($parser);
-
-            if (not $expr) {
-                expected($parser, "expression for `if` condition");
-            }
-
-            if (not consume_keyword($parser, 'then')) {
-                expected($parser, "`then` after `if` condition expression");
-            }
-
-            my $body = Statement($parser);
-
-            if (not $body) {
-                expected($parser, "statement body for `if` statement");
-            }
-
-            if (not consume_keyword($parser, 'else')) {
-                expected($parser, "`else` branch for `if` condition expression");
-            }
-
-            my $else = Statement($parser);
-
-            if (not $else) {
-                expected($parser, "statement body for `else` branch of `if` condition expression");
-            }
-
-            $parser->advance;
-            return [INSTR_IF, $expr, $body, $else];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# error about an `else` without an `if`
-sub ElseWithoutIf {
-    my ($parser) = @_;
-
-    if (consume_keyword($parser, 'else')) {
-        error($parser, "`else` without matching `if`");
-    }
-
-    return;
-}
-
-# ExistsStatement ::= KEYWORD_exists Statement
-sub ExistsStatement {
-    my ($parser) = @_;
-
-    $parser->try('ExistsStatement');
-
-    {
-        if (consume_keyword($parser, 'exists')) {
-            my $map = MapConstructor($parser);
-            return [INSTR_EXISTS, $map] if $map;
-
-            my $statement = Statement($parser);
-
-            if (not $statement or not defined $statement->[1]) {
-                expected($parser, "statement after exists keyword");
-            }
-
-            $parser->advance;
-            return [INSTR_EXISTS, $statement->[1]];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# DeleteExpression ::= KEYWORD_delete Statement
-sub DeleteExpression {
-    my ($parser) = @_;
-
-    $parser->try('DeleteExpression');
-
-    {
-        if (consume_keyword($parser, 'delete')) {
-            my $map = MapConstructor($parser);
-            return [INSTR_DELETE, $map] if $map;
-
-            my $statement = Statement($parser);
-
-            if (not $statement or not defined $statement->[1]) {
-                expected($parser, "statement after delete keyword");
-            }
-
-            $parser->advance;
-            return [INSTR_DELETE, $statement->[1]];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# KeysExpression ::= KEYWORD_keys Statement
-sub KeysExpression {
-    my ($parser) = @_;
-
-    $parser->try('KeysExpression');
-
-    {
-        if (consume_keyword($parser, 'keys')) {
-            my $map = MapConstructor($parser);
-            return [INSTR_KEYS, $map] if $map;
-
-            my $statement = Statement($parser);
-
-            if (not $statement or not defined $statement->[1]) {
-                expected($parser, "statement after keys keyword");
-            }
-
-            $parser->advance;
-            return [INSTR_KEYS, $statement->[1]];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# ValuesExpression ::= KEYWORD_values Statement
-sub ValuesExpression {
-    my ($parser) = @_;
-
-    $parser->try('ValuesExpression');
-
-    {
-        if (consume_keyword($parser, 'values')) {
-            my $map = MapConstructor($parser);
-            return [INSTR_VALUES, $map] if $map;
-
-            my $statement = Statement($parser);
-
-            if (not $statement or not defined $statement->[1]) {
-                expected($parser, "statement after values keyword");
-            }
-
-            $parser->advance;
-            return [INSTR_VALUES, $statement->[1]];
-        }
-    }
-
-    $parser->backtrack;
-}
-
-# error about unexpected keywords
-sub UnexpectedKeyword {
-    my ($parser) = @_;
-
-    my $token = $parser->next_token('peek');
-    return if not $token;
-
-    if ($token->[0] == TOKEN_KEYWORD) {
-        error($parser, "unexpected keyword `$token->[1]`");
-    }
-
-    return;
-}
+# Pratt parser for expressions
 
 my %precedence_table = (
     ACCESS      => 18,
@@ -994,7 +843,6 @@ use constant {
 
 my @binop_data;
 $binop_data[TOKEN_DOT]         = [INSTR_ACCESS,     'ACCESS',      ASSOC_LEFT];
-$binop_data[TOKEN_DOT]         = [INSTR_ACCESS,     'ACCESS',      ASSOC_LEFT];
 $binop_data[TOKEN_STAR_STAR]   = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
 $binop_data[TOKEN_CARET]       = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
 $binop_data[TOKEN_PERCENT]     = [INSTR_REM,        'EXPONENT',    ASSOC_LEFT];
@@ -1045,6 +893,37 @@ sub BinaryOp {
     }
 }
 
+# ExpressionGroup ::= L_BRACE Expression* R_BRACE
+sub ExpressionGroup {
+    my ($parser) = @_;
+
+    $parser->try('ExpressionGroup: L_BRACE Expression R_BRACE');
+
+    {
+        goto EXPRESSION_GROUP_FAIL if not $parser->consume(TOKEN_L_BRACE);
+
+        my @expressions;
+
+        while (1) {
+            my $expression = Expression($parser);
+
+            if ($expression) {
+                push @expressions, $expression unless $expression->[0] == INSTR_NOP;
+                next;
+            }
+
+            last if $parser->consume(TOKEN_R_BRACE);
+            goto EXPRESSION_GROUP_FAIL;
+        }
+
+        $parser->advance;
+        return [INSTR_EXPR_GROUP, \@expressions];
+    }
+
+  EXPRESSION_GROUP_FAIL:
+    $parser->backtrack;
+}
+
 sub Expression {
     my ($parser, $precedence) = @_;
 
@@ -1065,6 +944,8 @@ sub Expression {
 
             $left = Infix($parser, $left, $token_precedence);
         }
+
+        $parser->consume(TOKEN_TERM);
 
         $parser->advance;
         return $left;
@@ -1098,21 +979,138 @@ sub LiteralFloat {
     return [INSTR_LITERAL, ['TYPE', 'Real'], $token->[1] + 0];
 }
 
-sub LiteralHex {
+sub LiteralHexInteger {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_HEX);
-    return [INSTR_LITERAL, ['TYPE', 'Number'], hex $token->[1]];
+    return [INSTR_LITERAL, ['TYPE', 'Integer'], hex $token->[1]];
+}
+
+sub PrefixRBrace {
+    my ($parser) = @_;
+
+    my $expr = ExpressionGroup($parser);
+    return $expr if defined $expr;
+
+    $expr = MapConstructor($parser);
+    return $expr if defined $expr;
+
+    error($parser, "Unhandled { token");
+}
+
+sub PrefixSquoteStringI {
+    my ($parser) = @_;
+    my $token = $parser->consume(TOKEN_SQUOTE_STRING_I);
+    $token->[1] =~ s/^\$//;
+    $token->[1] =~ s/^\'|\'$//g;
+    return [INSTR_STRING_I, $token->[1]];
+}
+
+sub expand_escapes {
+    my ($string) = @_;
+    $string =~ s/\\(
+    (?:[arnt'"\\]) |               # Single char escapes
+    (?:[ul].) |                    # uc or lc next char
+    (?:x[0-9a-fA-F]{2}) |          # 2 digit hex escape
+    (?:x\{[0-9a-fA-F]+\}) |        # more than 2 digit hex
+    (?:\d{2,3}) |                  # octal
+    (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
+    )/"qq|\\$1|"/geex;
+    return $string;
+}
+
+sub PrefixDquoteStringI {
+    my ($parser) = @_;
+    my $token = $parser->consume(TOKEN_DQUOTE_STRING_I);
+    $token->[1] =~ s/^\$//;
+    $token->[1] =~ s/^\"|\"$//g;
+    return [INSTR_STRING_I, expand_escapes($token->[1])];
+}
+
+sub PrefixSquoteString {
+    my ($parser) = @_;
+    my $token = $parser->consume(TOKEN_SQUOTE_STRING);
+    $token->[1] =~ s/^\'|\'$//g;
+    return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
+}
+
+sub PrefixDquoteString {
+    my ($parser) = @_;
+    my $token = $parser->consume(TOKEN_DQUOTE_STRING);
+    $token->[1] =~ s/^\"|\"$//g;
+    return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
+}
+
+sub PrefixMinusMinus {
+    my ($parser) = @_;
+    $parser->consume(TOKEN_MINUS_MINUS);
+    my $expr = Expression($parser, $precedence_table{'PREFIX'});
+    expected($parser, 'Expression') if not defined $expr;
+    return [INSTR_PREFIX_SUB, $expr];
+}
+
+sub PrefixPlusPlus {
+    my ($parser) = @_;
+    $parser->consume(TOKEN_PLUS_PLUS);
+    my $expr = Expression($parser, $precedence_table{'PREFIX'});
+    expected($parser, 'Expression') if not defined $expr;
+    return [INSTR_PREFIX_ADD, $expr];
+}
+
+sub PrefixBang {
+    my ($parser) = @_;
+    return UnaryOp($parser, TOKEN_BANG, INSTR_NOT);
+}
+
+sub PrefixMinus {
+    my ($parser) = @_;
+    return UnaryOp($parser, TOKEN_MINUS, INSTR_NEG);
+}
+
+sub PrefixPlus {
+    my ($parser) = @_;
+    return UnaryOp($parser, TOKEN_PLUS,  INSTR_POS);
+}
+
+sub PrefixNot {
+    my ($parser) = @_;
+    return UnaryOp($parser, TOKEN_NOT,   INSTR_NOT);
+}
+
+sub PrefixLParen {
+    my ($parser) = @_;
+    $parser->consume(TOKEN_L_PAREN);
+    my $expr = Expression($parser);
+    expected($parser, '")"') if not $parser->consume(TOKEN_R_PAREN);
+    return $expr;
+}
+
+sub PrefixTerm {
+    my ($parser) = @_;
+    $parser->consume(TOKEN_TERM);
+    return [INSTR_NOP, undef];
 }
 
 my @prefix_dispatcher;
-$prefix_dispatcher[TOKEN_KEYWORD]   = \&StatementKeyword;
-$prefix_dispatcher[TOKEN_L_BRACE]   = \&MapConstructor;
-$prefix_dispatcher[TOKEN_L_BRACKET] = \&ArrayConstructor;
-$prefix_dispatcher[TOKEN_INT]       = \&LiteralInteger;
-$prefix_dispatcher[TOKEN_FLT]       = \&LiteralFloat;
-$prefix_dispatcher[TOKEN_HEX]       = \&LiteralHex;
-$prefix_dispatcher[TOKEN_TYPE]      = \&Type;
-$prefix_dispatcher[TOKEN_IDENT]     = \&Identifier;
+$prefix_dispatcher[TOKEN_KEYWORD]         = \&Keyword;
+$prefix_dispatcher[TOKEN_L_BRACE]         = \&PrefixRBrace;
+$prefix_dispatcher[TOKEN_L_BRACKET]       = \&ArrayConstructor;
+$prefix_dispatcher[TOKEN_INT]             = \&LiteralInteger;
+$prefix_dispatcher[TOKEN_FLT]             = \&LiteralFloat;
+$prefix_dispatcher[TOKEN_HEX]             = \&LiteralHexInteger;
+$prefix_dispatcher[TOKEN_TYPE]            = \&Type;
+$prefix_dispatcher[TOKEN_IDENT]           = \&Identifier;
+$prefix_dispatcher[TOKEN_SQUOTE_STRING_I] = \&PrefixSquoteStringI;
+$prefix_dispatcher[TOKEN_DQUOTE_STRING_I] = \&PrefixDquoteStringI;
+$prefix_dispatcher[TOKEN_SQUOTE_STRING]   = \&PrefixSquoteString;
+$prefix_dispatcher[TOKEN_DQUOTE_STRING]   = \&PrefixDquoteString;
+$prefix_dispatcher[TOKEN_MINUS_MINUS]     = \&PrefixMinusMinus;
+$prefix_dispatcher[TOKEN_PLUS_PLUS]       = \&PrefixPlusPlus;
+$prefix_dispatcher[TOKEN_BANG]            = \&PrefixBang;
+$prefix_dispatcher[TOKEN_PLUS]            = \&PrefixPlus;
+$prefix_dispatcher[TOKEN_MINUS]           = \&PrefixMinus;
+$prefix_dispatcher[TOKEN_NOT]             = \&PrefixNot;
+$prefix_dispatcher[TOKEN_L_PAREN]         = \&PrefixLParen;
+#$prefix_dispatcher[TOKEN_TERM]            = \&PrefixTerm;
 
 sub Prefix {
     my ($parser, $precedence) = @_;
@@ -1132,64 +1130,8 @@ sub Prefix {
 
     # no dispatch for token, handle edge cases
 
-    if ($token = $parser->consume(TOKEN_SQUOTE_STRING_I)) {
-        $token->[1] =~ s/^\$//;
-        $token->[1] =~ s/^\'|\'$//g;
-        return [INSTR_STRING_I, $token->[1]];
-    }
-
-    sub expand_escapes {
-        my ($string) = @_;
-        $string =~ s/\\(
-        (?:[arnt'"\\]) |               # Single char escapes
-        (?:[ul].) |                    # uc or lc next char
-        (?:x[0-9a-fA-F]{2}) |          # 2 digit hex escape
-        (?:x\{[0-9a-fA-F]+\}) |        # more than 2 digit hex
-        (?:\d{2,3}) |                  # octal
-        (?:N\{U\+[0-9a-fA-F]{2,4}\})   # unicode by hex
-        )/"qq|\\$1|"/geex;
-        return $string;
-    }
-
-    if ($token = $parser->consume(TOKEN_DQUOTE_STRING_I)) {
-        $token->[1] =~ s/^\$//;
-        $token->[1] =~ s/^\"|\"$//g;
-        return [INSTR_STRING_I, expand_escapes($token->[1])];
-    }
-
-    if ($token = $parser->consume(TOKEN_SQUOTE_STRING)) {
-        $token->[1] =~ s/^\'|\'$//g;
-        return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
-    }
-
-    if ($token = $parser->consume(TOKEN_DQUOTE_STRING)) {
-        $token->[1] =~ s/^\"|\"$//g;
-        return [INSTR_LITERAL, ['TYPE', 'String'], expand_escapes($token->[1])];
-    }
-
-    if ($parser->consume(TOKEN_MINUS_MINUS)) {
-        my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        expected($parser, 'Expression') if not defined $expr;
-        return [INSTR_PREFIX_SUB, $expr];
-    }
-
-    if ($parser->consume(TOKEN_PLUS_PLUS)) {
-        my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        expected($parser, 'Expression') if not defined $expr;
-        return [INSTR_PREFIX_ADD, $expr];
-    }
-
-    my $expr;
-    return $expr if $expr = UnaryOp($parser, TOKEN_BANG,  INSTR_NOT);
-    return $expr if $expr = UnaryOp($parser, TOKEN_MINUS, INSTR_NEG);
-    return $expr if $expr = UnaryOp($parser, TOKEN_PLUS,  INSTR_POS);
-    return $expr if $expr = UnaryOp($parser, TOKEN_NOT,   INSTR_NOT);
-
-    if ($token = $parser->consume(TOKEN_L_PAREN)) {
-        my $expr = Expression($parser);
-        expected($parser, '")"') if not $parser->consume(TOKEN_R_PAREN);
-        return $expr;
-    }
+    # throw exception on unexpected keyword
+    UnexpectedKeyword($parser);
 
     return;
 }
@@ -1215,7 +1157,7 @@ sub Infix {
     if ($token->[0] == TOKEN_QUESTION) {
         $parser->consume;
 
-        my $then = Statement($parser);
+        my $then = Expression($parser);
 
         if (not $then) {
             expected($parser, '<then> statement in conditional <if> ? <then> : <else> operator');
@@ -1225,7 +1167,7 @@ sub Infix {
             expected($parser, '":" after <then> statement in conditional <if> ? <then> : <else> operator');
         }
 
-        my $else = Statement($parser);
+        my $else = Expression($parser);
 
         if (not $else) {
             expected($parser, '<else> statement in conditional <if> ? <then> : <else> operator');
@@ -1271,9 +1213,9 @@ sub Postfix {
 
     # array/map access
     if ($parser->consume(TOKEN_L_BRACKET)) {
-        my $stmt = Statement($parser);
+        my $expression = Expression($parser);
 
-        if (not $stmt or not defined $stmt->[1]) {
+        if (not $expression or not defined $expression->[1]) {
             expected($parser, 'statement in postfix [] brackets');
         }
 
@@ -1281,7 +1223,7 @@ sub Postfix {
             expected($parser, 'closing ] bracket');
         }
 
-        return [INSTR_ACCESS, $left, $stmt];
+        return [INSTR_ACCESS, $left, $expression];
     }
 
     # no postfix
