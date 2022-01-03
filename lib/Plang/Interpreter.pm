@@ -12,10 +12,13 @@ use strict;
 
 use Plang::Lexer;
 use Plang::Parser;
-use Plang::Grammar qw/Program/;
+use Plang::ParseRules qw/Program/;
 use Plang::Types;
 use Plang::Validator;
 use Plang::AstInterpreter;
+
+use Plang::Constants::Tokens   ':all';
+use Plang::Constants::Keywords ':all';
 
 sub new {
     my ($class, %args) = @_;
@@ -48,83 +51,78 @@ sub initialize {
 
     $self->{lexer}->define_tokens(
         # [ TOKEN_TYPE,  MATCH REGEX,  OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
-        ['COMMENT_EOL',      qr{\G(   (?://|\#).*$        )}x,  \&discard],
-        ['COMMENT_INLINE',   qr{\G(   /\* .*? \*/         )}x,  \&discard],
-        ['COMMENT_MULTI',    qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  \&discard, sub { multiline_comment(@_) }],
-        ['DQUOTE_STRING_I',  qr{\G(   \$"(?:[^"\\]|\\.)*" )}x],
-        ['SQUOTE_STRING_I',  qr{\G(   \$'(?:[^'\\]|\\.)*' )}x],
-        ['DQUOTE_STRING',    qr{\G(   "(?:[^"\\]|\\.)*"   )}x],
-        ['SQUOTE_STRING',    qr{\G(   '(?:[^'\\]|\\.)*'   )}x],
-        ['EQ_TILDE',         qr{\G(   =~                  )}x],
-        ['BANG_TILDE',       qr{\G(   !~                  )}x],
-        ['NOT_EQ',           qr{\G(   !=                  )}x],
-        ['GREATER_EQ',       qr{\G(   >=                  )}x],
-        ['LESS_EQ',          qr{\G(   <=                  )}x],
-        ['EQ',               qr{\G(   ==                  )}x],
-        ['SLASH_EQ',         qr{\G(   /=                  )}x],
-        ['STAR_EQ',          qr{\G(   \*=                 )}x],
-        ['MINUS_EQ',         qr{\G(   -=                  )}x],
-        ['PLUS_EQ',          qr{\G(   \+=                 )}x],
-        ['DOT_EQ',           qr{\G(   \.=                 )}x],
-        ['PLUS_PLUS',        qr{\G(   \+\+                )}x],
-        ['STAR_STAR',        qr{\G(   \*\*                )}x],
-        ['MINUS_MINUS',      qr{\G(   --                  )}x],
-# !used ['L_ARROW',          qr{\G(   <-                  )}x],
-        ['R_ARROW',          qr{\G(   ->                  )}x],
-        ['ASSIGN',           qr{\G(   =                   )}x],
-        ['PLUS',             qr{\G(   \+                  )}x],
-        ['MINUS',            qr{\G(   -                   )}x],
-        ['GREATER',          qr{\G(   >                   )}x],
-        ['LESS',             qr{\G(   <                   )}x],
-        ['BANG',             qr{\G(   !                   )}x],
-        ['QUESTION',         qr{\G(   \?                  )}x],
-        ['COLON',            qr{\G(   :                   )}x],
-# !used ['TILDE_TILDE',      qr{\G(   ~~                  )}x],
-        ['TILDE',            qr{\G(   ~                   )}x],
-        ['PIPE_PIPE',        qr{\G(   \|\|                )}x],
-        ['PIPE',             qr{\G(   \|                  )}x],
-        ['AMP_AMP',          qr{\G(   &&                  )}x],
-# !used ['AMP',              qr{\G(   &                   )}x],
-        ['CARET_CARET',      qr{\G(   \^\^                )}x],
-        ['CARET',            qr{\G(   \^                  )}x],
-        ['PERCENT',          qr{\G(   %                   )}x],
-        ['POUND',            qr{\G(   \#                  )}x],
-        ['COMMA',            qr{\G(   ,                   )}x],
-        ['STAR',             qr{\G(   \*                  )}x],
-        ['SLASH',            qr{\G(   /                   )}x],
-        ['BSLASH',           qr{\G(   \\                  )}x],
-        ['L_BRACKET',        qr{\G(   \[                  )}x],
-        ['R_BRACKET',        qr{\G(   \]                  )}x],
-        ['L_PAREN',          qr{\G(   \(                  )}x],
-        ['R_PAREN',          qr{\G(   \)                  )}x],
-        ['L_BRACE',          qr{\G(   \{                  )}x],
-        ['R_BRACE',          qr{\G(   \}                  )}x],
-        ['HEX',              qr{\G(   0[xX][0-9a-fA-F]+   )}x],
-        ['FLT',              qr{\G(   [0-9]*(?:\.[0-9]*[eE][+-]?[0-9]+|\.[0-9]+|[eE][+-]?[0-9]+)  )}x],
-        ['INT',              qr{\G(   [0-9]+              )}x],
-        ['DOT_DOT',          qr{\G(   \.\.                )}x],
-        ['DOT',              qr{\G(   \.                  )}x],
-        ['NOT',              qr{\G(   not                 )}x],
-        ['AND',              qr{\G(   and                 )}x],
-        ['OR',               qr{\G(   or                  )}x],
-        ['IDENT',            qr{\G(   [A-Za-z_]\w*        )}x],
-        ['TERM',             qr{\G(   ;\n*                )}x],
-        ['WHITESPACE',       qr{\G(   \s+                 )}x,  \&discard],
-        ['OTHER',            qr{\G(   .                   )}x],
+        [TOKEN_COMMENT_EOL,      qr{\G(   (?://|\#).*$        )}x,  \&discard],
+        [TOKEN_COMMENT_INLINE,   qr{\G(   /\* .*? \*/         )}x,  \&discard],
+        [TOKEN_COMMENT_MULTI,    qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  \&discard, sub { multiline_comment(@_) }],
+        [TOKEN_DQUOTE_STRING_I,  qr{\G(   \$"(?:[^"\\]|\\.)*" )}x],
+        [TOKEN_SQUOTE_STRING_I,  qr{\G(   \$'(?:[^'\\]|\\.)*' )}x],
+        [TOKEN_DQUOTE_STRING,    qr{\G(   "(?:[^"\\]|\\.)*"   )}x],
+        [TOKEN_SQUOTE_STRING,    qr{\G(   '(?:[^'\\]|\\.)*'   )}x],
+        [TOKEN_EQ_TILDE,         qr{\G(   =~                  )}x],
+        [TOKEN_BANG_TILDE,       qr{\G(   !~                  )}x],
+        [TOKEN_NOT_EQ,           qr{\G(   !=                  )}x],
+        [TOKEN_GREATER_EQ,       qr{\G(   >=                  )}x],
+        [TOKEN_LESS_EQ,          qr{\G(   <=                  )}x],
+        [TOKEN_EQ,               qr{\G(   ==                  )}x],
+        [TOKEN_SLASH_EQ,         qr{\G(   /=                  )}x],
+        [TOKEN_STAR_EQ,          qr{\G(   \*=                 )}x],
+        [TOKEN_MINUS_EQ,         qr{\G(   -=                  )}x],
+        [TOKEN_PLUS_EQ,          qr{\G(   \+=                 )}x],
+        [TOKEN_DOT_EQ,           qr{\G(   \.=                 )}x],
+        [TOKEN_PLUS_PLUS,        qr{\G(   \+\+                )}x],
+        [TOKEN_STAR_STAR,        qr{\G(   \*\*                )}x],
+        [TOKEN_MINUS_MINUS,      qr{\G(   --                  )}x],
+# !used [TOKEN_L_ARROW,          qr{\G(   <-                  )}x],
+        [TOKEN_R_ARROW,          qr{\G(   ->                  )}x],
+        [TOKEN_ASSIGN,           qr{\G(   =                   )}x],
+        [TOKEN_PLUS,             qr{\G(   \+                  )}x],
+        [TOKEN_MINUS,            qr{\G(   -                   )}x],
+        [TOKEN_GREATER,          qr{\G(   >                   )}x],
+        [TOKEN_LESS,             qr{\G(   <                   )}x],
+        [TOKEN_BANG,             qr{\G(   !                   )}x],
+        [TOKEN_QUESTION,         qr{\G(   \?                  )}x],
+# !used [TOKEN_COLON_COLON,      qr{\G(   ::                  )}x],
+        [TOKEN_COLON,            qr{\G(   :                   )}x],
+# !used [TOKEN_TILDE_TILDE,      qr{\G(   ~~                  )}x],
+        [TOKEN_TILDE,            qr{\G(   ~                   )}x],
+        [TOKEN_PIPE_PIPE,        qr{\G(   \|\|                )}x],
+        [TOKEN_PIPE,             qr{\G(   \|                  )}x],
+        [TOKEN_AMP_AMP,          qr{\G(   &&                  )}x],
+# !used [TOKEN_AMP,              qr{\G(   &                   )}x],
+# !used [TOKEN_CARET_CARET_EQ,   qr{\G(   \^\^=               )}x],
+        [TOKEN_CARET_CARET,      qr{\G(   \^\^                )}x],
+        [TOKEN_CARET,            qr{\G(   \^                  )}x],
+        [TOKEN_PERCENT,          qr{\G(   %                   )}x],
+        [TOKEN_POUND,            qr{\G(   \#                  )}x],
+        [TOKEN_COMMA,            qr{\G(   ,                   )}x],
+        [TOKEN_STAR,             qr{\G(   \*                  )}x],
+        [TOKEN_SLASH,            qr{\G(   /                   )}x],
+        [TOKEN_BSLASH,           qr{\G(   \\                  )}x],
+        [TOKEN_L_BRACKET,        qr{\G(   \[                  )}x],
+        [TOKEN_R_BRACKET,        qr{\G(   \]                  )}x],
+        [TOKEN_L_PAREN,          qr{\G(   \(                  )}x],
+        [TOKEN_R_PAREN,          qr{\G(   \)                  )}x],
+        [TOKEN_L_BRACE,          qr{\G(   \{                  )}x],
+        [TOKEN_R_BRACE,          qr{\G(   \}                  )}x],
+        [TOKEN_HEX,              qr{\G(   0[xX][0-9a-fA-F]+   )}x],
+        [TOKEN_FLT,              qr{\G(   [0-9]*(?:\.[0-9]*[eE][+-]?[0-9]+|\.[0-9]+|[eE][+-]?[0-9]+)  )}x],
+        [TOKEN_INT,              qr{\G(   [0-9]+              )}x],
+        [TOKEN_DOT_DOT,          qr{\G(   \.\.                )}x],
+        [TOKEN_DOT,              qr{\G(   \.                  )}x],
+        [TOKEN_NOT,              qr{\G(   not                 )}x],
+        [TOKEN_AND,              qr{\G(   and                 )}x],
+        [TOKEN_OR,               qr{\G(   or                  )}x],
+        [TOKEN_IDENT,            qr{\G(   [A-Za-z_]\w*        )}x],
+        [TOKEN_TERM,             qr{\G(   ;\n*                )}x],
+        [TOKEN_WHITESPACE,       qr{\G(   \s+                 )}x,  \&discard],
+        [TOKEN_OTHER,            qr{\G(   .                   )}x],
     );
 
     $self->{parser} = Plang::Parser->new(debug => $conf{debug});
 
     $self->{parser}->add_rule(\&Program);
 
-    $self->{parser}->define_keywords(
-        'var', 'true', 'false', 'null',
-        'fn', 'return',
-        'while', 'next', 'last',
-        'if', 'then', 'else',
-        'exists', 'delete',
-        'keys', 'values',
-    );
+    $self->{parser}->define_keywords(@pretty_keyword);
 
     $self->{types} = Plang::Types->new(debug => $conf{debug});
 
@@ -206,6 +204,11 @@ sub handle_parse_errors {
     }
 
     return;
+}
+
+sub reset_parser {
+    my ($self) = @_;
+    $self->{lexer}->reset_lexer;
 }
 
 sub validate {

@@ -75,15 +75,15 @@ $plang->add_builtin_function('test_eq',
 sub test_eq_func {
     my ($plang, $context, $name, $arguments) = @_;
 
-    my ($expected, $got) = ($arguments->[0], $arguments->[1]);
+    my ($got, $expected) = ($arguments->[0], $arguments->[1]);
     my $test = $arguments->[2]->[1];
 
-    if ($plang->identical_objects($expected, $got)) {
-        push @passed, [$test_file, $test, $expected, $got];
+    if ($plang->identical_objects($got, $expected)) {
+        push @passed, [$test_file, $test, $got, $expected];
         print '.';
         return [['TYPE', 'Boolean'], 1];
     } else {
-        push @failed, [$test_file, $test, $expected, $got];
+        push @failed, [$test_file, $test, $got, $expected];
         print 'X';
         return [['TYPE', 'Boolean'], 0];
     }
@@ -112,11 +112,11 @@ sub test_stdout_func {
     $output = ''; # reset output for next test
 
     if ($expected eq $got) {
-        push @passed, [$test_file, $test, $expected, $got];
+        push @passed, [$test_file, $test, $got, $expected];
         print '.';
         return [['TYPE', 'Boolean'], 1];
     } else {
-        push @failed, [$test_file, $test, $expected, $got];
+        push @failed, [$test_file, $test, $got, $expected];
         print 'X';
         return [['TYPE', 'Boolean'], 0];
     }
@@ -160,19 +160,21 @@ foreach my $test (@selected_tests) {
         }
     }
 
+    $plang->reset_parser;
+
     eval { $plang->interpret_string($code) };
 
     if (my $exception = $@) {
         if (defined $expected_error) {
             if ($exception eq $expected_error) {
-                push @passed, [$test_file, 'EXCEPTION', $expected_error, $exception];
+                push @passed, [$test_file, 'EXCEPTION', $exception, $expected_error];
                 print '.';
             } else {
-                push @failed, [$test_file, 'EXCEPTION', $expected_error, $exception];
+                push @failed, [$test_file, 'EXCEPTION', $exception, $expected_error];
                 print 'X';
             }
         } else {
-            push @failed, [$test_file, 'EXCEPTION', 'No exception', $exception];
+            push @failed, [$test_file, 'EXCEPTION', $exception, 'No exception'];
             print 'X';
         }
     }
@@ -189,8 +191,8 @@ unless ($ENV{QUIET}) {
     foreach my $failure (@failed) {
         print '-' x 70, "\n";
         print "FAIL $failure->[0]: $failure->[1]\n";
-        print "       Expected: ", Dumper($failure->[2]), "\n";
-        print "            Got: ", Dumper($failure->[3]), "\n";
+        print "       Expected: ", Dumper($failure->[3]), "\n";
+        print "            Got: ", Dumper($failure->[2]), "\n";
     }
 }
 

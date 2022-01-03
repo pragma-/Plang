@@ -82,7 +82,7 @@ sub error {
 sub unary_op {
     my ($self, $instr, $context, $data) = @_;
 
-    my $value = $self->statement($context, $data->[1]);
+    my $value = $self->evaluate($context, $data->[1]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0])) {
         return $value;
@@ -114,8 +114,8 @@ sub unary_op {
 sub binary_op {
     my ($self, $instr, $context, $data) = @_;
 
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
         return $left;
@@ -208,13 +208,13 @@ sub statement_group {
 
     $new_context->{while_loop} = $context->{while_loop};
 
-    return $self->interpret_ast($new_context, $data->[1]);
+    return $self->execute($new_context, $data->[1]);
 }
 
 sub is_truthy {
     my ($self, $context, $expr) = @_;
 
-    my $result = $self->statement($context, $expr);
+    my $result = $self->evaluate($context, $expr);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $result->[0])) {
         return 1;
@@ -232,7 +232,7 @@ sub type_check_prefix_postfix_op {
             $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
         }
 
-        my $var = $self->statement($context, $data->[1]);
+        my $var = $self->evaluate($context, $data->[1]);
 
         if ($self->{types}->is_arithmetic($var->[0])) {
             return $var;
@@ -282,8 +282,8 @@ sub type_check_op_assign {
         $self->error($context, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal");
     }
 
-    $left  = $self->statement($context, $left);
-    $right = $self->statement($context, $right);
+    $left  = $self->evaluate($context, $left);
+    $right = $self->evaluate($context, $right);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
         return $left;
@@ -337,7 +337,7 @@ sub variable_declaration {
     my $right_value = undef;
 
     if ($initializer) {
-        $right_value = $self->statement($context, $initializer);
+        $right_value = $self->evaluate($context, $initializer);
     } else {
         $right_value = [['TYPE', 'Null'], undef];
     }
@@ -398,7 +398,7 @@ sub map_constructor {
             }
 
             if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-                $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+                $hashref->{$var->[1]} = $self->evaluate($context, $entry->[1]);
                 next;
             }
 
@@ -406,7 +406,7 @@ sub map_constructor {
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
-            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
+            $hashref->{$entry->[0]->[1]} = $self->evaluate($context, $entry->[1]);
             next;
         }
 
@@ -421,11 +421,11 @@ sub keyword_exists {
 
     # check for key in map
     if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->statement($context, $data->[1]->[1]);
+        my $var = $self->evaluate($context, $data->[1]->[1]);
 
         # map index
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->statement($context, $data->[1]->[2]);
+            my $key = $self->evaluate($context, $data->[1]->[2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 if (exists $var->[1]->{$key->[1]}) {
@@ -449,11 +449,11 @@ sub keyword_delete {
 
     # delete one key in map
     if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->statement($context, $data->[1]->[1]);
+        my $var = $self->evaluate($context, $data->[1]->[1]);
 
         # map index
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->statement($context, $data->[1]->[2]);
+            my $key = $self->evaluate($context, $data->[1]->[2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 my $val = delete $var->[1]->{$key->[1]};
@@ -485,7 +485,7 @@ sub keyword_delete {
 sub keyword_keys {
     my ($self, $context, $data) = @_;
 
-    my $map = $self->statement($context, $data->[1]);
+    my $map = $self->evaluate($context, $data->[1]);
 
     if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
         $self->error($context, "keys must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
@@ -497,7 +497,7 @@ sub keyword_keys {
 sub keyword_values {
     my ($self, $context, $data) = @_;
 
-    my $map = $self->statement($context, $data->[1]);
+    my $map = $self->evaluate($context, $data->[1]);
 
     if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
         $self->error($context, "values must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
@@ -541,7 +541,7 @@ sub function_definition {
 
         push @$param_types, $type;
 
-        my $value = $self->statement($new_context, $default_value);
+        my $value = $self->evaluate($new_context, $default_value);
 
         if (not defined $value) {
             if ($got_default_value) {
@@ -567,7 +567,7 @@ sub function_definition {
     $new_context->{current_function} = $name;
 
     foreach my $statement (@$statements) {
-        $result = $self->statement($new_context, $statement);
+        $result = $self->evaluate($new_context, $statement);
 
         # handle a returned value
         if ($statement->[0] == INSTR_RET) {
@@ -636,7 +636,7 @@ sub process_function_call_arguments {
                 for (my $j = 0; $j < @$parameters; $j++) {
                     if ($parameters->[$j]->[1] eq $ident) {
                         $processed_arguments->[$j] = $value;
-                        $evaluated_arguments->[$j] = $self->statement($context, $value);
+                        $evaluated_arguments->[$j] = $self->evaluate($context, $value);
                         $context->{locals}->{$parameters->[$j]->[1]} = $evaluated_arguments->[$j];
                         $found = 1;
                         last;
@@ -652,7 +652,7 @@ sub process_function_call_arguments {
         } else {
             # normal argument
             $processed_arguments->[$i] = $arg;
-            $evaluated_arguments->[$i] = $self->statement($context, $arg);
+            $evaluated_arguments->[$i] = $self->evaluate($context, $arg);
             $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         }
     }
@@ -665,7 +665,7 @@ sub process_function_call_arguments {
         if (defined $parameters->[$i]->[2]) {
             # found default argument
             $processed_arguments->[$i] = $parameters->[$i]->[2];
-            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+            $evaluated_arguments->[$i] = $self->evaluate($context, $parameters->[$i]->[2]);
             $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         } else {
             # no argument or default argument
@@ -739,7 +739,7 @@ sub function_call {
         $name = "anonymous-1";
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->statement($context, $target);
+        $func = $self->evaluate($context, $target);
         $name = "anonymous-2";
 
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
@@ -778,7 +778,7 @@ sub function_call {
     # invoke the function
     $new_context->{current_function} = $name;
     foreach my $statement (@$statements) {
-        $return_value = $self->statement($new_context, $statement->[1]);
+        $return_value = $self->evaluate($new_context, $statement->[1]);
         last if $statement->[1]->[0] == INSTR_RET;
     }
 
@@ -843,7 +843,7 @@ sub keyword_return {
         $self->error($context, "cannot use `return` outside of function");
     }
 
-    return $self->statement($context, $data->[1]->[1]);
+    return $self->evaluate($context, $data->[1]->[1]);
 }
 
 sub conditional {
@@ -861,12 +861,12 @@ sub keyword_if {
     my $result;
 
     # validate then
-    $result = $self->statement($context, $data->[2]);
+    $result = $self->evaluate($context, $data->[2]);
     push @types, $result->[0];
 
     # validate else
     if (defined $data->[3]) {
-        $result = $self->statement($context, $data->[3]);
+        $result = $self->evaluate($context, $data->[3]);
         push @types, $result->[0];
     }
 
@@ -878,12 +878,12 @@ sub keyword_while {
     my ($self, $context, $data) = @_;
 
     # validate conditional
-    $self->statement($context, $data->[1]);
+    $self->evaluate($context, $data->[1]);
 
     $context->{while_loop} = 1;
 
     # validate statements
-    $self->statement($context, $data->[2]);
+    $self->evaluate($context, $data->[2]);
 
     delete $context->{while_loop};
 
@@ -913,7 +913,7 @@ sub keyword_last {
 # rvalue array/map access
 sub access_notation {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
 
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
@@ -922,7 +922,7 @@ sub access_notation {
             $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
         }
 
-        my $key = $self->statement($context, $data->[2]);
+        my $key = $self->evaluate($context, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
         return [['TYPE', 'Any'], 0] if not defined $val;
         return $val;
@@ -930,7 +930,7 @@ sub access_notation {
 
     # array index
     if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-        my $index = $self->statement($context, $data->[2]);
+        my $index = $self->evaluate($context, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
@@ -943,7 +943,7 @@ sub access_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->statement($context, $data->[2]->[1]);
+        my $value = $self->evaluate($context, $data->[2]->[1]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -963,7 +963,7 @@ sub assignment {
     my ($self, $context, $data) = @_;
 
     my $left_value  = $data->[1];
-    my $right_value = $self->statement($context, $data->[2]);
+    my $right_value = $self->evaluate($context, $data->[2]);
 
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
@@ -975,7 +975,7 @@ sub assignment {
 
     # lvalue array/map access
     if ($left_value->[0] == INSTR_ACCESS) {
-        my $var = $self->statement($context, $left_value->[1]);
+        my $var = $self->evaluate($context, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             # desugar x.y to x['y']
@@ -983,10 +983,10 @@ sub assignment {
                 $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2]->[1]];
             }
 
-            my $key = $self->statement($context, $left_value->[2]);
+            my $key = $self->evaluate($context, $left_value->[2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
-                my $val = $self->statement($context, $right_value);
+                my $val = $self->evaluate($context, $right_value);
                 $var->[1]->{$key->[1]} = $val;
                 return $val;
             }
@@ -995,10 +995,10 @@ sub assignment {
         }
 
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-            my $index = $self->statement($context, $left_value->[2]);
+            my $index = $self->evaluate($context, $left_value->[2]);
 
             if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
-                my $val = $self->statement($context, $right_value);
+                my $val = $self->evaluate($context, $right_value);
                 $var->[1]->[$index->[1]] = $val;
                 return $val;
             }
@@ -1007,7 +1007,7 @@ sub assignment {
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->statement($context, $left_value->[2]->[1]);
+            my $value = $self->evaluate($context, $left_value->[2]->[1]);
 
             if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
@@ -1052,14 +1052,14 @@ sub assignment {
     }
 
     # a statement
-    my $eval = $self->statement($context, $data->[1]);
+    my $eval = $self->evaluate($context, $data->[1]);
     $self->error($context, "cannot assign to non-lvalue type " . $self->{types}->to_string($eval->[0]));
 }
 
 # rvalue array/map index
 sub array_index_notation {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
 
     # infer type
     if ($self->{types}->check($var->[0], ['TYPE', 'Any'])) {
@@ -1068,7 +1068,7 @@ sub array_index_notation {
 
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        my $key = $self->statement($context, $data->[2]);
+        my $key = $self->evaluate($context, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
             my $val = $var->[1]->{$key->[1]};
@@ -1081,7 +1081,7 @@ sub array_index_notation {
 
     # array index
     if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-        my $index = $self->statement($context, $data->[2]);
+        my $index = $self->evaluate($context, $data->[2]);
 
         # number index
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
@@ -1097,7 +1097,7 @@ sub array_index_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->statement($context, $data->[2]->[1]);
+        my $value = $self->evaluate($context, $data->[2]->[1]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -1121,7 +1121,7 @@ sub array_index_notation {
     $self->error($context, "cannot use postfix [] on type " . $self->{types}->to_string($var->[0]));
 }
 
-sub handle_statement_result {
+sub handle_expression_result {
     my ($self, $result) = @_;
     return $result;
 }

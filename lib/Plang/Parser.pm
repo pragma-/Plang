@@ -6,7 +6,7 @@
 # types and rules defined by define_keywords(), define_types()
 # and add_rule(). Typically only the start-rule need be added.
 #
-# See Plang::Grammar::Program() for the start-rule for a Plang program.
+# See Plang::ParseRules::Program() for the start-rule for a Plang program.
 #
 # See Plang::Interpreter for token, keyword and type definitions.
 
@@ -15,11 +15,12 @@ package Plang::Parser;
 use warnings;
 use strict;
 
+use Plang::Constants::Tokens ':all';
+
 sub new {
-    my ($proto, %conf) = @_;
-    my $class = ref($proto) || $proto;
-    my $self  = bless {}, $class;
-    $self->initialize(%conf);
+    my ($class, %args) = @_;
+    my $self = bless {}, $class;
+    $self->initialize(%args);
     return $self;
 }
 
@@ -74,10 +75,10 @@ sub try {
         $self->{indent}++;
 
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->('BACKTRACK', "[$count] saving posiition $self->{current_token}: ");
+        $self->{dprint}->('BACKTRACK', "[$count] saving posiition $self->{current_token}\n");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
+        $self->{dprint}->('TOKEN', "Trying token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
     }
 }
 
@@ -88,11 +89,11 @@ sub backtrack {
     $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
-        my $count = @{$self->{backtrack}};
-        $self->{dprint}->('BACKTRACK', "[$count] backtracking to position $self->{current_token}: ");
+        my $count = @{$self->{backtrack}} + 1;
+        $self->{dprint}->('BACKTRACK', "[$count] backtracking to position $self->{current_token}\n");
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
+        $self->{dprint}->('TOKEN', "Backtracked to token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
@@ -133,22 +134,27 @@ sub next_token {
     $opt ||= '';
 
     if ($self->{debug}) {
-        $self->{dprint}->('TOKEN', "Fetching next token:\n");
-        $self->{dprint}->('TOKEN', "(peeking)\n") if $opt eq 'peek';
+        if ($opt eq 'peek') {
+            $self->{dprint}->('TOKEN', "Peeking next token:\n");
+        } else {
+            $self->{dprint}->('TOKEN', "Fetching next token:\n");
+        }
     }
 
     my $token;
 
     NEXT_TOKEN: {
-        if ($opt eq 'peek') {
+        if ($opt eq 'peek' and @{$self->{read_tokens}}) {
             # return token if we've already peeked a token
             $token = $self->{read_tokens}->[$self->{current_token}];
 
             if ($self->{debug} && defined $token) {
-                $self->{dprint}->('TOKEN', "peeked existing: [$token->[0], " . $self->{clean}->($token->[1]) . "]\n");
+                $self->{dprint}->('TOKEN', "Peeked existing token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n");
             }
 
-            return $token if defined $token;
+            if (defined $token) {
+                return $token;
+            }
         }
 
         # attempt to get a new token
@@ -162,21 +168,19 @@ sub next_token {
             redo NEXT_TOKEN;
         }
 
-        # is this token a keyword?
-        if ($token->[0] eq 'IDENT') {
+        if ($token->[0] == TOKEN_IDENT) {
+            # is this identifier a keyword?
             foreach my $keyword (@{$self->{keywords}}) {
                 if ($token->[1] eq $keyword) {
-                    $token->[0] = "KEYWORD_$keyword";
+                    $token->[0] = TOKEN_KEYWORD;
                     last;
                 }
             }
-        }
 
-        # is this token a type?
-        if ($token->[0] eq 'IDENT') {
-            foreach my $keyword (@{$self->{types}}) {
-                if ($token->[1] eq $keyword) {
-                    $token->[0] = "TYPE_$keyword";
+            # is this identifier a type?
+            foreach my $type (@{$self->{types}}) {
+                if ($token->[1] eq $type) {
+                    $token->[0] = TOKEN_TYPE;
                     last;
                 }
             }
@@ -190,7 +194,7 @@ sub next_token {
     $self->consume unless $opt eq 'peek';
 
     if ($self->{debug}) {
-        $self->{dprint}->('TOKEN', "[$token->[0], " . $self->{clean}->($token->[1]) . "], position: $self->{current_token}\n");
+        $self->{dprint}->('TOKEN', "Got new token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "], position: $self->{current_token}\n");
     }
 
     return $token;
@@ -218,7 +222,7 @@ sub consume {
         return $token;
     }
 
-    $self->{dprint}->('PARSER', "Looking for $wanted...\n") if $debug;
+    $self->{dprint}->('PARSER', "Looking for " . $pretty_token[$wanted] . "\n") if $debug;
 
     if ($token->[0] eq $wanted) {
         $self->{dprint}->('PARSER', "got it (" . $self->{clean}->($token->[1]) . ") <--\n") if $debug;
@@ -226,7 +230,7 @@ sub consume {
         return $token;
     }
 
-    $self->{dprint}->('PARSER', "got $token->[0] instead\n") if $debug;
+    $self->{dprint}->('PARSER', "got " . $pretty_token[$token->[0]] . " instead\n") if $debug;
     return;
 }
 
@@ -237,7 +241,7 @@ sub consume_to {
 
     my $debug = $self->{debug};
 
-    $self->{dprint}->('PARSER', "Consuming until $target\n") if $debug;
+    $self->{dprint}->('PARSER', "Consuming until $pretty_token[$target]\n") if $debug;
 
     while (1) {
         my $token = $self->next_token('peek');
@@ -245,10 +249,10 @@ sub consume_to {
         $self->{dprint}->('PARSER', "Peeked EOF\n") if $debug and not defined $token;
         return if not defined $token;
 
-        $self->{dprint}->('PARSER', "Consumed $token->[0] at position $self->{current_token}\n") if $debug;
+        $self->{dprint}->('PARSER', "Consumed $pretty_token[$token->[0]] at position $self->{current_token}\n") if $debug;
         $self->consume;
 
-        if ($token->[0] eq $target) {
+        if ($token->[0] == $target) {
             $self->{dprint}->('PARSER', "Got target.\n") if $debug;
             return;
         }

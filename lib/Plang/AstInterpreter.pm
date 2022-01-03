@@ -53,7 +53,7 @@ sub initialize {
 
     # main instructions
     $self->{instr_dispatch}->[INSTR_NOP]         = \&null_statement;
-    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&statement_group;
+    $self->{instr_dispatch}->[INSTR_STMT_GROUP]  = \&expression_group;
     $self->{instr_dispatch}->[INSTR_LITERAL]     = \&stmt_literal;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
     $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
@@ -178,7 +178,7 @@ sub variable_declaration {
     my $right_value = undef;
 
     if ($initializer) {
-        $right_value = $self->statement($context, $initializer);
+        $right_value = $self->evaluate($context, $initializer);
     } else {
         $right_value = [['TYPE', 'Null'], undef];
     }
@@ -196,11 +196,11 @@ sub process_function_call_arguments {
         if (not defined $arguments->[$i]) {
             # no argument provided, but there's guaranteed to be a default
             # argument here since validator caught missing arguments, etc
-            $evaluated_arguments->[$i] = $self->statement($context, $parameters->[$i]->[2]);
+            $evaluated_arguments->[$i] = $self->evaluate($context, $parameters->[$i]->[2]);
             $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         } else {
             # argument provided
-            $evaluated_arguments->[$i] = $self->statement($context, $arguments->[$i]);
+            $evaluated_arguments->[$i] = $self->evaluate($context, $arguments->[$i]);
             $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         }
     }
@@ -230,7 +230,7 @@ sub function_call {
         $func = $target;
     } else {
         $self->{dprint}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->statement($context, $target);
+        $func = $self->evaluate($context, $target);
     }
 
     my $closure    = $func->[1]->[0];
@@ -254,7 +254,7 @@ sub function_call {
 
     # invoke the function
     foreach my $stmt (@$statements) {
-        $result = $self->statement($new_context, $stmt);
+        $result = $self->evaluate($new_context, $stmt);
         last if $stmt->[0] == INSTR_RET;
     }
 
@@ -296,12 +296,12 @@ sub map_constructor {
     foreach my $entry (@$map) {
         if ($entry->[0]->[0] == INSTR_IDENT) {
             my $var = $self->get_variable($context, $entry->[0]->[1]);
-            $hashref->{$var->[1]} = $self->statement($context, $entry->[1]);
+            $hashref->{$var->[1]} = $self->evaluate($context, $entry->[1]);
             next;
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
-            $hashref->{$entry->[0]->[1]} = $self->statement($context, $entry->[1]);
+            $hashref->{$entry->[0]->[1]} = $self->evaluate($context, $entry->[1]);
             next;
         }
     }
@@ -316,7 +316,7 @@ sub array_constructor {
     my $arrayref = [];
 
     foreach my $entry (@$array) {
-        push @$arrayref, $self->statement($context, $entry);
+        push @$arrayref, $self->evaluate($context, $entry);
     }
 
     return [['TYPE', 'Array'], $arrayref];
@@ -325,8 +325,8 @@ sub array_constructor {
 sub keyword_exists {
     my ($self, $context, $data) = @_;
 
-    my $var = $self->statement($context, $data->[1]->[1]);
-    my $key = $self->statement($context, $data->[1]->[2]);
+    my $var = $self->evaluate($context, $data->[1]->[1]);
+    my $key = $self->evaluate($context, $data->[1]->[2]);
 
     if (exists $var->[1]->{$key->[1]}) {
         return [['TYPE', 'Boolean'], 1];
@@ -340,8 +340,8 @@ sub keyword_delete {
 
     # delete one key in map
     if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->statement($context, $data->[1]->[1]);
-        my $key = $self->statement($context, $data->[1]->[2]);
+        my $var = $self->evaluate($context, $data->[1]->[1]);
+        my $key = $self->evaluate($context, $data->[1]->[2]);
 
         my $val = delete $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef] if not defined $val;
@@ -359,7 +359,7 @@ sub keyword_delete {
 sub keyword_keys {
     my ($self, $context, $data) = @_;
 
-    my $map = $self->statement($context, $data->[1]);
+    my $map = $self->evaluate($context, $data->[1]);
 
     my $hash = $map->[1];
     my $list = [];
@@ -374,7 +374,7 @@ sub keyword_keys {
 sub keyword_values {
     my ($self, $context, $data) = @_;
 
-    my $map = $self->statement($context, $data->[1]);
+    my $map = $self->evaluate($context, $data->[1]);
 
     my $hash = $map->[1];
     my $list = [];
@@ -388,7 +388,7 @@ sub keyword_values {
 
 sub keyword_return {
     my ($self, $context, $data) = @_;
-    return $self->statement($context, $data->[1]->[1]);
+    return $self->evaluate($context, $data->[1]->[1]);
 }
 
 sub keyword_next {
@@ -409,7 +409,7 @@ sub keyword_while {
             $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
         }
 
-        my $result = $self->statement($context, $data->[2]);
+        my $result = $self->evaluate($context, $data->[2]);
 
         next if $result->[0] == INSTR_NEXT;
         last if $result->[0] == INSTR_LAST;
@@ -420,61 +420,61 @@ sub keyword_while {
 
 sub add_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
     $left->[1] += $right->[1];
     return $left;
 }
 
 sub sub_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
     $left->[1] -= $right->[1];
     return $left;
 }
 
 sub mul_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
     $left->[1] *= $right->[1];
     return $left;
 }
 
 sub div_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
     $left->[1] /= $right->[1];
     return $left;
 }
 
 sub cat_assign {
     my ($self, $context, $data) = @_;
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
     $left->[1] .= $right->[1];
     return $left;
 }
 
 sub prefix_increment {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
     $var->[1]++;
     return $var;
 }
 
 sub prefix_decrement {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
     $var->[1]--;
     return $var;
 }
 
 sub postfix_increment {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
     my $temp_var = [$var->[0], $var->[1]];
     $var->[1]++;
     return $temp_var;
@@ -482,7 +482,7 @@ sub postfix_increment {
 
 sub postfix_decrement {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
     my $temp_var = [$var->[0], $var->[1]];
     $var->[1]--;
     return $temp_var;
@@ -499,24 +499,24 @@ sub keyword_if {
     my ($self, $context, $data) = @_;
 
     if ($self->is_truthy($context, $data->[1])) {
-        return $self->statement($context, $data->[2]);
+        return $self->evaluate($context, $data->[2]);
     } else {
-        return $self->statement($context, $data->[3]);
+        return $self->evaluate($context, $data->[3]);
     }
 }
 
 sub logical_and {
     my ($self, $context, $data) = @_;
-    my $left_value = $self->statement($context, $data->[1]);
+    my $left_value = $self->evaluate($context, $data->[1]);
     return $left_value if not $self->is_truthy($context, $left_value);
-    return $self->statement($context, $data->[2]);
+    return $self->evaluate($context, $data->[2]);
 }
 
 sub logical_or {
     my ($self, $context, $data) = @_;
-    my $left_value = $self->statement($context, $data->[1]);
+    my $left_value = $self->evaluate($context, $data->[1]);
     return $left_value if $self->is_truthy($context, $left_value);
-    return $self->statement($context, $data->[2]);
+    return $self->evaluate($context, $data->[2]);
 }
 
 sub range_operator {
@@ -524,8 +524,8 @@ sub range_operator {
 
     my ($to, $from) = ($data->[1], $data->[2]);
 
-    $to   = $self->statement($context, $to);
-    $from = $self->statement($context, $from);
+    $to   = $self->evaluate($context, $to);
+    $from = $self->evaluate($context, $from);
 
     return [INSTR_RANGE, $to, $from];
 }
@@ -535,7 +535,7 @@ sub assignment {
     my ($self, $context, $data) = @_;
 
     my $left_value  = $data->[1];
-    my $right_value = $self->statement($context, $data->[2]);
+    my $right_value = $self->evaluate($context, $data->[2]);
 
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
@@ -546,24 +546,24 @@ sub assignment {
 
     # lvalue array/map access
     if ($left_value->[0] == INSTR_ACCESS) {
-        my $var = $self->statement($context, $left_value->[1]);
+        my $var = $self->evaluate($context, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->statement($context, $left_value->[2]);
-            my $val = $self->statement($context, $right_value);
+            my $key = $self->evaluate($context, $left_value->[2]);
+            my $val = $self->evaluate($context, $right_value);
             $var->[1]->{$key->[1]} = $val;
             return $val;
         }
 
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-            my $index = $self->statement($context, $left_value->[2]);
-            my $val = $self->statement($context, $right_value);
+            my $index = $self->evaluate($context, $left_value->[2]);
+            my $val = $self->evaluate($context, $right_value);
             $var->[1]->[$index->[1]] = $val;
             return $val;
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->statement($context, $left_value->[2]->[1]);
+            my $value = $self->evaluate($context, $left_value->[2]->[1]);
 
             if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
@@ -597,11 +597,11 @@ sub assignment {
 # rvalue array/map access
 sub access_notation {
     my ($self, $context, $data) = @_;
-    my $var = $self->statement($context, $data->[1]);
+    my $var = $self->evaluate($context, $data->[1]);
 
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        my $key = $self->statement($context, $data->[2]);
+        my $key = $self->evaluate($context, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef] if not defined $val;
         return $val;
@@ -609,7 +609,7 @@ sub access_notation {
 
     # array index
     if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-        my $index = $self->statement($context, $data->[2]);
+        my $index = $self->evaluate($context, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
@@ -622,7 +622,7 @@ sub access_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->statement($context, $data->[2]->[1]);
+        my $value = $self->evaluate($context, $data->[2]->[1]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -640,7 +640,7 @@ sub access_notation {
 sub unary_op {
     my ($self, $instr, $context, $data) = @_;
 
-    my $value = $self->statement($context, $data->[1]);
+    my $value = $self->evaluate($context, $data->[1]);
 
     my $result;
 
@@ -662,8 +662,8 @@ sub unary_op {
 sub binary_op {
     my ($self, $instr, $context, $data) = @_;
 
-    my $left  = $self->statement($context, $data->[1]);
-    my $right = $self->statement($context, $data->[2]);
+    my $left  = $self->evaluate($context, $data->[1]);
+    my $right = $self->evaluate($context, $data->[2]);
 
     # String operations
     if ($self->{types}->check(['TYPE', 'String'], $left->[0])
@@ -743,12 +743,12 @@ sub null_statement {
     return [['TYPE', 'Null'], undef];
 }
 
-sub statement_group {
+sub expression_group {
     my ($self, $context, $data) = @_;
-    return $self->interpret_ast($self->new_context($context), $data->[1]);
+    return $self->execute($self->new_context($context), $data->[1]);
 }
 
-sub statement {
+sub evaluate {
     my ($self, $context, $data) = @_;
 
     return if not $data;
@@ -761,7 +761,7 @@ sub statement {
     return $data if $ins !~ /^\d+$/;
 
     if ($ins == INSTR_STMT) {
-        return $self->statement($context, $data->[1]);
+        return $self->evaluate($context, $data->[1]);
     }
 
     if ($ins == INSTR_STRING_I) {
@@ -774,7 +774,7 @@ sub statement {
 sub is_truthy {
     my ($self, $context, $expr) = @_;
 
-    my $result = $self->statement($context, $expr);
+    my $result = $self->evaluate($context, $expr);
 
     if ($self->{types}->check(['TYPE', 'Null'], $result->[0])) {
         return 0;
@@ -904,7 +904,7 @@ sub introspect {
         foreach my $param (@{$value->[2]}) {
             my $param_type = $self->{types}->to_string($param->[0]);
             if (defined $param->[2]) {
-                my $default_value = $self->statement($self->new_context, $param->[2]);
+                my $default_value = $self->evaluate($self->new_context, $param->[2]);
                 push @params, "$param->[1]: $param_type = " . $self->output_value($default_value, literal => 1);
             } else {
                 push @params, "$param->[1]: $param_type";
@@ -1180,7 +1180,7 @@ sub function_builtin_Map {
             $self->error($context, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
         }
 
-        return $self->statement($context, $mapinit);
+        return $self->evaluate($context, $mapinit);
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Map");
@@ -1208,7 +1208,7 @@ sub function_builtin_Array {
             $self->error($context, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
         }
 
-        return $self->statement($context, $mapinit);
+        return $self->evaluate($context, $mapinit);
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
@@ -1273,7 +1273,7 @@ sub interpolate_string {
     while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
         my ($text, $interpolate) = ($1, $2);
         my $ast = $self->parse_string($interpolate);
-        my $result = $self->interpret_ast($context, $ast);
+        my $result = $self->execute($context, $ast);
         $new_string .= $text . $self->output_value($result);
     }
 
@@ -1418,7 +1418,7 @@ sub run {
     }
 
     # add built-in functions to global enviornment
-    foreach my $builtin (keys %function_builtins) {
+    foreach my $builtin (sort keys %function_builtins) {
         my $ret_type = $function_builtins{$builtin}{ret};
         my $param_types  = [];
         my $param_whatis = [];
@@ -1439,7 +1439,7 @@ sub run {
     my $statements = $program->[1];
 
     # interpret the statements
-    my $result = $self->interpret_ast($context, $statements);
+    my $result = $self->execute($context, $statements);
 
     # return result to parent program if we're embedded
     return $result if $self->{embedded};
@@ -1448,10 +1448,10 @@ sub run {
     return if not defined $result;
 
     # handle final statement (print last value of program if not Null)
-    return $self->handle_statement_result($result, 1);
+    return $self->handle_expression_result($result, 1);
 }
 
-sub interpret_ast {
+sub execute {
     my ($self, $context, $ast) = @_;
 
     $Data::Dumper::Indent = 0;
@@ -1459,18 +1459,20 @@ sub interpret_ast {
     $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n") if $self->{debug};
 
     # try
-    my $last_statement_result = eval {
+    my $last_expression_result = eval {
 
         my $result;
 
         foreach my $node (@$ast) {
             my $instruction = $node->[0];
 
-            if ($instruction == INSTR_STMT) {
-                $result = $self->statement($context, $node->[1]);
+            if ($instruction == INSTR_STMT_GROUP) {
+                return $self->execute($context, $node->[1]);
+            } elsif ($instruction == INSTR_STMT) {
+                $result = $self->evaluate($context, $node->[1]);
 
                 if (defined $result) {
-                    $result = $self->handle_statement_result($result);
+                    $result = $self->handle_expression_result($result);
                     $self->{dprint}->('AST', "Statement result: " . Dumper($result) . "\n") if $self->{debug};
                 } else {
                     $self->{dprint}->('AST', "Statement result: none\n") if $self->{debug};
@@ -1486,11 +1488,11 @@ sub interpret_ast {
     # catch
     die $@ if $@;
 
-    return $last_statement_result;
+    return $last_expression_result;
 }
 
 # handles one statement result
-sub handle_statement_result {
+sub handle_expression_result {
     my ($self, $result, $print_any) = @_;
 
     $print_any ||= 0;

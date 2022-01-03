@@ -12,22 +12,32 @@ use warnings;
 use strict;
 
 sub new {
-    my ($proto, %conf) = @_;
-    my $class = ref($proto) || $proto;
+    my ($class, %args) = @_;
     my $self  = bless {}, $class;
-    $self->initialize(%conf);
+    $self->initialize(%args);
     return $self;
 }
 
 sub initialize {
     my ($self, %conf) = @_;
+
     $self->{tokentypes} = [];
+
+    $self->{line} = 0;
+    $self->{col}  = 0;
 }
 
 # define our tokentypes
 sub define_tokens {
     my $self = shift;
     @{$self->{tokentypes}} = @_;
+}
+
+sub reset_lexer {
+    my ($self) = @_;
+
+    $self->{line} = 0;
+    $self->{col} = 0;
 }
 
 sub tokens {
@@ -38,9 +48,6 @@ sub tokens {
 
     # the current line being lexed
     my $text;
-
-    $self->{line} = 0;
-    $self->{col}  = 0;
 
     # closures are neat
     return sub {
@@ -59,7 +66,7 @@ sub tokens {
                         # got a token
                         my $literal = $1;
 
-                        $self->{col} = pos ($text) + 1;
+                        $self->{col}  = pos ($text) + 1;
                         $self->{col} -= length $literal;
 
                         # do we have a specific function to continue lexing this token?
@@ -87,10 +94,8 @@ sub tokens {
                         return [
                             $tokentype->[0],
                             $literal,
-                            {
-                                line    => $self->{line},
-                                col     => $self->{col},
-                            }
+                            $self->{line},
+                            $self->{col},
                         ];
                     }
                 }
