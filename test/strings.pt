@@ -3,11 +3,11 @@ test_eq("hello world" ~ "world", 6)
 test_eq("hello world" ~ "bye", -1)
 test_eq("hi " ^^ 0x263a, 'hi ☺')
 
-# XXX test_eq("Hello!"[1..4], 'ello')
+test_eq("Hello!"[1..4], 'ello')
 
 var s = "Good-bye!"
-# XXX s[5..7] = "night"
-# XXX test_eq(s, 'Good-night!')
+s[5..7] = "night"
+test_eq(s, 'Good-night!')
 
 s = "Hello!"
 s[0] = "Jee"

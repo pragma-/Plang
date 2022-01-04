@@ -145,11 +145,8 @@ sub Keyword {
 sub UnexpectedKeyword {
     my ($parser) = @_;
 
-    my $token = $parser->next_token('peek');
-    return if not $token;
-
     # if a keyword is found outside of Keyword() then it is unexpected
-    if ($token->[0] == TOKEN_KEYWORD) {
+    if (my $token = $parser->consume(TOKEN_KEYWORD)) {
         error($parser, "unexpected keyword `$token->[1]`");
     }
 
@@ -736,6 +733,7 @@ my %infix_token_precedence = (
     TOKEN_STAR_EQ     , $precedence_table{'ASSIGNMENT'},
     TOKEN_SLASH_EQ    , $precedence_table{'ASSIGNMENT'},
     TOKEN_DOT_EQ      , $precedence_table{'ASSIGNMENT'},
+    TOKEN_DOT_DOT     , $precedence_table{'COMMA'},
     TOKEN_NOT         , $precedence_table{'LOW_NOT'},
     TOKEN_AND         , $precedence_table{'LOW_AND'},
     TOKEN_OR          , $precedence_table{'LOW_OR'},
@@ -771,6 +769,7 @@ $binop_data[TOKEN_MINUS_EQ]    = [INSTR_SUB_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_STAR_EQ]     = [INSTR_MUL_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_SLASH_EQ]    = [INSTR_DIV_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_DOT_EQ]      = [INSTR_CAT_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_DOT_DOT]     = [INSTR_RANGE,      'COMMA',       ASSOC_RIGHT];
 $binop_data[TOKEN_AND]         = [INSTR_AND,        'LOW_AND',     ASSOC_LEFT];
 $binop_data[TOKEN_OR]          = [INSTR_OR,         'LOW_OR',      ASSOC_LEFT];
 
@@ -1015,7 +1014,6 @@ $prefix_dispatcher[TOKEN_PLUS]            = \&PrefixPlus;
 $prefix_dispatcher[TOKEN_MINUS]           = \&PrefixMinus;
 $prefix_dispatcher[TOKEN_NOT]             = \&PrefixNot;
 $prefix_dispatcher[TOKEN_L_PAREN]         = \&PrefixLParen;
-#$prefix_dispatcher[TOKEN_TERM]            = \&PrefixTerm;
 
 sub Prefix {
     my ($parser, $precedence) = @_;
@@ -1041,26 +1039,10 @@ sub Prefix {
     return;
 }
 
-sub Infix {
-    my ($parser, $left, $precedence) = @_;
+sub InfixConditionalOperator {
+    my ($parser, $left) = @_;
 
-    # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
-
-    # get token's binop data
-    my $data = $binop_data[$token->[0]];
-
-    # attempt to dispatch token
-    if (defined $data) {
-        my $result = BinaryOp($parser, $left, $token->[0], $data->[0], $data->[1], $data->[2]);
-        return $result if defined $result;
-    }
-
-    # no dispatch for token, handle edge cases
-
-    if ($token->[0] == TOKEN_QUESTION) {
-        $parser->consume;
+    if ($parser->consume(TOKEN_QUESTION)) {
 
         my $then = Expression($parser);
 
@@ -1080,6 +1062,28 @@ sub Infix {
 
         return [INSTR_COND, $left, $then, $else];
     }
+}
+
+sub Infix {
+    my ($parser, $left, $precedence) = @_;
+
+    # peek at upcoming token
+    my $token = $parser->next_token('peek');
+    return if not defined $token;
+
+    # get token's binop data
+    my $data = $binop_data[$token->[0]];
+
+    # attempt to dispatch token
+    if (defined $data) {
+        my $result = BinaryOp($parser, $left, $token->[0], $data->[0], $data->[1], $data->[2]);
+        return $result if defined $result;
+    }
+
+    # no dispatch for token, handle edge cases
+
+    $data = InfixConditionalOperator($parser, $left);
+    return $data if defined $data;
 
     return Postfix($parser, $left, $precedence);
 }
