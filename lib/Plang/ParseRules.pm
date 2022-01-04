@@ -520,15 +520,11 @@ sub TypeFunctionParams {
 sub TypeFunctionReturn {
     my ($parser) = @_;
 
-    my $token = $parser->next_token('peek');
-    return if not $token;
-
-    if ($token->[0] eq 'R_ARROW') {
-        $parser->consume;
+    if ($parser->consume(TOKEN_R_ARROW)) {
         my $type = TypeLiteral($parser);
 
         if (not $type) {
-            expected($parser, 'function return type name');
+            expected($parser, 'function return type');
         }
 
         return $type;
@@ -550,20 +546,17 @@ sub KeywordFn {
 
     $identlist = [] if not defined $identlist;
 
-    my $return_type;
-    if ($parser->consume(TOKEN_R_ARROW)) {
-        $return_type = Type($parser);
-    }
+    my $return_type = TypeFunctionReturn($parser);
 
     $return_type = ['TYPE', 'Any'] if not defined $return_type;
 
     my $expression = Expression($parser);
 
-    if ($expression) {
-        return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$expression]];
+    if (!defined $expression) {
+        expected($parser, "Expression for body of function $name");
     }
 
-    expected($parser, "Expression for body of function $name");
+    return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$expression]];
 }
 
 # IdentifierList ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
@@ -1091,51 +1084,79 @@ sub Infix {
     return Postfix($parser, $left, $precedence);
 }
 
+sub PostfixPlusPlus {
+    my ($parser, $left) = @_;
+    $parser->consume(TOKEN_PLUS_PLUS);
+    return [INSTR_POSTFIX_ADD, $left];
+}
+
+sub PostfixMinusMinus {
+    my ($parser, $left) = @_;
+    $parser->consume(TOKEN_MINUS_MINUS);
+    return [INSTR_POSTFIX_SUB, $left];
+}
+
+sub PostfixLParen {
+    my ($parser, $left) = @_;
+
+    $parser->consume(TOKEN_L_PAREN);
+
+    my $arguments = [];
+
+    while (1) {
+        my $expression = Expression($parser);
+
+        if ($expression) {
+            push @{$arguments}, $expression;
+            $parser->consume(TOKEN_COMMA);
+            next;
+        }
+
+        last if $parser->consume(TOKEN_R_PAREN);
+        expected($parser, 'expression or closing ")" for function call argument list');
+    }
+
+    return [INSTR_CALL, $left, $arguments];
+}
+
+sub PostfixLBracket {
+    my ($parser, $left) = @_;
+
+    $parser->consume(TOKEN_L_BRACKET);
+
+    my $expression = Expression($parser);
+
+    if (not $expression or not defined $expression->[1]) {
+        expected($parser, 'expression in postfix [] brackets');
+    }
+
+    if (not $parser->consume(TOKEN_R_BRACKET)) {
+        expected($parser, 'closing ] bracket');
+    }
+
+    return [INSTR_ACCESS, $left, $expression];
+}
+
+my @postfix_dispatcher;
+$postfix_dispatcher[TOKEN_PLUS_PLUS]   = \&PostfixPlusPlus;
+$postfix_dispatcher[TOKEN_MINUS_MINUS] = \&PostfixMinusMinus;
+$postfix_dispatcher[TOKEN_L_PAREN]     = \&PostfixLParen;
+$postfix_dispatcher[TOKEN_L_BRACKET]   = \&PostfixLBracket;
+
 sub Postfix {
     my ($parser, $left, $precedence) = @_;
 
-    # post-increment
-    if ($parser->consume(TOKEN_PLUS_PLUS)) {
-        return [INSTR_POSTFIX_ADD, $left];
-    }
+    # peek at upcoming token
+    my $token = $parser->next_token('peek');
+    return if not defined $token;
 
-    # post-decrement
-    if ($parser->consume(TOKEN_MINUS_MINUS)) {
-        return [INSTR_POSTFIX_SUB, $left];
-    }
+    # get token's dispatcher
+    my $dispatcher = $postfix_dispatcher[$token->[0]];
 
-    # function call
-    if ($parser->consume(TOKEN_L_PAREN)) {
-        my $arguments = [];
-        while (1) {
-            my $expr = Expression($parser);
-
-            if ($expr) {
-                push @{$arguments}, $expr;
-                $parser->consume(TOKEN_COMMA);
-                next;
-            }
-
-            last if $parser->consume(TOKEN_R_PAREN);
-            expected($parser, 'expression or closing ")" for function call argument list');
-        }
-
-        return [INSTR_CALL, $left, $arguments];
-    }
-
-    # array/map access
-    if ($parser->consume(TOKEN_L_BRACKET)) {
-        my $expression = Expression($parser);
-
-        if (not $expression or not defined $expression->[1]) {
-            expected($parser, 'expression in postfix [] brackets');
-        }
-
-        if (not $parser->consume(TOKEN_R_BRACKET)) {
-            expected($parser, 'closing ] bracket');
-        }
-
-        return [INSTR_ACCESS, $left, $expression];
+    # attempt to dispatch token
+    if (defined $dispatcher) {
+        my $result = $dispatcher->($parser, $left);
+        return $result if defined $result;
     }
 
     # no postfix
