@@ -5,13 +5,13 @@ This README describes what is implemented so far.
 
 <details><summary>Click to show table of contents</summary>
 
+  * [Project structure](#project-structure)
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
     * [REPL](#repl)
   * [Embedding Plang](#embedding-plang)
   * [Running the Unit Tests](#running-the-unit-tests)
   * [Example Plang scripts](#example-plang-scripts)
-  * [Project structure](#project-structure)
   * [The Plang Language (so far)](#the-plang-language-so-far)
     * [Identifiers](#identifiers)
       * [Keywords](#keywords)
@@ -77,6 +77,25 @@ This README describes what is implemented so far.
     * [JSON compatibility/serialization](#json-compatibilityserialization)
 
 </details>
+
+## Project structure
+Path | Description
+--- | ---
+[`bin/plang`](../bin/plang) | Plang executable entry point. Parses and interprets Plang programs from STDIN or command-line arguments.
+[`bin/plang_builtin`](../bin/plang_builtin) | Simple demonstration of creating user-defined built-in functions.
+[`bin/plang_repl`](../bin/plang_repl) | Read-evaluate-print-loop with persistent environment. Use this to play with Plang.
+[`bin/runtests`](../bin/runtests) | Verifies that Plang is working correctly by running the tests in the [`test`](../test) directory.
+[`doc/`](../doc/) | Plang documentation.
+[`examples/`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
+[`lib/Plang/AstInterpreter.pm`](../lib/Plang/AstInterpreter.pm) | At this early stage, Plang is a simple AST interpreter.
+[`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
+[`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
+[`lib/Plang/Parser.pm`](../lib/Plang/Parser.pm) | Generic abstract backtracking parser class that accepts a list of parse rules.
+[`lib/Plang/ParseRules.pm`](../lib/Plang/ParseRules.pm) | Recursive-descent rules to parse a stream of tokens into an AST.
+[`lib/Plang/Validator.pm`](../lib/Plang/Validator.pm) | Compile-time type-checking and semantic validation. Does some syntax desugaring.
+[`lib/Plang/Types.pm`](../lib/Plang/Types.pm) | Plang's simple yet evolving and growing type system.
+[`lib/Plang/Constants/`](../lib/Plang/Constants/) | Integer constants identifying various tokens, keywords and instructions.
+[`test/`](../test) | Plang test programs.
 
 ## Running Plang
 You may use the [`plang`](../bin/plang) executable to interpret Plang scripts.
@@ -169,28 +188,9 @@ A test failure looks like this:
 ## Example Plang scripts
 [Check out some examples!](../examples/)
 
-## Project structure
-Path | Description
---- | ---
-[`bin/plang`](../bin/plang) | Plang executable entry point. Parses and interprets Plang programs from STDIN or command-line arguments.
-[`bin/plang_builtin`](../bin/plang_builtin) | Simple demonstration of creating user-defined built-in functions.
-[`bin/plang_repl`](../bin/plang_repl) | Read-evaluate-print-loop with persistent environment. Use this to play with Plang.
-[`bin/runtests`](../bin/runtests) | Verifies that Plang is working correctly by running the tests in the [`test`](../test) directory.
-[`doc/`](../doc/) | Plang documentation.
-[`examples/`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
-[`lib/Plang/AstInterpreter.pm`](../lib/Plang/AstInterpreter.pm) | At this early stage, Plang is a simple AST interpreter.
-[`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
-[`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
-[`lib/Plang/Parser.pm`](../lib/Plang/Parser.pm) | Generic abstract backtracking parser class that accepts a list of parse rules.
-[`lib/Plang/ParseRules.pm`](../lib/Plang/ParseRules.pm) | Recursive-descent rules to parse a stream of tokens into an AST.
-[`lib/Plang/Validator.pm`](../lib/Plang/Validator.pm) | Compile-time type-checking and semantic validation. Does some syntax desugaring.
-[`lib/Plang/Types.pm`](../lib/Plang/Types.pm) | Plang's simple yet evolving and growing type system.
-[`lib/Plang/Constants/`](../lib/Plang/Constants/) | Integer constants identifying various tokens, keywords and instructions.
-[`test/`](../test) | Plang test programs.
-
 ## The Plang Language (so far)
 
-Plang is an expression-oriented language with optional type annotations.
+Plang is a strongly-typed expression-oriented language with optional type annotations.
 Everything in Plang evaluates to a value that can be used in an expression.
 
 ### Identifiers
@@ -259,12 +259,12 @@ A type annotation may be provided to enable strict compile-time type-checking.
     > var a: String = 5
      Validator error: cannot initialize `a` with value of type Integer (expected String)
 
-Attempting to use a variable that has not been declared will produce an error.
+Attempting to use a variable that has not been declared will produce a compile-time error.
 
     > var a = 5; a + b
      Validator error: `b` not declared.
 
-Variables that have not yet been assigned a value will produce an error.
+Variables that have not yet been assigned a value will produce a compile-time error.
 
     > var a = 5; var b; a + b
      Validator error: `b` not defined.
@@ -660,7 +660,7 @@ as the first argument:
 
 Because the first parameter of the `filter` function is explicitly typed to return a `Boolean` value,
 Plang can perform strict compile-time type checking on the return value of the passed argument. For
-example, if we pass it a function inferred instead to return an `Integer` we get a helpful type error:
+example, if we pass it a function inferred instead to return an `Integer` we get a helpful compile-time type error:
 
     > filter(fn(a) 4, [1, 2, 3, 4, 5])
      Validator error: in function call for `filter`, expected Function (Any) -> Boolean
@@ -688,7 +688,7 @@ to `Boolean`:
     > var a = true; type(a)
      "Boolean"
 
-It will then be a type error to assign a value of any other type to it.
+It will then be a compile-time type error to assign a value of any other type to it.
 
     > var a = true; a = "hello"
      Validator error: cannot assign to `a` a value of type String (expected Boolean)

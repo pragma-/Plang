@@ -14,4 +14,6 @@ to recurse, et cetera.
 
 Plang is in early development stage. There will be bugs. There will be abrupt design changes.
 
+See [Project Structure](doc/README.md#project-structure) for a description of how to navigate Plang's source tree.
+
 For more details see [the documentation](doc/).
