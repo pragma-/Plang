@@ -1,0 +1,3 @@
+fn f f # define function `f` that returns itself
+
+# Validator error: in definition of function `f`: self-referential infinite return type

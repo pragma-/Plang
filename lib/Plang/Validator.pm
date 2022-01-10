@@ -593,6 +593,11 @@ sub function_definition {
         $func_data->[1] = $type;
     }
 
+    # check for self-referential infinite return type
+    if ($type->[0] eq 'TYPEFUNC' && $type->[3] == $type) {
+        $self->error($new_context, "in definition of function `$name`: self-referential infinite return type");
+    }
+
     return $func;
 }
 
