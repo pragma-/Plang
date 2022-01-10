@@ -10,7 +10,7 @@ package Plang::ParseRules;
 use warnings;
 use strict;
 
-use base 'Exporter';
+use parent 'Exporter';
 our @EXPORT_OK = qw/Program/; # start-rule
 our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
 

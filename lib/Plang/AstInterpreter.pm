@@ -1454,12 +1454,12 @@ sub execute {
 
                     if ($self->{debug}) {
                         $Data::Dumper::Indent = 0;
-                        $self->{dprint}->('AST', "Expression result: " . Dumper($result) . "\n");
+                        $self->{dprint}->('EXPR', "Expression result: " . Dumper($result) . "\n");
                         $Data::Dumper::Indent = 1;
                     }
                 } else {
                     if ($self->{debug}) {
-                        $self->{dprint}->('AST', "Expression result: none\n");
+                        $self->{dprint}->('EXPR', "Expression result: none\n");
                     }
                 }
             }

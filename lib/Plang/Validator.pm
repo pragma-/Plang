@@ -509,9 +509,9 @@ sub keyword_values {
 sub function_definition {
     my ($self, $context, $data) = @_;
 
-    my $ret_type   = $data->[1];
-    my $name       = $data->[2];
-    my $parameters = $data->[3];
+    my $ret_type    = $data->[1];
+    my $name        = $data->[2];
+    my $parameters  = $data->[3];
     my $expressions = $data->[4];
 
     my $param_types = [];
