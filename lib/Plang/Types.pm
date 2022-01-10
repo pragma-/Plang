@@ -343,7 +343,8 @@ sub unite {
     return ['TYPE', 'Any'] if @union == 0;
 
     if (@union == 1) {
-        return $union[0];
+        # return reference to copy of original type reference to prevent self-referential recursion
+        return [@{$union[0]}];
     }
 
     return $self->make_typeunion(\@union);
