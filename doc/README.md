@@ -132,11 +132,24 @@ You can set the `DEBUG` environment variable to enable debugging output.
 
 The value is a comma-separated list of tags, or `ALL` for everything.
 
-Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `STMT`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
+Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `EXPR`, `EVAL`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
 
     $ DEBUG=PARSER,AST ./plang <<< '1 + 2'  # debug messages only for tags `PARSER` and `AST`
+        +-> Trying Program: Expression*
+        |  +-> Trying Expression (prec 0)
+        |  |  Looking for INT
+        |  |  Got it (1)
+        |  |  Looking for PLUS
+        |  |  Got it (+)
+        |  |  +-> Trying Expression (prec 12)
+        |  |  |  Looking for INT
+        |  |  |  Got it (2)
+        |  |  <- Advanced Expression (prec 12)
+        |  <- Advanced Expression (prec 0)
+        <- Advanced Program: Expression*
+        AST: [[ADD,[LITERAL,['TYPE','Integer'],1,{'col' => 1,'line' => 1}],[LITERAL,['TYPE','Integer'],2,{'col' => 5,'line' => 1}],{'col' => 3,'line' => 1}]];
+        3
 
-      TODO show output
 <!-- -->
     $ DEBUG=ALL ./plang <<< '1 + 2'         # all debug messages (output too verbose to show here)
 
