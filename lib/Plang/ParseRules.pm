@@ -316,7 +316,7 @@ sub KeywordExists {
         expected($parser, "expression after `exists` keyword");
     }
 
-    return [INSTR_EXISTS, $expression->[1], token_position($token)];
+    return [INSTR_EXISTS, $expression, token_position($token)];
 }
 
 # KeywordDelete ::= "delete" Expression
@@ -331,7 +331,7 @@ sub KeywordDelete {
         expected($parser, "expression after `delete` keyword");
     }
 
-    return [INSTR_DELETE, $expression->[1], token_position($token)];
+    return [INSTR_DELETE, $expression, token_position($token)];
 }
 
 # KeywordKeys ::= "keys" Expression
@@ -346,7 +346,7 @@ sub KeywordKeys {
         expected($parser, "expression after `keys` keyword");
     }
 
-    return [INSTR_KEYS, $expression->[1], token_position($token)];
+    return [INSTR_KEYS, $expression, token_position($token)];
 }
 
 # KeywordValues ::= KEYWORD_values Expression
@@ -361,7 +361,7 @@ sub KeywordValues {
         expected($parser, "expression after `values` keyword");
     }
 
-    return [INSTR_VALUES, $expression->[1], token_position($token)];
+    return [INSTR_VALUES, $expression, token_position($token)];
 }
 
 # KeywordVar ::= "var" IDENT (":" Type)? Initializer?

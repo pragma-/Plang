@@ -486,7 +486,6 @@ sub keyword_exists {
     if ($data->[1]->[0] == INSTR_ACCESS) {
         my $var = $self->evaluate($context, $data->[1]->[1]);
 
-        # map index
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->evaluate($context, $data->[1]->[2]);
 
@@ -501,10 +500,11 @@ sub keyword_exists {
             $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
         }
 
-        $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
+        $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")", $self->position($var));
     }
 
-    $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($data->[1]) . ")");
+    my $expr = $self->evaluate($context, $data->[1]);
+    $self->error($context, "exists must be used on a Map key (got " . $self->{types}->to_string($expr->[0]) . ")", $self->position($data->[1]));
 }
 
 sub keyword_delete {
@@ -514,7 +514,6 @@ sub keyword_delete {
     if ($data->[1]->[0] == INSTR_ACCESS) {
         my $var = $self->evaluate($context, $data->[1]->[1]);
 
-        # map index
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             my $key = $self->evaluate($context, $data->[1]->[2]);
 
@@ -524,22 +523,22 @@ sub keyword_delete {
                 return $val;
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($data->[1]->[2]));
         }
 
-        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
+        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")", $self->position($var));
     }
 
     # delete all keys in map
     if ($data->[1]->[0] == INSTR_IDENT) {
-        my $var = $self->get_variable($context, $data->[1]->[1]);
+        my $var = $self->evaluate($context, $data->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             $var->[1] = {};
             return $var;
         }
 
-        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
+        $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")", $self->position($data->[1]));
     }
 
     $self->error($context, "delete must be used on Maps (got " . $self->{types}->to_string($data->[1]) . ")");
@@ -551,7 +550,7 @@ sub keyword_keys {
     my $map = $self->evaluate($context, $data->[1]);
 
     if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
-        $self->error($context, "keys must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
+        $self->error($context, "keys must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")", $self->position($data->[1]));
     }
 
     return [['TYPE', 'Array'], []];
@@ -563,7 +562,7 @@ sub keyword_values {
     my $map = $self->evaluate($context, $data->[1]);
 
     if (not $self->{types}->check(['TYPE', 'Map'], $map->[0])) {
-        $self->error($context, "values must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")");
+        $self->error($context, "values must be used on Maps (got " . $self->{types}->to_string($map->[0]) . ")", $self->position($data->[1]));
     }
 
     return [['TYPE', 'Array'], []];
