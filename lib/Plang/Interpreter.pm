@@ -165,6 +165,7 @@ sub add_builtin_function {
 
 sub parse {
     my ($self, $input_iter) = @_;
+    $self->reset_parser;
     # iterates over tokens returned by lexer
     my $token_iter = $self->{lexer}->tokens($input_iter);
     $self->{ast}   = $self->{parser}->parse($token_iter);

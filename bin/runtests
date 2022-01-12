@@ -160,8 +160,6 @@ foreach my $test (@selected_tests) {
         }
     }
 
-    $plang->reset_parser;
-
     eval { $plang->interpret_string($code) };
 
     if (my $exception = $@) {
