@@ -1,6 +1,12 @@
 #!/usr/bin/env perl
 
-# Interprets a Plang syntax tree.
+# Interprets a Plang abstract syntax tree. Run-time type-checking and semantic
+# validation is kept to a minimum (this is handled at compile-time in
+# Validator.pm). The AST is pruned to the program data; source file line/col
+# information, etc, is not retained.
+#
+# The error() function in this module produces run-time errors (without
+# line/col information).
 
 package Plang::AstInterpreter;
 
@@ -24,20 +30,6 @@ sub initialize {
     $self->{ast}      = $conf{ast};
     $self->{embedded} = $conf{embedded} // 0;
     $self->{debug}    = $conf{debug}    // 0;
-
-    if ($self->{debug}) {
-        my @tags = split /,/, $self->{debug};
-        $self->{debug}  = \@tags;
-        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub {
-            my $tag = shift;
-            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
-        };
-        $self->{indent} = 0;
-    } else {
-        $self->{dprint} = sub {};
-        $self->{clean}  = sub {''};
-    }
 
     $self->{max_recursion}  = $conf{max_recursion}  // 10000;
     $self->{recursions}     = 0;
@@ -106,6 +98,21 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+
+    # set up debugging helpers
+    if ($self->{debug}) {
+        my @tags = split /,/, $self->{debug};
+        $self->{debug}  = \@tags;
+        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
+        $self->{dprint} = sub {
+            my $tag = shift;
+            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        };
+        $self->{indent} = 0;
+    } else {
+        $self->{dprint} = sub {};
+        $self->{clean}  = sub {''};
+    }
 }
 
 sub dispatch_instruction {
@@ -298,14 +305,19 @@ sub map_constructor {
     my $hashref = {};
 
     foreach my $entry (@$map) {
-        if ($entry->[0]->[0] == INSTR_IDENT) {
-            my $var = $self->get_variable($context, $entry->[0]->[1]);
-            $hashref->{$var->[1]} = $self->evaluate($context, $entry->[1]);
+        my $key   = $entry->[0];
+        my $value = $entry->[1];
+
+        # identifier
+        if ($key->[0] == INSTR_IDENT) {
+            my $var = $self->get_variable($context, $key->[1]);
+            $hashref->{$var->[1]} = $self->evaluate($context, $value);
             next;
         }
 
-        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
-            $hashref->{$entry->[0]->[1]} = $self->evaluate($context, $entry->[1]);
+        # string
+        if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
+            $hashref->{$key->[1]} = $self->evaluate($context, $value);
             next;
         }
     }
@@ -600,6 +612,7 @@ sub assignment {
 # rvalue array/map access
 sub access_notation {
     my ($self, $context, $data) = @_;
+
     my $var = $self->evaluate($context, $data->[1]);
 
     # map index
@@ -731,7 +744,6 @@ sub binary_op {
 sub identifier {
     my ($self, $context, $data) = @_;
     my $var = $self->get_variable($context, $data->[1]);
-    $self->error($context, "undeclared variable `$data->[1]`") if not defined $var;
     return $var;
 }
 
@@ -1481,15 +1493,15 @@ sub evaluate {
 
     return if not $data;
 
+    my $ins = $data->[0];
+    return $data if $ins !~ /^\d+$/;
+
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
-        $self->{dprint}->('EXPR', "expr: " . Dumper($data) . "\n");
+        $Data::Dumper::Terse = 1;
+        $self->{dprint}->('EVAL', "eval $pretty_instr[$ins]: " . Dumper($data) . "\n");
         $Data::Dumper::Indent = 1;
     }
-
-    my $ins = $data->[0];
-
-    return $data if $ins !~ /^\d+$/;
 
     if ($ins == INSTR_STRING_I) {
         return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];

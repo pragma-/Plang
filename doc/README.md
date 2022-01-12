@@ -134,7 +134,7 @@ The value is a comma-separated list of tags, or `ALL` for everything.
 
 Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `EXPR`, `EVAL`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
 
-    $ DEBUG=PARSER,AST ./plang <<< '1 + 2'  # debug messages only for tags `PARSER` and `AST`
+    $ DEBUG=PARSER,AST ./plang '1 + 2'  # debug messages only for tags `PARSER` and `AST`
         +-> Trying Program: Expression*
         |  +-> Trying Expression (prec 0)
         |  |  Looking for INT
@@ -151,7 +151,7 @@ Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, 
         3
 
 <!-- -->
-    $ DEBUG=ALL ./plang <<< '1 + 2'         # all debug messages (output too verbose to show here)
+    $ DEBUG=ALL ./plang '1 + 2'         # all debug messages (output too verbose to show here)
 
 ### REPL
 The [`plang_repl`](../bin/plang_repl) script can be used to start a REPL session.

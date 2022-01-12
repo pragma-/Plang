@@ -1,10 +1,14 @@
 #!/usr/bin/env perl
 
-# Validates a Plang syntax tree by performing static type-checking,
-# semantic-analysis, etc, so the interpreter need not concern itself
-# with these potentially expensive operations.
+# The validator pass happens once at compile-time immediately after parsing
+# a Plang program into a syntax tree. Static type-checking, semantic-analysis,
+# etc, is performed on the syntax tree so the run-time interpreter need not
+# concern itself with these potentially expensive operations.
 #
-# Also performs various syntax desugaring.
+# This module also does some syntax desugaring.
+#
+# The error() function in this module produces compile-time errors with
+# line/col information.
 
 package Plang::Validator;
 
@@ -24,7 +28,10 @@ sub initialize {
 
     # validate these main instructions
     $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
+    $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
+    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
+    $self->{instr_dispatch}->[INSTR_ARRAYINIT]   = \&array_constructor;
     $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
     $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
     $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
@@ -73,14 +80,34 @@ sub initialize {
 }
 
 sub error {
-    my ($self, $context, $err_msg) = @_;
+    my ($self, $context, $err_msg, $position) = @_;
+
     chomp $err_msg;
+
+    if (defined $position) {
+        my $line = $position->{line};
+        my $col  = $position->{col};
+
+        if (defined $line) {
+            $err_msg .= " at line $line, col $col";
+        } else {
+            $err_msg .= " at EOF";
+        }
+    }
+
     $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Validator error: $err_msg\n";
 }
 
+sub position {
+    my ($self, $data) = @_;
+    return $data->[@$data - 1]; # position information is always the last element
+}
+
 sub unary_op {
     my ($self, $instr, $context, $data) = @_;
+
+    my $pos = $data->[2];
 
     my $value = $self->evaluate($context, $data->[1]);
 
@@ -98,7 +125,7 @@ sub unary_op {
         } elsif ($instr == INSTR_POS) {
             $result = [['TYPE', 'Number'], + $value->[1]];
         } else {
-            $self->error($context, "Unknown unary operator $instr");
+            $self->error($context, "Unknown unary operator $pretty_instr[$instr]", $pos);
         }
 
         if ($self->{types}->is_subtype($value->[0], $result->[0])) {
@@ -108,11 +135,13 @@ sub unary_op {
         return $result;
     }
 
-    $self->error($context, "cannot apply unary operator $pretty_instr[$instr] to type " . $self->{types}->to_string($value->[0]) . "\n");
+    $self->error($context, "cannot apply unary operator $pretty_instr[$instr] to type " . $self->{types}->to_string($value->[0]) . "\n", $pos);
 }
 
 sub binary_op {
     my ($self, $instr, $context, $data) = @_;
+
+    my $pos = $data->[3];
 
     my $left  = $self->evaluate($context, $data->[1]);
     my $right = $self->evaluate($context, $data->[2]);
@@ -151,11 +180,11 @@ sub binary_op {
     # Number operations
 
     if (not $self->{types}->is_arithmetic($left->[0])) {
-        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($left->[0]));
+        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos);
     }
 
     if (not $self->{types}->is_arithmetic($right->[0])) {
-        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($right->[0]));
+        $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos);
     }
 
     if ($self->{types}->check($left->[0], $right->[0]) or $self->{types}->check($right->[0], $left->[0])) {
@@ -185,20 +214,20 @@ sub binary_op {
             $result = [['TYPE', 'Boolean'], $left->[1]  > $right->[1]];
         } elsif ($instr == INSTR_GTE) {
             $result = [['TYPE', 'Boolean'], $left->[1] >= $right->[1]];
-        } else {
-            $self->error($context, "Unknown binary operator $instr");
         }
 
-        my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
+        if (defined $result) {
+            my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
 
-        if ($self->{types}->is_subtype($promotion, $result->[0])) {
-            $result->[0] = $promotion;
+            if ($self->{types}->is_subtype($promotion, $result->[0])) {
+                $result->[0] = $promotion;
+            }
+
+            return $result;
         }
-
-        return $result;
     }
 
-    $self->error($context, "cannot apply binary operator $pretty_instr[$instr] (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
+    $self->error($context, "cannot apply binary operator $pretty_instr[$instr] (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")", $pos);
 }
 
 sub expression_group {
@@ -226,9 +255,11 @@ sub is_truthy {
 sub type_check_prefix_postfix_op {
     my ($self, $context, $data, $op) = @_;
 
+    my $pos = $self->position($data);
+
     if ($data->[1]->[0] == INSTR_IDENT or $data->[1]->[0] == INSTR_ACCESS && $data->[1]->[1]->[0] == INSTR_IDENT) {
         # desugar x.y to x['y']
-        if (defined $data->[2] and $data->[2]->[0] == INSTR_IDENT) {
+        if (defined $data->[2] && ref($data->[2]) eq 'ARRAY' && $data->[2]->[0] == INSTR_IDENT) {
             $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
         }
 
@@ -238,18 +269,18 @@ sub type_check_prefix_postfix_op {
             return $var;
         }
 
-        $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($var->[0]));
+        $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($var->[0]), $pos);
     }
 
     if ($data->[1]->[0] == INSTR_LITERAL) {
-        $self->error($context, "cannot apply $op to a " . $self->{types}->to_string($data->[1]->[1]) . " literal");
+        $self->error($context, "cannot apply $op to a " . $self->{types}->to_string($data->[1]->[1]) . " literal", $pos);
     }
 
     if (ref ($data->[1]->[0]) ne 'ARRAY') {
-        $self->error($context, "cannot apply $op to instruction " . $pretty_instr[$data->[1]->[0]]);
+        $self->error($context, "cannot apply $op to instruction " . $pretty_instr[$data->[1]->[0]], $pos);
     }
 
-    $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($data->[1]->[0]));
+    $self->error($context, "cannot apply $op to type " . $self->{types}->to_string($data->[1]->[0]), $pos);
 }
 
 sub prefix_increment {
@@ -278,8 +309,11 @@ sub type_check_op_assign {
     my $left  = $data->[1];
     my $right = $data->[2];
 
+    my $pos_left  = $self->position($left);
+    my $pos_right = $self->position($right);
+
     if ($left->[0] == INSTR_LITERAL) {
-        $self->error($context, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal");
+        $self->error($context, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal", $pos_left);
     }
 
     $left  = $self->evaluate($context, $left);
@@ -294,18 +328,18 @@ sub type_check_op_assign {
     }
 
     if (not $self->{types}->is_arithmetic($left->[0])) {
-        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]));
+        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos_left);
     }
 
     if (not $self->{types}->is_arithmetic($right->[0])) {
-        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]));
+        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos_right);
     }
 
     if ($self->{types}->check($left->[0], $right->[0])) {
         return $left;
     }
 
-    $self->error($context, "cannot apply operator $op (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")");
+    $self->error($context, "cannot apply operator $op (have types " . $self->{types}->to_string($left->[0]) . " and " . $self->{types}->to_string($right->[0]) . ")", $pos_left);
 }
 
 sub add_assign {
@@ -328,6 +362,21 @@ sub div_assign {
     $self->type_check_op_assign($context, $data, 'DIV');
 }
 
+sub identifier {
+    my ($self, $context, $data) = @_;
+    my $var = $self->get_variable($context, $data->[1]);
+    $self->error($context, "undeclared variable `$data->[1]`", $data->[2]) if not defined $var;
+    return $var;
+}
+
+sub literal {
+    my ($self, $context, $data) = @_;
+    my $type  = $data->[1];
+    my $value = $data->[2];
+    my $pos   = $data->[3];
+    return [$type, $value, $pos];
+}
+
 sub variable_declaration {
     my ($self, $context, $data) = @_;
 
@@ -344,18 +393,18 @@ sub variable_declaration {
 
     if (!$self->{repl} and (my $var = $self->get_variable($context, $name, locals_only => 1))) {
         if ($var->[0] ne 'Builtin') {
-            $self->error($context, "cannot redeclare existing local `$name`");
+            $self->error($context, "cannot redeclare existing local `$name`", $self->position($data));
         }
     }
 
     if ($self->get_builtin_function($name)) {
-        $self->error($context, "cannot override builtin function `$name`");
+        $self->error($context, "cannot override builtin function `$name`", $self->position($data));
     }
 
     if (not $self->{types}->check($type, $right_value->[0])) {
         $self->error($context, "cannot initialize `$name` with value of type "
             . $self->{types}->to_string($right_value->[0])
-            . " (expected " . $self->{types}->to_string($type) . ")");
+            . " (expected " . $self->{types}->to_string($type) . ")", $self->position($data));
     }
 
     if ($self->{types}->check($type, ['TYPE', 'Any'])) {
@@ -377,10 +426,24 @@ sub set_variable {
     if (defined $guard and not $self->{types}->check($guard, $value->[0])) {
         $self->error($context, "cannot assign to `$name` a value of type "
             . $self->{types}->to_string($value->[0])
-            . " (expected " . $self->{types}->to_string($guard) . ")");
+            . " (expected " . $self->{types}->to_string($guard) . ")", $self->position($value));
     }
 
     $context->{locals}->{$name} = $value;
+}
+
+sub array_constructor {
+    my ($self, $context, $data) = @_;
+
+    my $array    = $data->[1];
+    my $pos      = $data->[2];
+    my $arrayref = [];
+
+    foreach my $entry (@$array) {
+        push @$arrayref, $self->evaluate($context, $entry);
+    }
+
+    return [['TYPE', 'Array'], $arrayref, $pos];
 }
 
 sub map_constructor {
@@ -394,7 +457,7 @@ sub map_constructor {
             my $var = $self->get_variable($context, $entry->[0]->[1]);
 
             if (not defined $var) {
-                $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key");
+                $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key", $self->position($entry->[0]));
             }
 
             if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
@@ -402,7 +465,7 @@ sub map_constructor {
                 next;
             }
 
-            $self->error($context, "cannot use type `" . $self->{types}->to_string($var->[0]) . "` as Map key");
+            $self->error($context, "cannot use type `" . $self->{types}->to_string($var->[0]) . "` as Map key", $self->position($entry->[0]));
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
@@ -410,7 +473,7 @@ sub map_constructor {
             next;
         }
 
-        $self->error($context, "cannot use type `" . $self->{types}->to_string($entry->[0]->[0]) . "` as Map key");
+        $self->error($context, "cannot use type `" . $self->{types}->to_string($entry->[0]->[0]) . "` as Map key", $self->position($entry->[0]));
     }
 
     return [['TYPE', 'Map'], $hashref];
@@ -435,7 +498,7 @@ sub keyword_exists {
                 }
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
         }
 
         $self->error($context, "exists must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")");
@@ -513,22 +576,23 @@ sub function_definition {
     my $name        = $data->[2];
     my $parameters  = $data->[3];
     my $expressions = $data->[4];
+    my $pos         = $data->[5];
 
     my $param_types = [];
     my $func_type   = ['TYPEFUNC', 'Function', $param_types, $ret_type];
     my $func_data   = [$context, $ret_type, $parameters, $expressions];
-    my $func        = [$func_type, $func_data];
+    my $func        = [$func_type, $func_data, $pos];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
     }
 
-    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0] ne 'Builtin') {
-        $self->error($context, "cannot define function `$name` with same name as existing local");
+    if (!$self->{repl} and exists $context->{locals}->{$name} and $context->{locals}->{$name}->[0]->[1] ne 'Builtin') {
+        $self->error($context, "cannot define function `$name` with same name as existing local", $pos);
     }
 
     if ($self->get_builtin_function($name)) {
-        $self->error($context, "cannot redefine builtin function `$name`");
+        $self->error($context, "cannot redefine builtin function `$name`", $pos);
     }
 
     $context->{locals}->{$name} = $func;
@@ -545,7 +609,7 @@ sub function_definition {
 
         if (not defined $value) {
             if ($got_default_value) {
-                $self->error($new_context, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value");
+                $self->error($new_context, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value", $self->position($param));
             }
 
             $value = [$type, 0];
@@ -553,7 +617,7 @@ sub function_definition {
             $got_default_value = 1;
 
             if (not $self->{types}->check($type, $value->[0])) {
-                $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]));
+                $self->error($new_context, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]), $self->position($value));
             }
         }
 
@@ -561,29 +625,49 @@ sub function_definition {
     }
 
     # infer return type
-    my @return_types;
+    my @return_values;
     my $result;
+    my $expr_pos;
 
     $new_context->{current_function} = $name;
 
     foreach my $expression (@$expressions) {
+        $expr_pos = $self->position($expression);
         $result = $self->evaluate($new_context, $expression);
 
-        # handle a returned value
+        # make note of a returned value
         if ($expression->[0] == INSTR_RET) {
-            push @return_types, $result->[0];
+            push @return_values, [$result, $expr_pos];
         }
     }
 
-    push @return_types, $result->[0];
-
     delete $new_context->{current_function};
+
+    # add final statement to return values
+    push @return_values, [$result, $expr_pos];
+
+    # type check return types
+    my @return_types;
+
+    my $ret_is_any = $self->{types}->is_equal($ret_type, ['TYPE', 'Any']);
+
+    foreach my $entry (@return_values) {
+        my ($value, $pos) = @$entry;
+        my $type = $value->[0];
+
+        # check for self-referential return value
+        if ($ret_is_any && $type->[0] eq 'TYPEFUNC' && $type->[3] == $func_type->[3]) {
+            $self->error($new_context, "in definition of function `$name`: self-referential return type", $pos);
+        }
+
+        # add type to list of return types
+        push @return_types, $value->[0];
+    }
 
     my $type = $self->{types}->unite(\@return_types);
 
-    # type check return type
     if (not $self->{types}->check($ret_type, $type)) {
-        $self->error($new_context, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type));
+        $self->error($new_context, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type), $pos);
     }
 
     # update with inferred return type if original return type is Any
@@ -593,22 +677,17 @@ sub function_definition {
         $func_data->[1] = $type;
     }
 
-    # check for self-referential infinite return type
-    if ($type->[0] eq 'TYPEFUNC' && $type->[3] == $type) {
-        $self->error($new_context, "in definition of function `$name`: self-referential infinite return type");
-    }
-
     return $func;
 }
 
 sub validate_function_argument_type {
-    my ($self, $context, $name, $parameter, $arg_type, %opts) = @_;
+    my ($self, $context, $name, $parameter, $arg_type, $pos) = @_;
 
     my $type1 = $parameter->[0];
     my $type2 = $arg_type;
 
     if (not $self->{types}->check($type1, $type2)) {
-        $self->error($context, "in function call for `$name`, expected " . $self->{types}->to_string($type1) . " for parameter `$parameter->[1]` but got " . $self->{types}->to_string($type2));
+        $self->error($context, "in function call for `$name`, expected " . $self->{types}->to_string($type1) . " for parameter `$parameter->[1]` but got " . $self->{types}->to_string($type2), $pos);
     }
 }
 
@@ -616,7 +695,7 @@ sub process_function_call_arguments {
     my ($self, $context, $name, $parameters, $arguments, $data) = @_;
 
     if (@$arguments > @$parameters) {
-        $self->error($context, "extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")");
+        $self->error($context, "extra arguments provided to function `$name` (takes " . @$parameters . " but passed " . @$arguments . ")", $self->position($data));
     }
 
     my $evaluated_arguments;
@@ -628,7 +707,7 @@ sub process_function_call_arguments {
             # named argument
             if (not defined $parameters->[$i]->[2]) {
                 # ensure positional arguments are filled first
-                $self->error($context, "positional parameter `$parameters->[$i]->[1]` must be filled before using named argument");
+                $self->error($context, "positional parameter `$parameters->[$i]->[1]` must be filled before using named argument", $self->position($arguments->[$i]));
             }
 
             my $named_arg = $arguments->[$i]->[1];
@@ -649,10 +728,10 @@ sub process_function_call_arguments {
                 }
 
                 if (not $found) {
-                    $self->error($context, "function `$name` has no parameter named `$ident`");
+                    $self->error($context, "function `$name` has no parameter named `$ident`", $self->position($named_arg));
                 }
             } else {
-                $self->error($context, "named argument must be an identifier (got " . $self->{types}->to_string($named_arg->[0]) . ")");
+                $self->error($context, "named argument must be an identifier (got " . $self->{types}->to_string($named_arg->[0]) . ")", $self->position($named_arg));
             }
         } else {
             # normal argument
@@ -675,14 +754,8 @@ sub process_function_call_arguments {
         } else {
             # no argument or default argument
             if (not defined $evaluated_arguments->[$i]) {
-                $self->error($context, "Missing argument `$parameters->[$i]->[1]` to function `$name`."),
+                $self->error($context, "missing argument `$parameters->[$i]->[1]` to function `$name`", $self->position($data)),
             }
-        }
-    }
-
-    for (my $i = 0; $i < @$parameters; $i++) {
-        if (not defined $evaluated_arguments->[$i]) {
-            $self->error($context, "missing argument `$parameters->[$i]->[1]` to function `$name`.");
         }
     }
 
@@ -719,7 +792,7 @@ sub function_call {
 
         if (not defined $func) {
             # undefined function
-            $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`.");
+            $self->error($context, "cannot invoke undefined function `" . $self->output_value($target) . "`", $self->position($target));
         }
 
         if ($self->{types}->is_equal(['TYPE', 'Any'], $func->[0])) {
@@ -728,7 +801,7 @@ sub function_call {
 
         if ($func->[0]->[0] ne 'TYPEFUNC') {
             # not a function
-            $self->error($context, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")");
+            $self->error($context, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")", $self->position($target));
         }
 
         if ($func->[0]->[1] eq 'Builtin') {
@@ -748,7 +821,7 @@ sub function_call {
         $name = "anonymous-2";
 
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
-            $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->{types}->to_string($func->[0]) . ")");
+            $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->{types}->to_string($func->[0]) . ")", $self->position($target));
         }
     }
 
@@ -774,7 +847,7 @@ sub function_call {
     # type-check arguments
     if (defined $parameters) {
         for (my $i = 0; $i < @$parameters; $i++) {
-            $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
+            $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
         }
     }
 
@@ -794,7 +867,7 @@ sub function_call {
 
     # type-check return value
     if (not $self->{types}->check($return_type, $return_value->[0])) {
-        $self->error($context, "cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type));
+        $self->error($context, "cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type), $self->position($return_value));
     }
 
     if ($self->{types}->check($return_type, ['TYPE', 'Any'])) {
@@ -819,7 +892,7 @@ sub type_check_builtin_function_call {
     my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments, $data);
 
     for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0]);
+        $self->validate_function_argument_type($context, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
     }
 
     my $return_value;
@@ -835,7 +908,7 @@ sub type_check_builtin_function_call {
     }
 
     if (not $self->{types}->check($return_type, $return_value->[0])) {
-        $self->error($context, "in function `$name`: cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type));
+        $self->error($context, "in function `$name`: cannot return " . $self->{types}->to_string($return_value->[0]) . " from function declared to return " . $self->{types}->to_string($return_type), $self->position($return_value));
     }
 
     return $return_value;
@@ -845,7 +918,7 @@ sub keyword_return {
     my ($self, $context, $data) = @_;
 
     if (not $context->{current_function}) {
-        $self->error($context, "cannot use `return` outside of function");
+        $self->error($context, "cannot use `return` outside of function", $self->position($data));
     }
 
     return $self->evaluate($context, $data->[1]);
@@ -899,7 +972,7 @@ sub keyword_next {
     my ($self, $context, $data) = @_;
 
     if (not $context->{while_loop}) {
-        $self->error($context, "cannot use `next` outside of loop");
+        $self->error($context, "cannot use `next` outside of loop", $self->position($data));
     }
 
     return [['TYPE', 'Null'], undef];
@@ -909,7 +982,7 @@ sub keyword_last {
     my ($self, $context, $data) = @_;
 
     if (not $context->{while_loop}) {
-        $self->error($context, "cannot use `last` outside of loop");
+        $self->error($context, "cannot use `last` outside of loop", $self->position($data));
     }
 
     return [['TYPE', 'Null'], undef];
@@ -918,6 +991,7 @@ sub keyword_last {
 # rvalue array/map access
 sub access_notation {
     my ($self, $context, $data) = @_;
+
     my $var = $self->evaluate($context, $data->[1]);
 
     # map index
@@ -929,7 +1003,7 @@ sub access_notation {
 
         my $key = $self->evaluate($context, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
-        return [['TYPE', 'Any'], 0] if not defined $val;
+        return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
         return $val;
     }
 
@@ -939,7 +1013,7 @@ sub access_notation {
 
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
-            return [['TYPE', 'Null'], undef] if not defined $val;
+            return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
             return $val;
         }
 
@@ -961,11 +1035,15 @@ sub access_notation {
             return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
         }
     }
+
+    $self->error($context, "cannot use ACCESS notation on object of type " . $self->{types}->to_string($var->[0]), $self->position($var));
 }
 
 # lvalue assignment
 sub assignment {
     my ($self, $context, $data) = @_;
+
+    my $pos = $self->position($data);
 
     my $left_value  = $data->[1];
     my $right_value = $self->evaluate($context, $data->[2]);
@@ -973,7 +1051,7 @@ sub assignment {
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
         my $var = $self->get_variable($context, $left_value->[1]);
-        $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`") if not defined $var;
+        $var // $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`", $left_value->[2]);
         $self->set_variable($context, $left_value->[1], $right_value);
         return $right_value;
     }
@@ -996,7 +1074,7 @@ sub assignment {
                 return $val;
             }
 
-            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")");
+            $self->error($context, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
         }
 
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
@@ -1008,7 +1086,7 @@ sub assignment {
                 return $val;
             }
 
-            $self->error($context, "Array index must be of type Number (got " . $self->{types}->to_string($index->[0]) . ")");
+            $self->error($context, "Array index must be of type Number (got " . $self->{types}->to_string($index->[0]) . ")", $self->position($index));
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
@@ -1029,10 +1107,10 @@ sub assignment {
                         return [['TYPE', 'String'], $var->[1]];
                     }
 
-                    $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with RANGE in postfix []");
+                    $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with RANGE in postfix []", $pos);
                 }
 
-                $self->error($context, "invalid types to RANGE (have " . $self->{types}->to_string($from->[0]) . " and " . $self->{types}->to_string($to->[0]) . ") inside assignment postfix []");
+                $self->error($context, "invalid types to RANGE (have " . $self->{types}->to_string($from->[0]) . " and " . $self->{types}->to_string($to->[0]) . ") inside assignment postfix []", $pos);
             }
 
             if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
@@ -1047,18 +1125,18 @@ sub assignment {
                     return [['TYPE', 'String'], $var->[1]];
                 }
 
-                $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with postfix []");
+                $self->error($context, "cannot assign from type " . $self->{types}->to_string($right_value->[0]) . " to type " . $self->{types}->to_string($left_value->[0]) . " with postfix []", $pos);
             }
 
-            $self->error($context, "invalid type " . $self->{types}->to_string($value->[0]) . " inside assignment postfix []");
+            $self->error($context, "invalid type " . $self->{types}->to_string($value->[0]) . " inside assignment postfix []", $pos);
         }
 
-        $self->error($context, "cannot assign to postfix [] on type " . $self->{types}->to_string($var->[0]));
+        $self->error($context, "cannot assign to postfix [] on type " . $self->{types}->to_string($var->[0]), $pos);
     }
 
     # an expression
     my $eval = $self->evaluate($context, $data->[1]);
-    $self->error($context, "cannot assign to non-lvalue type " . $self->{types}->to_string($eval->[0]));
+    $self->error($context, "cannot assign to non-lvalue type " . $self->{types}->to_string($eval->[0]), $self->position($eval));
 }
 
 # rvalue array/map index
