@@ -25,6 +25,7 @@ sub initialize {
 
     $self->{line} = 0;
     $self->{col}  = 0;
+    $self->{eof}  = 0;
 }
 
 # define our tokentypes
@@ -53,10 +54,13 @@ sub tokens {
     return sub {
         while (1) {
             # get next line if we don't have a line
-            $self->{line}++, $text = $input->() if not defined $text;
+            $self->{line}++, $text = $input->() if not defined $text and not $self->{eof};
 
             # all done when there's no more input
-            return if not defined $text;
+            if (not defined $text) {
+                $self->{eof} = 1;
+                return;
+            }
 
             LOOP: {
                 # go through each tokentype

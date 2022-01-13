@@ -98,7 +98,11 @@ sub Program {
         eval {
             my $expression = Expression($parser);
 
-            if ($expression and $expression->[0] != INSTR_NOP) {
+            if (not defined $expression) {
+                expected($parser, 'expression');
+            }
+
+            if ($expression->[0] != INSTR_NOP) {
                 push @expressions, $expression;
             }
         };
