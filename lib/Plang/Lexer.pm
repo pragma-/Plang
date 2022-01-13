@@ -36,9 +36,9 @@ sub define_tokens {
 
 sub reset_lexer {
     my ($self) = @_;
-
     $self->{line} = 0;
-    $self->{col} = 0;
+    $self->{col}  = 0;
+    $self->{eof}  = 0;
 }
 
 sub tokens {
