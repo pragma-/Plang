@@ -1010,6 +1010,13 @@ sub PrefixLParen {
     return $expr;
 }
 
+sub PrefixType {
+    my ($parser) = @_;
+    my $token = $parser->consume(TOKEN_TYPE);
+    # convert to identifier to invoke builtin function for type conversion
+    return [INSTR_IDENT, $token->[1], token_position($token)];
+}
+
 my @prefix_dispatcher;
 $prefix_dispatcher[TOKEN_KEYWORD]         = \&Keyword;
 $prefix_dispatcher[TOKEN_L_BRACE]         = \&PrefixRBrace;
@@ -1017,7 +1024,7 @@ $prefix_dispatcher[TOKEN_L_BRACKET]       = \&ArrayConstructor;
 $prefix_dispatcher[TOKEN_INT]             = \&LiteralInteger;
 $prefix_dispatcher[TOKEN_FLT]             = \&LiteralFloat;
 $prefix_dispatcher[TOKEN_HEX]             = \&LiteralHexInteger;
-$prefix_dispatcher[TOKEN_TYPE]            = \&Type;
+$prefix_dispatcher[TOKEN_TYPE]            = \&PrefixType;
 $prefix_dispatcher[TOKEN_IDENT]           = \&Identifier;
 $prefix_dispatcher[TOKEN_SQUOTE_STRING_I] = \&PrefixSquoteStringI;
 $prefix_dispatcher[TOKEN_DQUOTE_STRING_I] = \&PrefixDquoteStringI;
