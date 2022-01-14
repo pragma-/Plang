@@ -311,7 +311,7 @@ sub KeywordExists {
 
     my $expression = Expression($parser);
 
-    if (not $expression or not defined $expression->[1]) {
+    if (not $expression) {
         expected($parser, "expression after `exists` keyword");
     }
 
@@ -326,7 +326,7 @@ sub KeywordDelete {
 
     my $expression = Expression($parser);
 
-    if (not $expression or not defined $expression->[1]) {
+    if (not $expression) {
         expected($parser, "expression after `delete` keyword");
     }
 
@@ -341,7 +341,7 @@ sub KeywordKeys {
 
     my $expression = Expression($parser);
 
-    if (not $expression or not defined $expression->[1]) {
+    if (not $expression) {
         expected($parser, "expression after `keys` keyword");
     }
 
@@ -356,7 +356,7 @@ sub KeywordValues {
 
     my $expression = Expression($parser);
 
-    if (not $expression or not defined $expression->[1]) {
+    if (not $expression) {
         expected($parser, "expression after `values` keyword");
     }
 
@@ -546,17 +546,13 @@ sub KeywordFn {
     my $ident_token = $parser->consume(TOKEN_IDENT);
     my $name  = $ident_token ? $ident_token->[1] : '#anonymous';
 
-    my $identlist = IdentifierList($parser);
+    my $identlist = IdentifierList($parser) // [];
 
-    $identlist = [] if not defined $identlist;
-
-    my $return_type = TypeFunctionReturn($parser);
-
-    $return_type = ['TYPE', 'Any'] if not defined $return_type;
+    my $return_type = TypeFunctionReturn($parser) // ['TYPE', 'Any'];
 
     my $expression = Expression($parser);
 
-    if (!defined $expression) {
+    if (not $expression) {
         expected($parser, "expression for body of function $name");
     }
 
@@ -1133,7 +1129,7 @@ sub PostfixLBracket {
 
     my $expression = Expression($parser);
 
-    if (not $expression or not defined $expression->[1]) {
+    if (not $expression) {
         expected($parser, 'expression in postfix [] brackets');
     }
 
