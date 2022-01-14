@@ -140,8 +140,7 @@ sub Keyword {
     $parser->try('Keyword');
 
     # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
+    my $token = $parser->next_token('peek') // return;
 
     # get token's dispatcher
     my $dispatcher = $keyword_dispatcher[$keyword_id{$token->[1]}];
@@ -156,7 +155,7 @@ sub Keyword {
         }
     }
 
-    error($parser, "Unknown keyword `$token->[1]`");
+    error($parser, "unknown keyword `$token->[1]`");
 }
 
 # error about unexpected keywords
@@ -174,11 +173,7 @@ sub UnexpectedKeyword {
 sub consume_keyword {
     my ($parser, $keyword) = @_;
 
-    my $token = $parser->consume(TOKEN_KEYWORD);
-
-    if (!defined $token) {
-        return;
-    }
+    my $token = $parser->consume(TOKEN_KEYWORD) // return;
 
     if ($token->[1] eq $keyword) {
         return $token;
@@ -383,6 +378,7 @@ sub KeywordVar {
     my $name = $ident_token->[1];
 
     my $type;
+
     if ($parser->consume(TOKEN_COLON)) {
         $type = Type($parser);
 
@@ -391,9 +387,7 @@ sub KeywordVar {
         }
     }
 
-    if (not $type) {
-        $type = ['TYPE', 'Any'];
-    }
+    $type //= ['TYPE', 'Any'];
 
     my $initializer = Initializer($parser);
 
@@ -442,8 +436,7 @@ sub Type {
 
     my $typeunion = [];
 
-    my $type = TypeLiteral($parser);
-    goto TYPE_FAIL if not $type;
+    my $type = TypeLiteral($parser) // goto TYPE_FAIL;
 
     while (1) {
         push @$typeunion, $type;
@@ -478,12 +471,8 @@ sub TypeLiteral {
     my $type = TypeFunction($parser);
     return $type if $type;
 
-    my $token = $parser->next_token('peek');
-    return if not $token;
-
-    if ($token->[0] == TOKEN_TYPE) {
+    if (my $token = $parser->consume(TOKEN_TYPE)) {
         my $type = $token->[1];
-        $parser->consume;
         return ['TYPE', $type, token_position($token)];
     }
 
@@ -493,8 +482,7 @@ sub TypeLiteral {
 sub TypeFunction {
     my ($parser) = @_;
 
-    my $token = $parser->next_token('peek');
-    return if not $token;
+    my $token = $parser->next_token('peek') // return;
 
     my $kind = $token->[1];
 
@@ -581,9 +569,10 @@ sub IdentifierList {
 
     $parser->try('IdentifierList');
 
-    goto IDENTLIST_FAIL if not $parser->consume(TOKEN_L_PAREN);
+    $parser->consume(TOKEN_L_PAREN) // goto IDENTLIST_FAIL;
 
     my $identlist = [];
+
     while (1) {
         if (my $token = $parser->consume(TOKEN_IDENT)) {
             my $name = $token->[1];
@@ -625,10 +614,11 @@ sub MapConstructor {
 
     if (my $token = $parser->consume(TOKEN_L_BRACE)) {
         my @map;
+
         while (1) {
             my $parsedkey = $parser->consume(TOKEN_DQUOTE_STRING)
-            || $parser->consume(TOKEN_SQUOTE_STRING)
-            || $parser->consume(TOKEN_IDENT);
+                         || $parser->consume(TOKEN_SQUOTE_STRING)
+                         || $parser->consume(TOKEN_IDENT);
 
             if ($parsedkey) {
                 my $mapkey;
@@ -822,30 +812,24 @@ sub ExpressionGroup {
 
     $parser->try('ExpressionGroup: L_BRACE Expression R_BRACE');
 
-    {
-        my $token = $parser->consume(TOKEN_L_BRACE);
+    my $token = $parser->consume(TOKEN_L_BRACE) // goto EXPRESSION_GROUP_FAIL;
 
-        if (!defined $token) {
-            goto EXPRESSION_GROUP_FAIL;
+    my @expressions;
+
+    while (1) {
+        my $expression = Expression($parser);
+
+        if ($expression) {
+            push @expressions, $expression unless $expression->[0] == INSTR_NOP;
+            next;
         }
 
-        my @expressions;
-
-        while (1) {
-            my $expression = Expression($parser);
-
-            if ($expression) {
-                push @expressions, $expression unless $expression->[0] == INSTR_NOP;
-                next;
-            }
-
-            last if $parser->consume(TOKEN_R_BRACE);
-            goto EXPRESSION_GROUP_FAIL;
-        }
-
-        $parser->advance;
-        return [INSTR_EXPR_GROUP, \@expressions, token_position($token)];
+        last if $parser->consume(TOKEN_R_BRACE);
+        goto EXPRESSION_GROUP_FAIL;
     }
+
+    $parser->advance;
+    return [INSTR_EXPR_GROUP, \@expressions, token_position($token)];
 
   EXPRESSION_GROUP_FAIL:
     $parser->backtrack;
@@ -858,28 +842,22 @@ sub Expression {
 
     $parser->try("Expression (prec $precedence)");
 
-    {
-        if ($parser->consume(TOKEN_TERM)) {
-            $parser->advance;
-            return [INSTR_NOP, undef];
-        }
-
-        my $left = Prefix($parser, $precedence);
-
-        goto EXPRESSION_FAIL if not $left;
-
-        while (1) {
-            my $token = $parser->next_token('peek');
-            last if not defined $token;
-            my $token_precedence = get_precedence $token->[0];
-            last if $precedence >= $token_precedence;
-
-            $left = Infix($parser, $left, $token_precedence);
-        }
-
+    if ($parser->consume(TOKEN_TERM)) {
         $parser->advance;
-        return $left;
+        return [INSTR_NOP, undef];
     }
+
+    my $left = Prefix($parser, $precedence) // goto EXPRESSION_FAIL;
+
+    while (1) {
+        my $token = $parser->next_token('peek') // last;
+        my $token_precedence = get_precedence $token->[0];
+        last if $precedence >= $token_precedence;
+        $left = Infix($parser, $left, $token_precedence);
+    }
+
+    $parser->advance;
+    return $left;
 
   EXPRESSION_FAIL:
     $parser->backtrack;
@@ -1046,8 +1024,7 @@ sub Prefix {
     my ($parser, $precedence) = @_;
 
     # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
+    my $token = $parser->next_token('peek') // return;
 
     # get token's dispatcher
     my $dispatcher = $prefix_dispatcher[$token->[0]];
@@ -1095,8 +1072,7 @@ sub Infix {
     my ($parser, $left, $precedence) = @_;
 
     # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
+    my $token = $parser->next_token('peek') // return;
 
     # get token's binop data
     my $data = $binop_data[$token->[0]];
@@ -1178,8 +1154,7 @@ sub Postfix {
     my ($parser, $left, $precedence) = @_;
 
     # peek at upcoming token
-    my $token = $parser->next_token('peek');
-    return if not defined $token;
+    my $token = $parser->next_token('peek') // return;
 
     # get token's dispatcher
     my $dispatcher = $postfix_dispatcher[$token->[0]];
