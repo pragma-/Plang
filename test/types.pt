@@ -1,9 +1,20 @@
-test_eq(type(fn null), 'Function () -> Null');
-
-fn f(a: Number, b: String) -> Boolean true
-test_eq(type(f), 'Function (Number, String) -> Boolean')
-
 test_eq(type(1==1), 'Boolean')
 test_eq(type("hi"), 'String')
 test_eq(type(42), 'Integer')
 test_eq(type(null), 'Null')
+
+test_eq(type(fn null), 'Function () -> Null');
+
+fn f1(a: Number, b: String) -> Boolean
+  true
+
+test_eq(type(f1), 'Function (Number, String) -> Boolean')
+
+test_eq(whatis(f1), 'Function (a: Number, b: String) -> Boolean')
+
+fn f2(a: Integer = 10, b: Integer = 20)
+  a + b
+
+test_eq(type(f2), 'Function (Integer, Integer) -> Integer')
+
+test_eq(whatis(f2), 'Function (a: Integer = 10, b: Integer = 20) -> Integer')
