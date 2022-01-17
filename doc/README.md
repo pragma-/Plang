@@ -324,10 +324,14 @@ Ergo, the expression immediately preceding `last` will be the value of the loop.
      1 2 3 4 5
 
 #### try/catch/throw
-    TryExpression ::= "try" Expression ("catch" ("(" Expression ")")? Expression)+
+    Try   ::= "try" Expression ("catch" ("(" Expression ")")? Expression)+
+    Throw ::= "throw" Expression
 
 At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
 support properly typed exceptions.
+
+All `catch` expressions are evaluated in a new lexical scope. A special variable named `e` is
+implicitly declared in this new scope, defined to be the value of the caught exception.
 
 Use `try <expression>` to evaluate an expression with exception handling.
 
@@ -349,20 +353,20 @@ the name of the exception to throw.
     > try
         throw "bar"
       catch ("foo")
-        print("Caught foo")
+        print($"Caught {e} in foo handler")
       catch ("bar")
-        print("Caught bar")
+        print($"Caught {e} in bar handler")
       catch
         print($"Caught unknown exception: {e}")
 
-    Caught bar
+    Caught bar in bar handler
 <!-- -->
     > try
         throw "foobar"
       catch ("foo")
-        print("Caught foo")
+        print($"Caught {e} in foo handler")
       catch ("bar")
-        print("Caught bar")
+        print($"Caught {e} in bar handler")
       catch
         print($"Caught unknown exception: {e}")
 
