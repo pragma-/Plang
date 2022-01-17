@@ -32,6 +32,4 @@ sub plang {
 }
 
 # interpret plang script and exit using returned value
-
-my $ret = plang("@ARGV") // 0;
-exit int $ret;
+exit int (plang("@ARGV") // 0);

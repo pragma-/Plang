@@ -295,7 +295,7 @@ sub KeywordIf {
 sub ElseWithoutIf {
     my ($parser) = @_;
 
-    # if an `else` is consumed outside of IfExpression() then it is a stray `else`
+    # if an `else` is consumed outside of KeywordIf() then it is a stray `else`
     if (consume_keyword($parser, 'else')) {
         error($parser, "`else` without matching `if`");
     }
@@ -348,7 +348,7 @@ sub KeywordKeys {
     return [INSTR_KEYS, $expression, token_position($token)];
 }
 
-# KeywordValues ::= KEYWORD_values Expression
+# KeywordValues ::= "values" Expression
 sub KeywordValues {
     my ($parser) = @_;
 
