@@ -45,6 +45,10 @@ my %constants = (
 	INSTR_RANGE => $n++,
 	INSTR_ACCESS => $n++,
 	INSTR_STRING_I => $n++,
+	INSTR_TRY => $n++,
+	INSTR_THROW => $n++,
+
+    # binary operators begin here
 	INSTR_NOT => $n++,
 	INSTR_NEG => $n++,
 	INSTR_POS => $n++,

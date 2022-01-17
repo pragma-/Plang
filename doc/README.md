@@ -5,6 +5,7 @@ This README describes what is implemented so far.
 
 <details><summary>Click to show table of contents</summary>
 
+<!-- md-toc-begin -->
   * [Project structure](#project-structure)
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
@@ -19,6 +20,7 @@ This README describes what is implemented so far.
       * [Variables](#variables)
       * [if/then/else](#ifthenelse)
       * [while/next/last](#whilenextlast)
+      * [try/catch/throw](#trycatchthrow)
       * [Operators](#operators)
       * [Truthiness](#truthiness)
     * [Scoping](#scoping)
@@ -75,6 +77,7 @@ This README describes what is implemented so far.
       * [exists](#exists)
       * [delete](#delete)
     * [JSON compatibility/serialization](#json-compatibilityserialization)
+<!-- md-toc-end -->
 
 </details>
 
@@ -233,6 +236,9 @@ last | break out of the loop
 next | jump to the next iteration of the loop
 exists | test if a key exists in a Map
 delete | deletes a key from a Map
+try | try an expression with exception handling
+catch | catch an exception from a tried expression
+throw | throw an exception
 
 ### Expressions and ExpressionGroups
     Expression      ::=  ExpressionGroup
@@ -316,6 +322,51 @@ Ergo, the expression immediately preceding `last` will be the value of the loop.
 
     > var i = 0; while (++i <= 5) print(i, end=" "); print("");
      1 2 3 4 5
+
+#### try/catch/throw
+    TryExpression ::= "try" Expression ("catch" ("(" Expression ")")? Expression)+
+
+At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
+support properly typed exceptions.
+
+Use `try <expression>` to evaluate an expression with exception handling.
+
+Use `catch [exception] <expression> ` to handle an exception. `[exception]` is an optional
+parenthesized String denoting the name of the exception to catch. When `[exception]` is
+omitted, the `catch` will act as a default handler for any exception. Catch handlers are
+processed top-to-bottom in the order they are defined.
+
+Use `throw <exception>` to trigger an exception. `<exception>` is a required String denoting
+the name of the exception to throw.
+
+    > try
+        1/0
+      catch
+        print("Caught division by zero")
+
+    Caught division by zero
+<!-- -->
+    > try
+        throw "bar"
+      catch ("foo")
+        print("Caught foo")
+      catch ("bar")
+        print("Caught bar")
+      catch
+        print($"Caught unknown exception: {e}")
+
+    Caught bar
+<!-- -->
+    > try
+        throw "foobar"
+      catch ("foo")
+        print("Caught foo")
+      catch ("bar")
+        print("Caught bar")
+      catch
+        print($"Caught unknown exception: {e}")
+
+    Caught unknown exception: foobar
 
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.

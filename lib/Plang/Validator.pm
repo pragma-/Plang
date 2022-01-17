@@ -56,6 +56,8 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
     $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
     $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+    $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
+    $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
 
     # validate these unary operators
     $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
@@ -566,6 +568,60 @@ sub keyword_values {
     }
 
     return [['TYPE', 'Array'], []];
+}
+
+sub keyword_try {
+    my ($self, $context, $data) = @_;
+
+    my $catchers = $data->[2];
+
+    my $default_catcher;
+
+    my %duplicates;
+
+    foreach my $catcher (@$catchers) {
+        my ($cond, $body, $pos) = @$catcher;
+
+        if (not $cond) {
+            if ($default_catcher) {
+                $self->error($context, "extra default `catch`", $pos);
+            }
+
+            $default_catcher = $body;
+        } else {
+            my $new_context = $self->new_context($context);
+
+            $cond = $self->evaluate($new_context, $cond);
+
+            if (not $self->{types}->check(['TYPE', 'String'], $cond->[0])) {
+                $self->error($new_context, "`catch` condition must be of type String (got " . $self->{types}->to_string($cond->[0]) . ")", $pos);
+            }
+
+            if (exists $duplicates{$cond->[1]}) {
+                $self->error($new_context, 'duplicate `catch` condition "' . $cond->[1] . '"', $pos);
+            }
+
+            $duplicates{$cond->[1]} = $cond;
+        }
+    }
+
+    if (not $default_catcher) {
+        $self->error($context, "no default `catch` for `try`", $self->position($data));
+    }
+
+    return;
+}
+
+sub keyword_throw {
+    my ($self, $context, $data) = @_;
+
+    my $expr = $self->evaluate($context, $data->[1]);
+
+    if (not $self->{types}->check(['TYPE', 'String'], $expr->[0])) {
+        $self->error($context, "`throw` expression must be of type String (got " . $self->{types}->to_string($expr->[0]) . ")", $self->position($expr));
+    }
+
+    return $expr;
 }
 
 sub function_definition {

@@ -77,6 +77,8 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
     $self->{instr_dispatch}->[INSTR_RANGE]       = \&range_operator;
     $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+    $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
+    $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
 
     # unary operators
     $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
@@ -400,6 +402,48 @@ sub keyword_values {
     }
 
     return [['TYPE', 'Array'], $list];
+}
+
+sub keyword_try {
+    my ($self, $context, $data) = @_;
+
+    my $expr     = $data->[1];
+    my $catchers = $data->[2];
+
+    my $result = eval {
+        $self->evaluate($context, $expr);
+    };
+
+    if (my $exception = $@) {
+        my $catch;
+
+        foreach my $catcher (@$catchers) {
+            my ($cond, $body) = @$catcher;
+
+            if (not $cond) {
+                $catch = $body;
+                last;
+            }
+
+            $cond = $self->evaluate($context, $cond);
+
+            if ($cond->[1] eq $exception->[1]) {
+                $catch = $body;
+                last;
+            }
+        }
+
+        my $new_context = $self->new_context($context);
+        $self->declare_variable($new_context, ['TYPE', 'String'], 'e', $exception);
+        return $self->evaluate($new_context, $catch);
+    }
+
+    return $result;
+}
+
+sub keyword_throw {
+    my ($self, $context, $data) = @_;
+    die $self->evaluate($context, $data->[1]);
 }
 
 sub keyword_return {
@@ -1449,43 +1493,33 @@ sub execute {
         $Data::Dumper::Indent = 1;
     }
 
-    # try
-    my $last_expression_result = eval {
-        my $result;
+    my $result;
 
-        foreach my $node (@$ast) {
-            my $instruction = $node->[0];
+    foreach my $node (@$ast) {
+        my $instruction = $node->[0];
 
-            if ($instruction == INSTR_EXPR_GROUP) {
-                return $self->execute($context, $node->[1]);
+        if ($instruction == INSTR_EXPR_GROUP) {
+            return $self->execute($context, $node->[1]);
+        } else {
+            $result = $self->evaluate($context, $node);
+
+            if (defined $result) {
+                $result = $self->handle_expression_result($result);
+
+                if ($self->{debug}) {
+                    $Data::Dumper::Indent = 0;
+                    $self->{dprint}->('EXPR', "Expression result: " . Dumper($result) . "\n");
+                    $Data::Dumper::Indent = 1;
+                }
             } else {
-                $result = $self->evaluate($context, $node);
-
-                if (defined $result) {
-                    $result = $self->handle_expression_result($result);
-
-                    if ($self->{debug}) {
-                        $Data::Dumper::Indent = 0;
-                        $self->{dprint}->('EXPR', "Expression result: " . Dumper($result) . "\n");
-                        $Data::Dumper::Indent = 1;
-                    }
-                } else {
-                    if ($self->{debug}) {
-                        $self->{dprint}->('EXPR', "Expression result: none\n");
-                    }
+                if ($self->{debug}) {
+                    $self->{dprint}->('EXPR', "Expression result: none\n");
                 }
             }
         }
+    }
 
-        $result //= [['TYPE', 'Null'], undef];
-
-        return $result;
-    };
-
-    # catch
-    die $@ if $@;
-
-    return $last_expression_result;
+    return $result // [['TYPE', 'Null'], undef];
 }
 
 sub evaluate {

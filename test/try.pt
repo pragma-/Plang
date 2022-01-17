@@ -1,0 +1,24 @@
+try
+  1 / 0
+catch
+  print("Caught division by zero")
+
+test_stdout("Caught division by zero\n")
+
+try
+  throw "test"
+catch ("test")
+  print($"Caught {e} in test catch")
+catch
+  print($"Caught {e} in default catch")
+
+test_stdout("Caught test in test catch\n")
+
+try
+  throw "foo"
+catch ("bar")
+  print($"Caught {e} in bar catch")
+catch
+  print($"Caught {e} in default catch")
+
+test_stdout("Caught foo in default catch\n")

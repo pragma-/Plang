@@ -133,6 +133,9 @@ $keyword_dispatcher[KEYWORD_DELETE] = \&KeywordDelete;
 $keyword_dispatcher[KEYWORD_KEYS]   = \&KeywordKeys;
 $keyword_dispatcher[KEYWORD_VALUES] = \&KeywordValues;
 $keyword_dispatcher[KEYWORD_VAR]    = \&KeywordVar;
+$keyword_dispatcher[KEYWORD_TRY]    = \&KeywordTry;
+$keyword_dispatcher[KEYWORD_CATCH]  = \&CatchWithoutTry;
+$keyword_dispatcher[KEYWORD_THROW]  = \&KeywordThrow;
 
 sub Keyword {
     my ($parser) = @_;
@@ -361,6 +364,80 @@ sub KeywordValues {
     }
 
     return [INSTR_VALUES, $expression, token_position($token)];
+}
+
+# KeywordTry ::= try Expression (catch ("(" String ")")? Expression)+
+sub KeywordTry {
+    my ($parser) = @_;
+
+    my $try_token = consume_keyword($parser, 'try');
+
+    my $expr = Expression($parser);
+
+    if (not $expr) {
+        expected($parser, "expression for body of `try`");
+    }
+
+    my @catchers;
+
+    while (my $catch_token = consume_keyword($parser, 'catch')) {
+        my $catch_cond;
+        my $catch_body;
+
+        # check for a catch condition
+        if ($parser->consume(TOKEN_L_PAREN)) {
+            $catch_cond = Expression($parser);
+
+            if (not $catch_cond) {
+                expected($parser, "expression for `catch` condition");
+            }
+
+            if (not $parser->consume(TOKEN_R_PAREN)) {
+                expected($parser, "closing ) for `catch` condition");
+            }
+        }
+
+        $catch_body = Expression($parser);
+
+        if (not $catch_body) {
+            expected($parser, "expression for `catch` body");
+        }
+
+        push @catchers, [$catch_cond, $catch_body, token_position($catch_token)];
+    }
+
+    if (not @catchers) {
+        expected($parser, "`catch` expression after `try`");
+    }
+
+    return [INSTR_TRY, $expr, \@catchers, token_position($try_token)];
+}
+
+# error about a `catch` without a `try`
+sub CatchWithoutTry {
+    my ($parser) = @_;
+
+    # if a `catch` is consumed outside of KeywordTry() then it is a stray `catch`
+    if (consume_keyword($parser, 'catch')) {
+        error($parser, "cannot use `catch` outside of `try`");
+    }
+
+    return;
+}
+
+# KeywordThrow ::= "throw" Expression
+sub KeywordThrow {
+    my ($parser) = @_;
+
+    my $token = consume_keyword($parser, 'throw');
+
+    my $expr = Expression($parser);
+
+    if (not $expr) {
+        expected($parser, "expression after `throw`");
+    }
+
+    return [INSTR_THROW, $expr, token_position($token)];
 }
 
 # KeywordVar ::= "var" IDENT (":" Type)? Initializer?

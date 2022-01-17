@@ -236,7 +236,20 @@ sub interpret {
         }
     }
 
-    return $self->{interpreter}->run($self->{ast}, %opt);
+    if (not $self->{embedded}) {
+        # if not embedded, catch unhandled exceptions
+        my $result = eval { $self->{interpreter}->run($self->{ast}, %opt) };
+
+        if (my $exception = $@) {
+            print STDERR "Run-time error: unhandled exception: ", $self->{interpreter}->output_value($exception), "\n";
+            exit 1;
+        }
+
+        return $result;
+    } else {
+        # otherwise let host catch exceptions
+        return $self->{interpreter}->run($self->{ast}, %opt);
+    }
 }
 
 sub interpret_stream {
