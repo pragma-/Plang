@@ -203,6 +203,10 @@ sub binary_op {
         } elsif ($instr == INSTR_MUL) {
             $result = [['TYPE', 'Number'],  $left->[1]  * $right->[1]];
         } elsif ($instr == INSTR_DIV) {
+            if ($right->[1] == 0) {
+                $self->error($context, "division by zero", $self->position($right));
+            }
+
             $result = [['TYPE', 'Number'],  $left->[1]  / $right->[1]];
         } elsif ($instr == INSTR_REM) {
             $result = [['TYPE', 'Number'],  $left->[1]  % $right->[1]];
@@ -335,6 +339,10 @@ sub type_check_op_assign {
 
     if (not $self->{types}->is_arithmetic($right->[0])) {
         $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos_right);
+    }
+
+    if ($op eq 'DIV' && $right->[1] == 0) {
+        $self->error($context, "division by zero", $self->position($right));
     }
 
     if ($self->{types}->check($left->[0], $right->[0])) {
