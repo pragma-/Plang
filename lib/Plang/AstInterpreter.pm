@@ -417,6 +417,10 @@ sub keyword_try {
     if (my $exception = $@) {
         my $catch;
 
+        if (not ref $exception) {
+            $exception = [['TYPE', 'String'], $exception];
+        }
+
         foreach my $catcher (@$catchers) {
             my ($cond, $body) = @$catcher;
 
@@ -1370,6 +1374,8 @@ sub output_string_literal {
 
 sub output_value {
     my ($self, $value, %opts) = @_;
+
+    return $value if not ref $value;
 
     my $result = '';;
 
