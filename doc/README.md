@@ -14,16 +14,11 @@ This README describes what is implemented so far.
   * [Running the Unit Tests](#running-the-unit-tests)
   * [Example Plang scripts](#example-plang-scripts)
   * [The Plang Language (so far)](#the-plang-language-so-far)
-    * [Identifiers](#identifiers)
-      * [Keywords](#keywords)
-    * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
-      * [Variables](#variables)
-      * [if/then/else](#ifthenelse)
-      * [while/next/last](#whilenextlast)
-      * [try/catch/throw](#trycatchthrow)
       * [Operators](#operators)
       * [Truthiness](#truthiness)
-    * [Scoping](#scoping)
+    * [Identifiers](#identifiers)
+      * [Keywords](#keywords)
+    * [Variables](#variables)
     * [Functions](#functions)
       * [Optional type annotations](#optional-type-annotations)
       * [Default arguments](#default-arguments)
@@ -43,6 +38,11 @@ This README describes what is implemented so far.
         * [map](#map)
         * [filter](#filter)
         * [Type conversion functions](#type-conversion-functions)
+    * [Scoping](#scoping)
+    * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
+      * [if/then/else](#ifthenelse)
+      * [while/next/last](#whilenextlast)
+      * [try/catch/throw](#trycatchthrow)
     * [Type-checking](#type-checking)
       * [Optional type annotations](#optional-type-annotations-1)
       * [Type narrowing during inference](#type-narrowing-during-inference)
@@ -211,158 +211,6 @@ A test failure looks like this:
 Plang is a statically-typed expression-oriented language with optional type annotations.
 Everything in Plang evaluates to a value that can be used in an expression.
 
-### Identifiers
-    Identifier ::=  ( "_" | Letter )  { "_" | Letter | Digit }*
-    Letter     ::=  "a" .. "z" | "A" .. "Z"
-    Digit      ::=  "0" .. "9"
-
-An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
-by additional underscores, letters or digits.
-
-#### Keywords
-Keywords are reserved identifiers that have a special meaning to Plang.
-
-Keyword | Description
---- | ---
-var | variable declaration
-fn | function definition
-return | return value from function
-true | a Boolean with a true value
-false | a Boolean with a false value
-null | a Null with a null value
-if | conditional if expression
-then | then branch of a conditional if expression
-else | else branch of a conditional if expression
-while | loop while a condition is true
-last | break out of the loop
-next | jump to the next iteration of the loop
-exists | test if a key exists in a Map
-delete | deletes a key from a Map
-try | try an expression with exception handling
-catch | catch an exception from a tried expression
-throw | throw an exception
-
-### Expressions and ExpressionGroups
-    Expression      ::=  ExpressionGroup
-                      | IfExpression
-                      | WhileExpression
-                      | ? et cetera ?
-                      | [Terminator]
-    ExpressionGroup ::=  "{" Expression* "}"
-    Terminator      ::=  ";"
-
-A single expression evaluates to a value.
-
-An expression group is multiple expressions enclosed in a pair of curly-braces. An expression groups evaluates to the value of its final expression.
-
-Expressions can optionally be explicitly terminated by a semi-colon.
-
-#### Variables
-    VariableDeclaration ::= "var" Identifier [":" Type] [Initializer]
-    Initializer         ::= "=" Expression
-
-The `var` expression evaluates to the value of its initializer. When type annotations are omitted,
-the variable's type will be inferred from its initializer value.
-
-    > var a = 5
-     [Integer] 5
-
-    > var a = "hello"
-     [String] "hello"
-
-A type annotation may be provided to enable strict compile-time type-checking.
-
-    > var a: String = 5
-     Validator error: cannot initialize `a` with value of type Integer (expected String)
-
-Attempting to use a variable that has not been declared will produce a compile-time error.
-
-    > var a = 5; a + b
-     Validator error: `b` not declared.
-
-Variables that have not yet been assigned a value will produce a compile-time error.
-
-    > var a = 5; var b; a + b
-     Validator error: `b` not defined.
-
-#### if/then/else
-    IfExpression ::= "if" Expression "then" Expression "else" Expression
-
-If the expression after `if` is [truthy](#truthiness) then the expression after `then` will be
-evaluated otherwise the expression after `else` will be evaluated.
-
-The value of the `if` expression is the value of the expression of the branch that was evaluated.
-
-    > if true then 1 else 2
-     1
-
-    > if false then 1 else 2
-     2
-
-#### while/next/last
-    WhileExpression ::= "while" "(" Expression ")" Expression
-
-While the expression in parenthesis is [truthy](#truthiness) the expression in the while body will be evaluated.
-
-The value of the `while` expression is the value of the expression evaluated within the loop.
-
-The `next` keyword can be used to immediately jump to the next iteration of the loop.
-
-The `last <expression>` keyword can be used to immediately exit the loop, with a value.
-
-    > var i = 0; while (++i <= 5) print(i, end=" "); print("");
-     1 2 3 4 5
-
-See [`print`](#print) for information about the `print` function.
-
-#### try/catch/throw
-    Try   ::= "try" Expression { "catch" [ "(" Expression ")" ] Expression }+
-    Throw ::= "throw" Expression
-
-At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
-support properly typed exceptions.
-
-Use `try <expression>` to evaluate an expression with exception handling.
-
-Use `catch [exception] <expression> ` to handle an exception. `[exception]` is an optional
-parenthesized String denoting the name of the exception to catch. When `[exception]` is
-omitted, the `catch` will act as a default handler for any exception.
-
-All `catch` expressions are evaluated in a new lexical scope. A special variable named `e` is
-implicitly declared in this new scope, defined to be the value of the caught exception.
-
-Use `throw <exception>` to trigger an exception. `<exception>` is a required String denoting
-the name of the exception to throw.
-
-    > try
-        1/0
-      catch
-        print("Caught {e}")
-
-    Caught Illegal division by zero
-<!-- -->
-    > try
-        throw "bar"
-      catch ("foo")
-        print($"Caught {e} in foo handler")
-      catch ("bar")
-        print($"Caught {e} in bar handler")
-      catch
-        print($"Caught some other exception: {e}")
-
-    Caught bar in bar handler
-<!-- -->
-    > try
-        throw "foobar"
-      catch ("foo")
-        print($"Caught {e} in foo handler")
-      catch ("bar")
-        print($"Caught {e} in bar handler")
-      catch
-        print($"Caught some other exception: {e}")
-
-    Caught some other exception: foobar
-
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
 
@@ -420,23 +268,64 @@ Boolean | `false` when value is `false`; `true` otherwise.
 Number | `false` when value is `0`; `true` otherwise.
 String | `false` when value is empty string; `true` otherwise.
 
-### Scoping
-Plang is lexically scoped. Expression groups introduce a new lexical scope. Identifiers, variables and functions
-created within a scope are destroyed when the scope ends. Identifiers within an inner scope may override identifers
-of the same name found in outer scopes.
+### Identifiers
+    Identifier ::=  ( "_" | Letter )  { "_" | Letter | Digit }*
+    Letter     ::=  "a" .. "z" | "A" .. "Z"
+    Digit      ::=  "0" .. "9"
 
-    { # outer scpe
-       var a = 5
+An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
+by additional underscores, letters or digits.
 
-       { # new inner scope
-          var a = 10 # new instance of `a` shadows outer `a`
-          var b = 15
+#### Keywords
+Keywords are reserved identifiers that have a special meaning to Plang.
 
-          a + b  # 25
-       } # end inner scope, inner `a` and `b` no longer exist
+Keyword | Description
+--- | ---
+var | variable declaration
+fn | function definition
+return | return value from function
+true | a Boolean with a true value
+false | a Boolean with a false value
+null | a Null with a null value
+if | conditional if expression
+then | then branch of a conditional if expression
+else | else branch of a conditional if expression
+while | loop while a condition is true
+last | break out of the loop
+next | jump to the next iteration of the loop
+exists | test if a key exists in a Map
+delete | deletes a key from a Map
+try | try an expression with exception handling
+catch | catch an exception from a tried expression
+throw | throw an exception
 
-       a  # 5
-    } # end outer scope, `a` no longer exists
+### Variables
+    VariableDeclaration ::= "var" Identifier [":" Type] [Initializer]
+    Initializer         ::= "=" Expression
+
+The `var` expression evaluates to the value of its initializer. When type annotations are omitted,
+the variable's type will be inferred from its initializer value.
+
+    > var a = 5
+     [Integer] 5
+
+    > var a = "hello"
+     [String] "hello"
+
+A type annotation may be provided to enable strict compile-time type-checking.
+
+    > var a: String = 5
+     Validator error: cannot initialize `a` with value of type Integer (expected String)
+
+Attempting to use a variable that has not been declared will produce a compile-time error.
+
+    > var a = 5; a + b
+     Validator error: `b` not declared.
+
+Variables that have not yet been assigned a value will produce a compile-time error.
+
+    > var a = 5; var b; a + b
+     Validator error: `b` not defined.
 
 ### Functions
     FunctionDefinition  ::= "fn" [ Identifier ] [ IdentifierList ] [ "->" Type ] Expression
@@ -548,7 +437,7 @@ produces the output:
      2
 
 ### Built-in functions
-These are the built-in functions. You can add additional built-in functions
+These are the provided built-in functions. You can define additional built-in functions
 through Plang's internal API. See [embedding Plang](#embedding-plang) for more information.
 
 #### Input/Output
@@ -658,6 +547,117 @@ In other words, it takes two parameters and returns an `Array`. The first parame
 
 ##### Type conversion functions
 See [Types](#types).
+
+### Scoping
+Plang is lexically scoped. Expression groups introduce a new lexical scope. Identifiers, variables and functions
+created within a scope are destroyed when the scope ends. Identifiers within an inner scope may override identifers
+of the same name found in outer scopes.
+
+    { # outer scpe
+       var a = 5
+
+       { # new inner scope
+          var a = 10 # new instance of `a` shadows outer `a`
+          var b = 15
+
+          a + b  # 25
+       } # end inner scope, inner `a` and `b` no longer exist
+
+       a  # 5
+    } # end outer scope, `a` no longer exists
+
+### Expressions and ExpressionGroups
+    Expression      ::=  ExpressionGroup
+                      | IfExpression
+                      | WhileExpression
+                      | ? et cetera ?
+                      | [Terminator]
+    ExpressionGroup ::=  "{" Expression* "}"
+    Terminator      ::=  ";"
+
+A single expression evaluates to a value. In the place of any expression, an expression group may be used.
+
+An expression group is multiple expressions enclosed in a pair of curly-braces. An expression groups evaluates to the value of its final expression.
+
+Expressions can optionally be explicitly terminated by a semi-colon.
+
+#### if/then/else
+    IfExpression ::= "if" Expression "then" Expression "else" Expression
+
+If the expression after `if` is [truthy](#truthiness) then the expression after `then` will be
+evaluated otherwise the expression after `else` will be evaluated.
+
+The value of the `if` expression is the value of the expression of the branch that was evaluated.
+
+    > if true then 1 else 2
+     1
+
+    > if false then 1 else 2
+     2
+
+#### while/next/last
+    WhileExpression ::= "while" "(" Expression ")" Expression
+
+While the expression in parenthesis is [truthy](#truthiness) the expression in the while body will be evaluated.
+
+The value of the `while` expression is the value of the expression evaluated within the loop.
+
+The `next` keyword can be used to immediately jump to the next iteration of the loop.
+
+The `last <expression>` keyword can be used to immediately exit the loop, with a value.
+
+    > var i = 0; while (++i <= 5) print(i, end=" "); print("");
+     1 2 3 4 5
+
+See [`print`](#print) for information about the `print` function.
+
+#### try/catch/throw
+    Try   ::= "try" Expression { "catch" [ "(" Expression ")" ] Expression }+
+    Throw ::= "throw" Expression
+
+At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
+support properly typed exceptions.
+
+Use `try <expression>` to evaluate an expression with exception handling.
+
+Use `catch [exception] <expression> ` to handle an exception. `[exception]` is an optional
+parenthesized String denoting the name of the exception to catch. When `[exception]` is
+omitted, the `catch` will act as a default handler for any exception.
+
+All `catch` expressions are evaluated in a new lexical scope. A special variable named `e` is
+implicitly declared in this new scope, defined to be the value of the caught exception.
+
+Use `throw <exception>` to trigger an exception. `<exception>` is a required String denoting
+the name of the exception to throw.
+
+    > try
+        1/0
+      catch
+        print("Caught {e}")
+
+    Caught Illegal division by zero
+<!-- -->
+    > try
+        throw "bar"
+      catch ("foo")
+        print($"Caught {e} in foo handler")
+      catch ("bar")
+        print($"Caught {e} in bar handler")
+      catch
+        print($"Caught some other exception: {e}")
+
+    Caught bar in bar handler
+<!-- -->
+    > try
+        throw "foobar"
+      catch ("foo")
+        print($"Caught {e} in foo handler")
+      catch ("bar")
+        print($"Caught {e} in bar handler")
+      catch
+        print($"Caught some other exception: {e}")
+
+    Caught some other exception: foobar
 
 ### Type-checking
 Plang is gradually typed with optional nominal type annotations.
