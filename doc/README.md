@@ -74,6 +74,8 @@ This README describes what is implemented so far.
       * [filter](#filter-1)
     * [Map operations](#map-operations)
       * [Creating and accessing maps](#creating-and-accessing-maps)
+      * [keys](#keys)
+      * [values](#values)
       * [exists](#exists)
       * [delete](#delete)
     * [JSON compatibility/serialization](#json-compatibilityserialization)
@@ -135,22 +137,22 @@ You can set the `DEBUG` environment variable to enable debugging output.
 
 The value is a comma-separated list of tags, or `ALL` for everything.
 
-Currently available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `EXPR`, `EVAL`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
+Available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TYPES`, `EXPR`, `EVAL`, `RESULT`, `OPERS`, `VARS`, `FUNCS`.
 
-    $ DEBUG=PARSER,AST ./plang '1 + 2'  # debug messages only for tags `PARSER` and `AST`
+    $ DEBUG=PARSER,AST ./plang '12 + 23'  # debug messages only for tags `PARSER` and `AST`
         +-> Trying Program: Expression*
         |  +-> Trying Expression (prec 0)
         |  |  Looking for INT
-        |  |  Got it (1)
+        |  |  Got it (12)
         |  |  Looking for PLUS
         |  |  Got it (+)
         |  |  +-> Trying Expression (prec 12)
         |  |  |  Looking for INT
-        |  |  |  Got it (2)
+        |  |  |  Got it (23)
         |  |  <- Advanced Expression (prec 12)
         |  <- Advanced Expression (prec 0)
         <- Advanced Program: Expression*
-        AST: [[ADD,[LITERAL,['TYPE','Integer'],1,{'col' => 1,'line' => 1}],[LITERAL,['TYPE','Integer'],2,{'col' => 5,'line' => 1}],{'col' => 3,'line' => 1}]];
+        AST: [[ADD,[LITERAL,['TYPE','Integer'],12,{'col' => 1,'line' => 1}],[LITERAL,['TYPE','Integer'],23,{'col' => 5,'line' => 1}],{'col' => 3,'line' => 1}]];
         3
 
 <!-- -->
@@ -206,13 +208,13 @@ A test failure looks like this:
 
 ## The Plang Language (so far)
 
-Plang is a strongly-typed expression-oriented language with optional type annotations.
+Plang is a statically-typed expression-oriented language with optional type annotations.
 Everything in Plang evaluates to a value that can be used in an expression.
 
 ### Identifiers
-    Identifier ::=  ("_" | Letter)  ("_" | Letter | Digit)*
-    Letter     ::=  "a" - "z" | "A" - "Z"
-    Digit      ::=  "0" - "9"
+    Identifier ::=  ( "_" | Letter )  { "_" | Letter | Digit }*
+    Letter     ::=  "a" .. "z" | "A" .. "Z"
+    Digit      ::=  "0" .. "9"
 
 An identifier is a sequence of characters beginning with an underscore or a letter, optionally followed
 by additional underscores, letters or digits.
@@ -244,34 +246,29 @@ throw | throw an exception
     Expression      ::=  ExpressionGroup
                       | IfExpression
                       | WhileExpression
-                      | [ et cetera ]
-                      | Expression Terminator?
-                      | Terminator?
-    ExpressionGroup ::=  "{" Expression+ "}"
-    Terminator     ::=  ";"
+                      | ? et cetera ?
+                      | [Terminator]
+    ExpressionGroup ::=  "{" Expression* "}"
+    Terminator      ::=  ";"
 
-An expression evaluates to a single value. An expression group is multiple expressions enclosed
-in a single pair of curly-braces. An expression groups evaluates to the value of its final expression.
+A single expression evaluates to a value.
+
+An expression group is multiple expressions enclosed in a pair of curly-braces. An expression groups evaluates to the value of its final expression.
+
+Expressions can optionally be explicitly terminated by a semi-colon.
 
 #### Variables
-    VariableDeclaration ::= "var" Identifier (":" Type)? Initializer?
+    VariableDeclaration ::= "var" Identifier [":" Type] [Initializer]
     Initializer         ::= "=" Expression
-
-Variables are declared explicitly with the `var` keyword, followed by an identifier.
-The identifier may be optionally followed by a type annotation, which is a type description
-prefixed with a colon. Variables declarations may optionally have an initializer that assigns
-a default value. Without an initializer, the value of variables will default to `null`.
 
 The `var` expression evaluates to the value of its initializer. When type annotations are omitted,
 the variable's type will be inferred from its initializer value.
 
-    > var a = 5; print(type(a)); a
-     Integer
-     5
+    > var a = 5
+     [Integer] 5
 
-    > var a = "hello"; print(type(a)); a
-     String
-     "hello"
+    > var a = "hello"
+     [String] "hello"
 
 A type annotation may be provided to enable strict compile-time type-checking.
 
@@ -291,14 +288,10 @@ Variables that have not yet been assigned a value will produce a compile-time er
 #### if/then/else
     IfExpression ::= "if" Expression "then" Expression "else" Expression
 
-The `if` expression expects a condition expression followed by the `then` keyword and then
-either a single expression or a group of expressions enclosed in braces. This must then be
-followed by the `else` keyword and another single expression or group of expressions enclosed
-in braces.
+If the expression after `if` is [truthy](#truthiness) then the expression after `then` will be
+evaluated otherwise the expression after `else` will be evaluated.
 
-If the condition is [truthy](#truthiness) then the expressions(s) in the `then` branch are
-evaluated, otherwise the expression(s) of the `else` branch are evaluated. The value of
-the `if` expression is the value of the final expression of the branch that was evaluated.
+The value of the `if` expression is the value of the expression of the branch that was evaluated.
 
     > if true then 1 else 2
      1
@@ -309,36 +302,34 @@ the `if` expression is the value of the final expression of the branch that was 
 #### while/next/last
     WhileExpression ::= "while" "(" Expression ")" Expression
 
-The `while` expression expects a condition enclosed in parentheses, followed by a single expression
-or a group of expressions enclosed in braces.
+While the expression in parenthesis is [truthy](#truthiness) the expression in the while body will be evaluated.
 
-As long as the condition is [truthy](#truthiness) the expression(s) in its body will be executed.
-The value of the `while` expression is the value of the final expression to be evaluated within the loop.
+The value of the `while` expression is the value of the expression evaluated within the loop.
 
 The `next` keyword can be used to immediately jump to the next iteration of the loop.
 
-The `last` keyword can be used to immediately exit the loop. This keyword does not count as an expression.
-Ergo, the expression immediately preceding `last` will be the value of the loop.
+The `last <expression>` keyword can be used to immediately exit the loop, with a value.
 
     > var i = 0; while (++i <= 5) print(i, end=" "); print("");
      1 2 3 4 5
 
+See [`print`](#print) for information about the `print` function.
+
 #### try/catch/throw
-    Try   ::= "try" Expression ("catch" ("(" Expression ")")? Expression)+
+    Try   ::= "try" Expression { "catch" [ "(" Expression ")" ] Expression }+
     Throw ::= "throw" Expression
 
 At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
 support properly typed exceptions.
 
-All `catch` expressions are evaluated in a new lexical scope. A special variable named `e` is
-implicitly declared in this new scope, defined to be the value of the caught exception.
-
 Use `try <expression>` to evaluate an expression with exception handling.
 
 Use `catch [exception] <expression> ` to handle an exception. `[exception]` is an optional
 parenthesized String denoting the name of the exception to catch. When `[exception]` is
-omitted, the `catch` will act as a default handler for any exception. Catch handlers are
-processed top-to-bottom in the order they are defined.
+omitted, the `catch` will act as a default handler for any exception.
+
+All `catch` expressions are evaluated in a new lexical scope. A special variable named `e` is
+implicitly declared in this new scope, defined to be the value of the caught exception.
 
 Use `throw <exception>` to trigger an exception. `<exception>` is a required String denoting
 the name of the exception to throw.
@@ -346,9 +337,9 @@ the name of the exception to throw.
     > try
         1/0
       catch
-        print("Caught division by zero")
+        print("Caught {e}")
 
-    Caught division by zero
+    Caught Illegal division by zero
 <!-- -->
     > try
         throw "bar"
@@ -357,7 +348,7 @@ the name of the exception to throw.
       catch ("bar")
         print($"Caught {e} in bar handler")
       catch
-        print($"Caught unknown exception: {e}")
+        print($"Caught some other exception: {e}")
 
     Caught bar in bar handler
 <!-- -->
@@ -368,9 +359,9 @@ the name of the exception to throw.
       catch ("bar")
         print($"Caught {e} in bar handler")
       catch
-        print($"Caught unknown exception: {e}")
+        print($"Caught some other exception: {e}")
 
-    Caught unknown exception: foobar
+    Caught some other exception: foobar
 
 #### Operators
 These are the operators implemented so far, from highest to lowest precedence.
@@ -432,7 +423,7 @@ String | `false` when value is empty string; `true` otherwise.
 ### Scoping
 Plang is lexically scoped. Expression groups introduce a new lexical scope. Identifiers, variables and functions
 created within a scope are destroyed when the scope ends. Identifiers within an inner scope may override identifers
-of the same name found in outer scopes. This is called shadowing.
+of the same name found in outer scopes.
 
     { # outer scpe
        var a = 5
@@ -448,32 +439,35 @@ of the same name found in outer scopes. This is called shadowing.
     } # end outer scope, `a` no longer exists
 
 ### Functions
-    FunctionDefinition  ::= "fn" Identifier? IdentifierList? ("->" Type)? Expression
-    IdentifierList      ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
+    FunctionDefinition  ::= "fn" [ Identifier ] [ IdentifierList ] [ "->" Type ] Expression
+    IdentifierList      ::= "(" { Identifier [ ":" Type ] [ Initializer ] [ "," ] }* ")"
 
 A function definition is created by using the `fn` keyword followed by:
- * an identifer (which may be omitted to create an anonymous function)
- * an identifier list (which may be omitted if there are no parameters desired)
- * a "->" followed by a type (which may be omitted to infer the return type)
+ * an identifer, which may be omitted to create an anonymous function
+ * an identifier list, which may be omitted if there are no parameters desired
+ * a "->" followed by a type, which may be omitted to infer the return type
  * and finally an expression (which can also be a group of expressions)
 
 An identifier list is a parentheses-enclosed list of identifiers. The list is separated by
 a comma and/or whitespace. Each identifier optionally may be followed by a colon and a type
 description. Each identifier may optionally be followed by an initializer to create a default value.
 
-Plang functions automatically return the value of the final expression.
-You may use the `return` keyword to return the value of an earlier expression.
+Plang functions automatically return the value of its expression. When using a group of expressions,
+the `return` keyword may be used to return the value of any expression within the group.
 
 To call a function, write its identifier followed by a list of arguments enclosed in
-parentheses. The argument list is separated the same way as the identifier list. Arguments
-may be any valid expression.
+parentheses.
 
 The `fn` expression evaluates to a reference to the newly defined function.
 
 #### Optional type annotations
-Function definitions may optionally include type annotations to explicitly restrict
-what types the function works with. Without a type annotation the `Any` type is used,
-which tells Plang to infer the actual type from the value being supplied or returned.
+Function definitions may optionally include type annotations for the function signature.
+Compile-time errors will be generated if the types of values provided to or returned from
+the function do not match the annotations.
+
+Without a type annotation, Plang will attempt to infer the types from the values being supplied
+or returned. If Plang cannot infer the type then the `Any` type will be used, effectively disabling
+type-checking for the parameter or return value.
 
 See [Optional type annotations](#optional-type-annotations) for more information and examples.
 
@@ -489,9 +483,10 @@ function call, and will be replaced with the value of the default argument.
 In a function call, arguments can be passed positionally or by name. Arguments that are
 passed by name are called named arguments.
 
-Named arguments may be passed only to parameters that have a default argument value. All
+Named arguments may be passed only to parameters that have a default argument. All
 parameters without a default arguments are strictly positional parameters. All positional
-arguments must be passed prior to passing a named argument.
+arguments must be passed prior to passing a named argument. If a named argument is
+passed, all subsequent arguments must also be named.
 
 Consider a function that has many default arguments:
 
@@ -506,27 +501,29 @@ arguments in any order:
 
     new_creature(damage = 25, health = 125, armor = 75, name = "a troll")
 
-Another advantage of named arguments comes into play when you want to omit some arguments. With
-positional arguments, if you wanted to set specific arguments you'd also need to set each
-each prior argument, defeating the purpose of the default arguments.
-
-With named arguments you can simply specify the arguments you care about and let the
-default arguments do their job for the rest:
+Another advantage of named arguments is that you can simply specify the arguments you care
+about and let the default arguments do their job for the rest:
 
     new_creature(armor = 200, damage = 100)
 
 #### Anonymous functions
 Here are some ways to define an anonymous function:
 
-    > var greeter = fn { print("Hello!") }; greeter()
-     Hello!
-<!-- -->
+By omitting the identifier:
+
     > var adder = fn (a, b) a + b; adder(10, 20)
      30
-<!-- -->
+
+If it takes no arguments, the parameter list can be omitted too:
+
+    > var greeter = fn { print("Hello!") }; greeter()
+     Hello!
+
+Anonymous functions can be invoked directly:
+
     > (fn (a, b) a + b)(1, 2)
      3
-<!-- -->
+
     > (fn 42)()
      42
 
@@ -667,18 +664,16 @@ Plang is gradually typed with optional nominal type annotations.
 
 #### Optional type annotations
 Plang's type system allows type annotations to be omitted. When type annotations are omitted,
-the type will default to `Any`. The `Any` type tells Plang to infer the actual type from the
-value provided.
+Plang will attempt to infer the types from the values. If Plang cannot infer the types, the
+`Any` type will be used, which effectively disables type-checking for that object.
 
-Here is a brief demonstration of a function definition with optional type annotations. Let's consider
-a simple `add` function. With no explicit type annotations, the function's return type and the types
-of its parameters will default to the `Any` type:
+Let's consider a simple `add` function. With no explicit type annotations and no inferrable values,
+the function's return type and the types of its parameters will default to the `Any` type:
 
     > fn add(a, b) a + b; print(type(add));
      Function (Any, Any) -> Any
 
-This tells Plang to infer the types of its parameters from the types of the arguments passed,
-and the type of its return value from the type of the value being returned.
+This tells Plang to accept any types of values for the function call.
 
     > fn add(a, b) a + b; add(3, 4)
      7
@@ -689,16 +684,15 @@ with an undesirable run-time error:
     > fn add(a, b) a + b; add(3, "4")
      Run-time error: cannot apply binary operator ADD (have types Integer and String)
 
-One way to resolve this is to apply the `Real()` type-conversion function to the
-parameters inside the function body, creating a polymorphic function that can accept
-any arguments that can be converted to `Real`:
+The `Real()` type-conversion function can be applied to the parameters, inside the function
+body, to create a semi-polymorphic function that can accept any argument that can be converted
+to `Real`:
 
     > fn add(a, b) Real(a) + Real(b); add(3, "4")
      7
 
-On the other hand, if you desire explicit compile-time type checking on the
-parameters you can add a type annotation, prefixed with a colon, after each
-parameter identifier:
+This will still produce a run-time error if something that cannot be converted to `Real` is passed. If
+explicit compile-time type-checking is desired, a type annotation may be provided:
 
     > fn add(a: Real, b: Real) a + b; print(type(add));
       Function (Real, Real) -> Real
@@ -709,10 +703,15 @@ types specified for the parameters:
     > fn add(a: Real, b: Real) a + b; add(3, "4")
      Validator error: In function call for `add`, expected Real for parameter `b` but got String
 
-This version of `add` returns `Real` because its return type was inferred from the types of
-its parameters.
+The return type annotation can be omitted if it can be inferred from the parameters or function body.
 
-Let's delve a bit into return type inference by considering the `filter` built-in function:
+In the following example, Plang will throw a compile-time type error because `f` attempts to return
+a value that is not a `Real`:
+
+    > fn f(x) -> Real "42"
+     Validator error: in definition of function `f`: cannot return value of type String from function declared to return type Real
+
+Consider the built-in `filter` function:
 
     > print(type(filter))
      Builtin (Function (Any) -> Boolean, Array) -> Array
@@ -720,31 +719,21 @@ Let's delve a bit into return type inference by considering the `filter` built-i
 It has two parameters and returns an `Array`. The first parameter is a `Function` that takes
 one `Any` argument and returns a `Boolean` value. The second parameter is an `Array`.
 
-Thanks to type inference, a concise anonymous function without type annotations can be passed
-as the first argument:
-
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
 Because the first parameter of the `filter` function is explicitly typed to return a `Boolean` value,
-Plang can perform strict compile-time type checking on the return value of the passed argument. For
-example, if we pass it a function inferred instead to return an `Integer` we get a helpful compile-time type error:
+Plang can perform strict compile-time type checking. If we pass it a function inferred instead to return
+an `Integer` we get a helpful compile-time type error:
 
-    > filter(fn(a) 4, [1, 2, 3, 4, 5])
+    > filter(fn(a) 4, [1,2,3,4,5])
      Validator error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Integer
 
-Let's return to the `add` function. To explicitly specify the type of the return value, you
-can place a type annotation, prefixed with an arrow, just before the function body:
+Corrected:
 
-    > fn add(a: Real, b: Real) -> Real { a + b }; print(type(add))
-     Function (Real, Real) -> Real
-
-Now Plang will throw a compile-time type error if `add` attempts to return a value that
-is not a `Real`:
-
-    > fn add(a: Real, b: Real) -> Real { "42" }
-     Validator error: in definition of function `add`: cannot return value of type String from function declared to return type Real
+    > filter(fn(a) a==4, [1,2,3,4,5])
+     4
 
 #### Type narrowing during inference
 To enforce the consistency of values assigned to the variable during its lifetime,
@@ -838,9 +827,9 @@ The `Number` type is the supertype of `Integer` and `Real`. Any guard typed as `
 will accept a value of types `Integer` or `Real`.
 
 ##### Integer
-    HexLiteral     ::= "0" ("x" | "X") (Digit | "a" - "f" | "A" - "F")+
-    OctalLiteral   ::= "0" ("0" - "9")+
-    IntegerLiteral ::= ("0" - "9")+
+    HexLiteral     ::= "0" ( "x" | "X" ) { Digit | "a" - "f" | "A" - "F" }+
+    OctalLiteral   ::= "0" { "0" - "9" }+
+    IntegerLiteral ::= { "0" - "9" }+
 
 The `Integer` type denotes an integral value. `Integer` is a subtype of `Number`.
 
@@ -865,9 +854,9 @@ String | `"X"` | if `"X"` begins with an Integer then its value, otherwise `0`
 ##### Real
     RealLiteral ::= Digit+
                       (
-                        "." Digit* ("e" | "E") ("+" | "-")? Digit+
+                        "." Digit* ( "e" | "E" ) [ "+" | "-" ] Digit+
                        | "." Digit+
-                       | ("e" | "E") ("+" | "-")? Digit+
+                       | ( "e" | "E" ) [ "+" | "-" ] Digit+
                       )?
 
 The `Real` type denotes a floating-point value. `Real` is a subtype of `Number`.
@@ -890,8 +879,8 @@ String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Real then its value, otherwise `0`
 
 ##### String
-    String         ::= ("'" StringContents? "'") | ('"' StringContents? '"')
-    StringContents ::= TODO
+    String         ::= ( "'" [ StringContents ] "'" ) | ( '"' [ StringContents ] '"' )
+    StringContents ::= ? sequence of bytes/characters ?
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
 no significance between the different quotes.
@@ -922,9 +911,9 @@ Array | any value | A String containing a constructor of that Array
 Map | any value | A String containing a constructor of that Map
 
 ##### Array
-    ArrayConstructor ::= "[" (Expression ","?)* "]"
+    ArrayConstructor ::= "[" { Expression [ "," ] }* "]"
 
-An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotations to constrain Array elements to a single type.*
+An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotation to constrain Array elements to a single type.*
 
 For more details see:
 
@@ -939,7 +928,7 @@ String | A String containing an [Array constructor](#array) | the constructed Ar
 Array | any value | that value
 
 ##### Map
-    MapConstructor ::= "{" ( (IDENT | String) ":" Expression )* "}"
+    MapConstructor ::= "{" { ( IDENT | String ) ":" Expression }* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
@@ -1073,6 +1062,18 @@ Same as above, but using the alternative `.` access syntax:
 
     > var m = {}; m.x = {"y": 42}; m.x.y
      42
+
+#### keys
+Use `keys` to get an array of a map's keys.
+
+    > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; keys m
+     ['apple','banana','cherry']
+
+#### values
+Use `keys` to get an array of a map's keys.
+
+    > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; values m
+     ['green','yellow','red']
 
 #### exists
 To check for existence of a map key, use the `exists` keyword. If the key exists then
