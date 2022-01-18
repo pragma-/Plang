@@ -164,11 +164,6 @@ foreach my $test (@selected_tests) {
 
     if (my $exception = $@) {
         if (defined $expected_error) {
-            if (ref $exception eq 'ARRAY') {
-                # exception is a Plang String object; convert to run-time error message
-                $exception = "Run-time error: unhandled exception: $exception->[1]\n";
-            }
-
             if ($exception eq $expected_error) {
                 push @passed, [$test_file, 'EXCEPTION', $exception, $expected_error];
                 print '.';
