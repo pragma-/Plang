@@ -269,7 +269,7 @@ Number | `false` when value is `0`; `true` otherwise.
 String | `false` when value is empty string; `true` otherwise.
 
 ### Identifiers
-    Identifier ::=  ( "_" | Letter )  { "_" | Letter | Digit }*
+    Identifier ::=  ("_" | Letter)  {"_" | Letter | Digit}*
     Letter     ::=  "a" .. "z" | "A" .. "Z"
     Digit      ::=  "0" .. "9"
 
@@ -293,6 +293,8 @@ else | else branch of a conditional if expression
 while | loop while a condition is true
 last | break out of the loop
 next | jump to the next iteration of the loop
+keys | create array of a Map's keys
+values | create array of a Map's values
 exists | test if a key exists in a Map
 delete | deletes a key from a Map
 try | try an expression with exception handling
@@ -328,8 +330,8 @@ Variables that have not yet been assigned a value will produce a compile-time er
      Validator error: `b` not defined.
 
 ### Functions
-    FunctionDefinition  ::= "fn" [ Identifier ] [ IdentifierList ] [ "->" Type ] Expression
-    IdentifierList      ::= "(" { Identifier [ ":" Type ] [ Initializer ] [ "," ] }* ")"
+    FunctionDefinition  ::= "fn" [Identifier] [IdentifierList] ["->" Type] Expression
+    IdentifierList      ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
 
 A function definition is created by using the `fn` keyword followed by:
  * an identifer, which may be omitted to create an anonymous function
@@ -612,7 +614,7 @@ The `last <expression>` keyword can be used to immediately exit the loop, with a
 See [`print`](#print) for information about the `print` function.
 
 #### try/catch/throw
-    Try   ::= "try" Expression { "catch" [ "(" Expression ")" ] Expression }+
+    Try   ::= "try" Expression {"catch" ["(" Expression ")"] Expression}+
     Throw ::= "throw" Expression
 
 At this early stage, Plang supports simplified String-based exceptions. Eventually Plang will
@@ -827,9 +829,9 @@ The `Number` type is the supertype of `Integer` and `Real`. Any guard typed as `
 will accept a value of types `Integer` or `Real`.
 
 ##### Integer
-    HexLiteral     ::= "0" ( "x" | "X" ) { Digit | "a" - "f" | "A" - "F" }+
-    OctalLiteral   ::= "0" { "0" - "9" }+
-    IntegerLiteral ::= { "0" - "9" }+
+    HexLiteral     ::= "0" ("x" | "X") {Digit | "a" - "f" | "A" - "F"}+
+    OctalLiteral   ::= "0" {"0" - "9"}+
+    IntegerLiteral ::= {"0" - "9"}+
 
 The `Integer` type denotes an integral value. `Integer` is a subtype of `Number`.
 
@@ -879,7 +881,7 @@ String | `""` | `0`
 String | `"X"` | if `"X"` begins with a Real then its value, otherwise `0`
 
 ##### String
-    String         ::= ( "'" [ StringContents ] "'" ) | ( '"' [ StringContents ] '"' )
+    String         ::= ("'" [StringContents] "'") | ('"' [StringContents] '"')
     StringContents ::= ? sequence of bytes/characters ?
 
 A `String` is a sequence of characters enclosed in double or single quotes. There is
@@ -911,7 +913,7 @@ Array | any value | A String containing a constructor of that Array
 Map | any value | A String containing a constructor of that Map
 
 ##### Array
-    ArrayConstructor ::= "[" { Expression [ "," ] }* "]"
+    ArrayConstructor ::= "[" {Expression [","]}* "]"
 
 An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotation to constrain Array elements to a single type.*
 
@@ -928,7 +930,7 @@ String | A String containing an [Array constructor](#array) | the constructed Ar
 Array | any value | that value
 
 ##### Map
-    MapConstructor ::= "{" { ( IDENT | String ) ":" Expression }* "}"
+    MapConstructor ::= "{" {(IDENT | String) ":" Expression}* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
@@ -1064,34 +1066,34 @@ Same as above, but using the alternative `.` access syntax:
      42
 
 #### keys
-Use `keys` to get an array of a map's keys.
+Use `keys` to get an array of a Map's keys.
 
     > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; keys m
      ['apple','banana','cherry']
 
 #### values
-Use `keys` to get an array of a map's keys.
+Use `values` to get an array of a Map's values.
 
     > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; values m
      ['green','yellow','red']
 
 #### exists
-To check for existence of a map key, use the `exists` keyword. If the key exists then
-`true` is yielded, otherwise `false`. Note that setting a map key to `null` does not
+To check for existence of a Map key, use the `exists` keyword. If the key exists then
+`true` is yielded, otherwise `false`. Note that setting a Map key to `null` does not
 delete the key. See the [`delete`](#delete) keyword.
 
     > var m = { "a": 1, "b": 2 }; exists m["a"]
      true
 
 #### delete
-To delete keys from a map, use the `delete` keyword. Setting a key to `null` does not
+To delete keys from a Map, use the `delete` keyword. Setting a key to `null` does not
 delete the key.
 
 When used on a Map key, the `delete` keyword deletes the key and returns its value, or
 `null` if no such key exists.
 
-When used on a Map itself, the `delete` keyword deletes all keys in the map and returns
-the empty map.
+When used on a Map itself, the `delete` keyword deletes all keys in the Map and returns
+the empty Map.
 
     > var m = { "a": 1, "b": 2 }; delete m["b"]; m
      { "a": 1 }
