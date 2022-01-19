@@ -169,14 +169,14 @@ sub binary_op {
             $right->[1] = chr $right->[1];
         }
 
-        return [['TYPE', 'Boolean'],  $left->[1]   eq  $right->[1]]         if $instr == INSTR_EQ;
-        return [['TYPE', 'Boolean'],  $left->[1]   ne  $right->[1]]         if $instr == INSTR_NEQ;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) == -1]  if $instr == INSTR_LT;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) ==  1]  if $instr == INSTR_GT;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) <=  0]  if $instr == INSTR_LTE;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) >=  0]  if $instr == INSTR_GTE;
-        return [['TYPE', 'String'],   $left->[1]    .  $right->[1]]         if $instr == INSTR_STRCAT;
-        return [['TYPE', 'Integer'], index $left->[1], $right->[1]]         if $instr == INSTR_STRIDX;
+        return [['TYPE', 'Boolean'],  $left->[1]   eq  $right->[1], $pos]         if $instr == INSTR_EQ;
+        return [['TYPE', 'Boolean'],  $left->[1]   ne  $right->[1], $pos]         if $instr == INSTR_NEQ;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) == -1, $pos]  if $instr == INSTR_LT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) ==  1, $pos]  if $instr == INSTR_GT;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) <=  0, $pos]  if $instr == INSTR_LTE;
+        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) >=  0, $pos]  if $instr == INSTR_GTE;
+        return [['TYPE', 'String'],   $left->[1]    .  $right->[1], $pos]         if $instr == INSTR_STRCAT;
+        return [['TYPE', 'Integer'], index $left->[1], $right->[1], $pos]         if $instr == INSTR_STRIDX;
     }
 
     # Number operations
@@ -223,6 +223,8 @@ sub binary_op {
         }
 
         if (defined $result) {
+            push @$result, $pos;
+
             my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
 
             if ($self->{types}->is_subtype($promotion, $result->[0])) {
@@ -597,6 +599,10 @@ sub keyword_try {
 
             $default_catcher = $body;
         } else {
+            if ($default_catcher) {
+                $self->error($context, "default `catch` must be last", $pos);
+            }
+
             my $new_context = $self->new_context($context);
 
             $cond = $self->evaluate($new_context, $cond);
