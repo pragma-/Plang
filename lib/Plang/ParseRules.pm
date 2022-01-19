@@ -84,7 +84,7 @@ sub token_position {
 }
 
 # start-rule:
-# Program ::= Expression*
+# Program ::= {Expression}+
 sub Program {
     my ($parser) = @_;
 
@@ -206,7 +206,7 @@ sub KeywordFalse {
     return [['TYPE', 'Boolean'], 0, token_position($token)];
 }
 
-# KeywordReturn ::= "return" Expression?
+# KeywordReturn ::= "return" [Expression]
 sub KeywordReturn {
     my ($parser) = @_;
     my $token = consume_keyword($parser, 'return');
@@ -250,7 +250,7 @@ sub KeywordNext {
     return [INSTR_NEXT, undef, token_position($token)];
 }
 
-# KeywordLast ::= "last" Expression?
+# KeywordLast ::= "last" [Expression]
 sub KeywordLast {
     my ($parser) = @_;
     my $token = consume_keyword($parser, 'last');
@@ -366,7 +366,7 @@ sub KeywordValues {
     return [INSTR_VALUES, $expression, token_position($token)];
 }
 
-# KeywordTry ::= try Expression (catch ("(" String ")")? Expression)+
+# KeywordTry ::= try Expression {catch ["(" Expression ")"] Expression}+
 sub KeywordTry {
     my ($parser) = @_;
 
@@ -440,7 +440,7 @@ sub KeywordThrow {
     return [INSTR_THROW, $expr, token_position($token)];
 }
 
-# KeywordVar ::= "var" IDENT (":" Type)? Initializer?
+# KeywordVar ::= "var" IDENT [":" Type] [Initializer]
 sub KeywordVar {
     my ($parser) = @_;
 
@@ -471,7 +471,7 @@ sub KeywordVar {
     return [INSTR_VAR, $type, $name, $initializer, token_position($var_token)];
 }
 
-# Initializer ::= ASSIGN Expression
+# Initializer ::= "=" Expression
 sub Initializer {
     my ($parser) = @_;
 
@@ -501,11 +501,7 @@ sub Initializer {
     $parser->backtrack;
 }
 
-# Type         ::= TypeLiteral ("|" TypeLiteral)*
-# TypeLiteral  ::= TypeFunction | TYPE
-# TypeFunction ::= (TYPE_Function | TYPE_Builtin) TypeFunctionParams? TypeFunctionReturn?
-# TypeFunctionParams ::= "(" (Type ","?)* ")"
-# TypeFunctionReturn ::= "->" Type
+# Type         ::= TypeLiteral {"|" TypeLiteral}*
 sub Type {
     my ($parser) = @_;
 
@@ -542,6 +538,7 @@ sub Type {
     $parser->backtrack;
 };
 
+# TypeLiteral  ::= TypeFunction | TYPE
 sub TypeLiteral {
     my ($parser) = @_;
 
@@ -556,6 +553,7 @@ sub TypeLiteral {
     return;
 }
 
+# TypeFunction ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
 sub TypeFunction {
     my ($parser) = @_;
 
@@ -576,6 +574,7 @@ sub TypeFunction {
     return;
 }
 
+# TypeFunctionParams ::= "(" {Type [","]}* ")"
 sub TypeFunctionParams {
     my ($parser) = @_;
 
@@ -598,6 +597,7 @@ sub TypeFunctionParams {
     return;
 }
 
+# TypeFunctionReturn ::= "->" TypeLiteral
 sub TypeFunctionReturn {
     my ($parser) = @_;
 
@@ -614,7 +614,7 @@ sub TypeFunctionReturn {
     return;
 }
 
-# KeywordFn ::= "fn" IDENT? IdentifierList? ("->" Type)? ExpressionGroup | Expression)
+# KeywordFn ::= "fn" [IDENT] [IdentifierList] ["->" Type] Expression
 sub KeywordFn {
     my ($parser) = @_;
 
@@ -636,7 +636,7 @@ sub KeywordFn {
     return [INSTR_FUNCDEF, $return_type, $name, $identlist, [$expression], token_position($fn_token)];
 }
 
-# IdentifierList ::= "(" (Identifier (":" Type)? Initializer? ","?)* ")"
+# IdentifierList ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
 sub IdentifierList {
     my ($parser) = @_;
 
@@ -678,7 +678,7 @@ sub IdentifierList {
     $parser->backtrack;
 }
 
-# MapConstructor ::= "{" ((String | IDENT) ":" Expression ","?)* "}"
+# MapConstructor ::= "{" {(String | IDENT) ":" Expression [","]}* "}"
 #         String ::= DQUOTE_STRING | SQUOTE_STRING
 sub MapConstructor {
     my ($parser) = @_;
@@ -733,7 +733,7 @@ sub MapConstructor {
     $parser->backtrack;
 }
 
-# ArrayConstructor ::= "[" (Expression ","?)* "]"
+# ArrayConstructor ::= "[" {Expression [","]}* "]"
 sub ArrayConstructor {
     my ($parser) = @_;
 
@@ -860,6 +860,8 @@ sub get_precedence {
     return $infix_token_precedence{$tokentype} // 0;
 }
 
+# UnaryOp ::= Op Expression
+# Op      ::= "!" | "-" | "+" | ? etc ?
 sub UnaryOp {
     my ($parser, $op, $ins) = @_;
 
@@ -869,6 +871,8 @@ sub UnaryOp {
     }
 }
 
+# BinaryOp ::= Expression BinOp Expression
+# BinOp    ::= "-" | "+" | "/" | "*" | "%" | ">" | ">=" | "<" | "<=" | "==" | "&&" | ? etc ?
 sub BinaryOp {
     my ($parser, $left, $op, $ins, $precedence, $right_associative) = @_;
     $right_associative ||= 0;
@@ -879,7 +883,7 @@ sub BinaryOp {
     }
 }
 
-# ExpressionGroup ::= L_BRACE Expression* R_BRACE
+# ExpressionGroup ::= "{" {Expression}* "}"
 sub ExpressionGroup {
     my ($parser) = @_;
 
@@ -908,6 +912,7 @@ sub ExpressionGroup {
     $parser->backtrack;
 }
 
+# Expression ::= ExpressionGroup | UnaryOp | BinaryOp | Identifier | KeywordNull .. KeywordThrow | LiteralInteger .. LiteralFloat | ? etc ?
 sub Expression {
     my ($parser, $precedence) = @_;
 
@@ -936,12 +941,14 @@ sub Expression {
     $parser->backtrack;
 }
 
+# Identifier ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}*
 sub Identifier {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_IDENT);
     return [INSTR_IDENT, $token->[1], token_position($token)];
 }
 
+# LiteralInteger ::= {"0" .. "9"}+
 sub LiteralInteger {
     my ($parser) = @_;
 
@@ -954,12 +961,14 @@ sub LiteralInteger {
     return [INSTR_LITERAL, ['TYPE', 'Integer'], $token->[1] + 0, token_position($token)];
 }
 
+# LiteralFloat ::= {"0" .. "9"}* ("." {"0" .. "9"}* ("e" | "E") ["+" | "-"] {"0" .. "9"}+ | "." {"0" .. "9"}+ | ("e" | "E") ["+" | "-"] {"0" .. "9"}+)
 sub LiteralFloat {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_FLT);
     return [INSTR_LITERAL, ['TYPE', 'Real'], $token->[1] + 0, token_position($token)];
 }
 
+# LiteralHexInteger ::= "0" ("x" | "X") {"0" .. "9" | "a" .. "f" | "A" .. "F"}+
 sub LiteralHexInteger {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_HEX);

@@ -6,6 +6,7 @@ This README describes what is implemented so far.
 <details><summary>Click to show table of contents</summary>
 
 <!-- md-toc-begin -->
+* [Plang](#plang)
   * [Project structure](#project-structure)
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
@@ -79,6 +80,7 @@ This README describes what is implemented so far.
       * [exists](#exists)
       * [delete](#delete)
     * [JSON compatibility/serialization](#json-compatibilityserialization)
+    * [Plang EBNF Grammar](#plang-ebnf-grammar)
 <!-- md-toc-end -->
 
 </details>
@@ -1116,3 +1118,44 @@ The Array() and Map() type conversion functions can be used to convert a String 
 an Array constructor or a Map constructor back to an Array or a Map object.
 
 See [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang) and [examples/json.plang](../examples/json.plang) for more details.
+
+### Plang EBNF Grammar
+Here is the, potentially incomplete, Plang EBNF grammar.
+
+    Program            ::= {Expression}+
+    KeywordNull        ::= "null"
+    KeywordTrue        ::= "true"
+    KeywordFalse       ::= "false"
+    KeywordReturn      ::= "return" [Expression]
+    KeywordWhile       ::= "while" "(" Expression ")" Expression
+    KeywordNext        ::= "next"
+    KeywordLast        ::= "last" [Expression]
+    KeywordIf          ::= "if" Expression "then" Expression "else" Expression
+    KeywordExists      ::= "exists" Expression
+    KeywordDelete      ::= "delete" Expression
+    KeywordKeys        ::= "keys" Expression
+    KeywordValues      ::= "values" Expression
+    KeywordTry         ::= try Expression {catch ["(" Expression ")"] Expression}+
+    KeywordThrow       ::= "throw" Expression
+    KeywordVar         ::= "var" IDENT [":" Type] [Initializer]
+    Initializer        ::= "=" Expression
+    Type               ::= TypeLiteral {"|" TypeLiteral}*
+    TypeLiteral        ::= TypeFunction | TYPE
+    TypeFunction       ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
+    TypeFunctionParams ::= "(" {Type [","]}* ")"
+    TypeFunctionReturn ::= "->" TypeLiteral
+    KeywordFn          ::= "fn" [IDENT] [IdentifierList] ["->" Type] Expression
+    IdentifierList     ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
+    MapConstructor     ::= "{" {(String | IDENT) ":" Expression [","]}* "}"
+    String             ::= DQUOTE_STRING | SQUOTE_STRING
+    ArrayConstructor   ::= "[" {Expression [","]}* "]"
+    UnaryOp            ::= Op Expression
+    Op                 ::= "!" | "-" | "+" | ? etc ?
+    BinaryOp           ::= Expression BinOp Expression
+    BinOp              ::= "-" | "+" | "/" | "*" | "%" | ">" | ">=" | "<" | "<=" | "==" | "&&" | ? etc ?
+    ExpressionGroup    ::= "{" {Expression}* "}"
+    Expression         ::= ExpressionGroup | UnaryOp | BinaryOp | Identifier | KeywordNull .. KeywordThrow | LiteralInteger .. LiteralFloat | ? etc ?
+    Identifier         ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}*
+    LiteralInteger     ::= {"0" .. "9"}+
+    LiteralFloat       ::= {"0" .. "9"}* ("." {"0" .. "9"}* ("e" | "E") ["+" | "-"] {"0" .. "9"}+ | "." {"0" .. "9"}+ | ("e" | "E") ["+" | "-"] {"0" .. "9"}+)
+    LiteralHexInteger  ::= "0" ("x" | "X") {"0" .. "9" | "a" .. "f" | "A" .. "F"}+
