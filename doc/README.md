@@ -32,7 +32,7 @@ This README describes what is implemented so far.
       * [Input/Output](#inputoutput)
         * [print](#print)
       * [Introspection](#introspection)
-        * [type](#type)
+        * [typeof](#typeof)
         * [whatis](#whatis)
       * [Data and structures](#data-and-structures)
         * [length](#length)
@@ -468,23 +468,23 @@ Optionally, you can use [named arguments](#named-arguments) for clarity:
      hello! good-bye!
 
 #### Introspection
-##### type
-The `type` function returns the type of an expression, as a string. For functions,
+##### typeof
+The `typeof` function returns the type of an expression, as a string. For functions,
 it returns strictly the type signature. If you're interested in function parameter
 identifiers and default arguments, see the [`whatis`](#whatis) builtin function.
 
 Its signature is: `Builtin (expr: Any) -> String`
 
-    > type(3.14)
+    > typeof(3.14)
      "Real"
 
-    > var a = "hello"; type(a)
+    > var a = "hello"; typeof(a)
      "String"
 
-    > type(print)
+    > typeof(print)
      "Builtin (Any, String) -> Null"
 
-    > type(filter)
+    > typeof(filter)
      "Builtin (Function (Any) -> Boolean, Array) -> Array"
 
 ##### whatis
@@ -674,7 +674,7 @@ Plang will attempt to infer the types from the values. If Plang cannot infer the
 Let's consider a simple `add` function. With no explicit type annotations and no inferrable values,
 the function's return type and the types of its parameters will default to the `Any` type:
 
-    > fn add(a, b) a + b; print(type(add));
+    > fn add(a, b) a + b; print(typeof(add));
      Function (Any, Any) -> Any
 
 This tells Plang to accept any types of values for the function call.
@@ -698,7 +698,7 @@ to `Real`:
 This will still produce a run-time error if something that cannot be converted to `Real` is passed. If
 explicit compile-time type-checking is desired, a type annotation may be provided:
 
-    > fn add(a: Real, b: Real) a + b; print(type(add));
+    > fn add(a: Real, b: Real) a + b; print(typeof(add));
       Function (Real, Real) -> Real
 
 Now Plang will throw a compile-time error if the types of the arguments do not match the
@@ -717,7 +717,7 @@ a value that is not a `Real`:
 
 Consider the built-in `filter` function:
 
-    > print(type(filter))
+    > print(typeof(filter))
      Builtin (Function (Any) -> Boolean, Array) -> Array
 
 It has two parameters and returns an `Array`. The first parameter is a `Function` that takes
@@ -746,7 +746,7 @@ variables declared as `Any` will be narrowed to the type of the value initially 
 For example, a variable of type `Any` initialized to `true` will have its type narrowed
 to `Boolean`:
 
-    > var a = true; type(a)
+    > var a = true; typeof(a)
      "Boolean"
 
 It will then be a compile-time type error to assign a value of any other type to it.

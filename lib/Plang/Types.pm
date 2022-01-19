@@ -131,8 +131,18 @@ sub is_subtype {
 # return true if a type name is arithmetic
 sub is_arithmetic {
     my ($self, $type) = @_;
-    return 1 if $self->has_subtype('Number', $type->[1]);
-    return 1 if $self->has_subtype('Boolean', $type->[1]);
+
+    if ($type->[0] eq 'TYPE') {
+        return 1 if $self->has_subtype('Number', $type->[1]);
+        return 1 if $self->has_subtype('Boolean', $type->[1]);
+    }
+
+    if ($type->[0] eq 'TYPEUNION') {
+        foreach my $t (@{$type->[1]}) {
+            return $self->is_arithmetic($t);
+        }
+    }
+
     return 0;
 }
 
@@ -319,25 +329,24 @@ sub is_equal {
     die "unknown type\n";
 }
 
-
-sub contains {
-    my ($self, $types, $type) = @_;
-
-    foreach my $t (@$types) {
-        return 1 if $self->is_equal($t, $type);
-    }
-
-    return 0;
-}
-
 sub unite {
     my ($self, $types) = @_;
 
     my @union;
+    my %uniq;
+
     foreach my $type (@$types) {
         next if $self->is_equal($type, ['TYPE', 'Any']);
-        next if $self->contains(\@union, $type);
-        push @union, $type;
+
+        if ($type->[0] eq 'TYPEUNION') {
+            foreach my $t (@{$type->[1]}) {
+                push @union, $t unless exists $uniq{$t->[1]};
+                $uniq{$t->[1]} = 1;
+            }
+        } else {
+            push @union, $type unless exists $uniq{$type->[1]};
+            $uniq{$type->[1]} = 1;
+        }
     }
 
     return ['TYPE', 'Any'] if @union == 0;
@@ -351,8 +360,8 @@ sub unite {
 
 sub make_typeunion {
     my ($self, $types) = @_;
-    my @sorted = sort { $a->[1] cmp $b->[1] } @$types;
-    return ['TYPEUNION', \@sorted];
+    my @union = sort { $a->[1] cmp $b->[1] } @$types;
+    return ['TYPEUNION', \@union];
 }
 
 1;

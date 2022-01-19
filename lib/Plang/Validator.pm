@@ -113,19 +113,15 @@ sub unary_op {
 
     my $value = $self->evaluate($context, $data->[1]);
 
-    if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0])) {
-        return $value;
-    }
-
-    if ($self->{types}->is_arithmetic($value->[0])) {
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0]) || $self->{types}->is_arithmetic($value->[0])) {
         my $result;
 
         if ($instr == INSTR_NOT) {
-            $result = [['TYPE', 'Boolean'], int ! $value->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_NEG) {
-            $result = [['TYPE', 'Number'], - $value->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_POS) {
-            $result = [['TYPE', 'Number'], + $value->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } else {
             $self->error($context, "Unknown unary operator $pretty_instr[$instr]", $pos);
         }
@@ -148,44 +144,31 @@ sub binary_op {
     my $left  = $self->evaluate($context, $data->[1]);
     my $right = $self->evaluate($context, $data->[2]);
 
-    if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
-        return $left;
-    }
-
-    if ($self->{types}->is_equal(['TYPE', 'Any'], $right->[0])) {
-        return $right;
-    }
 
     # String operations
 
-    if ($self->{types}->check(['TYPE', 'String'], $left->[0])
-            or $self->{types}->check(['TYPE', 'String'], $right->[0])) {
-
-        if ($self->{types}->check(['TYPE', 'Number'], $left->[0])) {
-            $left->[1] = chr $left->[1];
-        }
-
-        if ($self->{types}->check(['TYPE', 'Number'], $right->[0])) {
-            $right->[1] = chr $right->[1];
-        }
-
-        return [['TYPE', 'Boolean'],  $left->[1]   eq  $right->[1], $pos]         if $instr == INSTR_EQ;
-        return [['TYPE', 'Boolean'],  $left->[1]   ne  $right->[1], $pos]         if $instr == INSTR_NEQ;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) == -1, $pos]  if $instr == INSTR_LT;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) ==  1, $pos]  if $instr == INSTR_GT;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) <=  0, $pos]  if $instr == INSTR_LTE;
-        return [['TYPE', 'Boolean'], ($left->[1]  cmp  $right->[1]) >=  0, $pos]  if $instr == INSTR_GTE;
-        return [['TYPE', 'String'],   $left->[1]    .  $right->[1], $pos]         if $instr == INSTR_STRCAT;
-        return [['TYPE', 'Integer'], index $left->[1], $right->[1], $pos]         if $instr == INSTR_STRIDX;
+    if (    $self->{types}->check(['TYPE', 'String'], $left->[0])
+         or $self->{types}->check(['TYPE', 'String'], $right->[0])
+         or $self->{types}->is_equal(['TYPE', 'Any'], $left->[0])
+         or $self->{types}->is_equal(['TYPE', 'Any'], $right->[0]))
+    {
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_EQ;
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_NEQ;
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_LT;
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_GT;
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_LTE;
+        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_GTE;
+        return [['TYPE', 'String'],  0, $pos]  if $instr == INSTR_STRCAT;
+        return [['TYPE', 'Integer'], 0, $pos]  if $instr == INSTR_STRIDX;
     }
 
     # Number operations
 
-    if (not $self->{types}->is_arithmetic($left->[0])) {
+    if (!$self->{types}->is_equal(['TYPE', 'Any'], $left->[0]) && !$self->{types}->is_arithmetic($left->[0])) {
         $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos);
     }
 
-    if (not $self->{types}->is_arithmetic($right->[0])) {
+    if (!$self->{types}->is_equal(['TYPE', 'Any'], $right->[0]) && !$self->{types}->is_arithmetic($right->[0])) {
         $self->error($context, "cannot apply operator $pretty_instr[$instr] to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos);
     }
 
@@ -193,38 +176,32 @@ sub binary_op {
         my $result;
 
         if ($instr == INSTR_EQ) {
-            $result = [['TYPE', 'Boolean'], $left->[1] == $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_NEQ) {
-            $result = [['TYPE', 'Boolean'], $left->[1] != $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_ADD) {
-            $result = [['TYPE', 'Number'],  $left->[1]  + $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_SUB) {
-            $result = [['TYPE', 'Number'],  $left->[1]  - $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_MUL) {
-            $result = [['TYPE', 'Number'],  $left->[1]  * $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_DIV) {
-            if ($right->[1] == 0) {
-                $self->error($context, "division by zero", $self->position($right));
-            }
-
-            $result = [['TYPE', 'Number'],  $left->[1]  / $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_REM) {
-            $result = [['TYPE', 'Number'],  $left->[1]  % $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_POW) {
-            $result = [['TYPE', 'Number'],  $left->[1] ** $right->[1]];
+            $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_LT) {
-            $result = [['TYPE', 'Boolean'], $left->[1]  < $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_LTE) {
-            $result = [['TYPE', 'Boolean'], $left->[1] <= $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_GT) {
-            $result = [['TYPE', 'Boolean'], $left->[1]  > $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         } elsif ($instr == INSTR_GTE) {
-            $result = [['TYPE', 'Boolean'], $left->[1] >= $right->[1]];
+            $result = [['TYPE', 'Boolean'], 0, $pos];
         }
 
         if (defined $result) {
-            push @$result, $pos;
-
             my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
 
             if ($self->{types}->is_subtype($promotion, $result->[0])) {
@@ -343,10 +320,6 @@ sub type_check_op_assign {
         $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos_right);
     }
 
-    if ($op eq 'DIV' && $right->[1] == 0) {
-        $self->error($context, "division by zero", $self->position($right));
-    }
-
     if ($self->{types}->check($left->[0], $right->[0])) {
         return $left;
     }
@@ -431,7 +404,7 @@ sub variable_declaration {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
 
-    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context) . "\n") if $self->{debug};
+    $self->{dprint}->('VARS', "set_variable $name to " . Dumper($value) . "\n") if $self->{debug};
 
     my $guard = $context->{guards}->{$name};
 
@@ -693,7 +666,7 @@ sub function_definition {
         $self->declare_variable($new_context, $type, $ident, $value);
     }
 
-    # infer return type
+    # collect returned values to infer return type
     my @return_values;
     my $result;
     my $expr_pos;
@@ -890,7 +863,7 @@ sub function_call {
         $name = "anonymous-2";
 
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
-            $self->error($context, "cannot invoke `" . $self->output_value($func) . "` as a function (have type " . $self->{types}->to_string($func->[0]) . ")", $self->position($target));
+            $self->error($context, "cannot invoke value of type " . $self->{types}->to_string($func->[0]) . " as a function", $self->position($target));
         }
     }
 
@@ -1030,11 +1003,11 @@ sub keyword_while {
     $context->{while_loop} = 1;
 
     # validate expressions
-    $self->evaluate($context, $data->[2]);
+    my $result = $self->evaluate($context, $data->[2]);
 
     delete $context->{while_loop};
 
-    return [['TYPE', 'Null'], undef];
+    return $result;
 }
 
 sub keyword_next {
@@ -1044,7 +1017,7 @@ sub keyword_next {
         $self->error($context, "cannot use `next` outside of loop", $self->position($data));
     }
 
-    return [['TYPE', 'Null'], undef];
+    return [['TYPE', 'Null'], undef, $self->position($data)];
 }
 
 sub keyword_last {

@@ -153,19 +153,19 @@ sub declare_variable {
     my ($self, $context, $type, $name, $value) = @_;
     $context->{guards}->{$name} = $type;
     $context->{locals}->{$name} = $value;
-    $self->{dprint}->('VARS', "declare_variable $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
+    $self->{dprint}->('VARS', "declare_variable $name with value " . Dumper($value) ."\n") if $self->{debug};
 }
 
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{locals}->{$name} = $value;
-    $self->{dprint}->('VARS', "set_variable $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
+    $self->{dprint}->('VARS', "set_variable $name to value " . Dumper($value) . "\n") if $self->{debug};
 }
 
 sub get_variable {
     my ($self, $context, $name, %opt) = @_;
 
-    $self->{dprint}->('VARS', "get_variable: $name\n" . Dumper($context->{locals}) . "\n") if $self->{debug};
+    $self->{dprint}->('VARS', "get_variable: $name has value " . Dumper($context->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
 
     # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
@@ -418,6 +418,8 @@ sub keyword_try {
         my $catch;
 
         if (not ref $exception) {
+            chomp $exception;
+            $exception =~ s/ at.*// if $exception =~ /\.pm line \d+/; # strip Perl info
             $exception = [['TYPE', 'String'], $exception];
         }
 
@@ -845,7 +847,7 @@ my %function_builtins = (
         subref => \&function_builtin_print,
         vsubref => \&validate_builtin_print,
     },
-    'type' => {
+    'typeof' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'String'],
         subref => \&function_builtin_type,

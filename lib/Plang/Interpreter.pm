@@ -239,6 +239,8 @@ sub interpret {
     my $result = eval { $self->{interpreter}->run($self->{ast}, %opt) };
 
     if (my $exception = $@) {
+        chomp $exception;
+        $exception =~ s/ at.*// if $exception =~ /\.pm line \d+/; # strip Perl info
         die "Run-time error: unhandled exception: ", $self->{interpreter}->output_value($exception), "\n";
     }
 
