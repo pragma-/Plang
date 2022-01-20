@@ -361,7 +361,7 @@ Without a type annotation, Plang will attempt to infer the types from the values
 or returned. If Plang cannot infer the type then the `Any` type will be used, effectively disabling
 type-checking for the parameter or return value.
 
-See [Optional type annotations](#optional-type-annotations) for more information and examples.
+See [Optional type annotations](#optional-type-annotations-1) for more information and examples.
 
 #### Default arguments
 In a function definition, parameters may optionally be followed by an initializer. This is
