@@ -670,14 +670,14 @@ Plang's type system allows type annotations to be omitted. When type annotations
 Plang will attempt to infer the types from the values. If Plang cannot infer the types, the
 `Any` type will be used, which effectively disables type-checking for that object.
 
-Let's consider a simple `add` function. With no explicit type annotations and no inferrable values,
-the function's return type and the types of its parameters will default to the `Any` type:
+Let's consider a simple `add` function without type annotations:
 
     > fn add(a, b) a + b; print(typeof(add));
      Function (Any, Any) -> Number
 
-This tells Plang to accept any types of values for the function call. Plang inferred a
-return type of `Number` because that's the type of the `+` operator.
+Because the `+` operator expects types of `Number`, Plang can infer the return type. Since
+`a` and `b` are of type `Any`, any value may be passed to the function. As long as the values
+are sub-types of `Number`, the function will be happy:
 
     > fn add(a, b) a + b; add(3, 4)
      7
@@ -695,10 +695,9 @@ to `Real`:
     > fn add(a, b) Real(a) + Real(b); add(3, "4")
      7
 
-This will still produce a run-time error if something that cannot be converted to `Real` is passed. If
-explicit compile-time type-checking is desired, type annotations may be provided. In the following
-example, Plang infers a return type of `Real` instead of `Number` because both operands to `+` are
-of type `Real`.
+Unfortunately, the above will still produce a run-time error if something that cannot
+be converted to `Real` is passed. Wouldn't compile-time error messages be better? Enter
+type annotations!
 
     > fn add(a: Real, b: Real) a + b; print(typeof(add));
       Function (Real, Real) -> Real
@@ -706,17 +705,15 @@ of type `Real`.
 Now Plang will throw a compile-time error if the types of the arguments do not match the
 types specified for the parameters:
 
-    > fn add(a: Real, b: Real) a + b; add(3, "4")
+    > fn add(a: Real, b: Real) a + b; add(3, "yellow")
      Validator error: In function call for `add`, expected Real for parameter `b` but got String
 
-The return type annotation can be omitted if it can be inferred from the parameters or function body.
-Of course, it's always possible to explicitly specify a return type annotation. In the following example,
-Plang will throw a compile-time type error because `f` attempts to return a value that is not a `Real`:
+In the follow example, the function `f` is annotated to return `Integer`, but whoops:
 
-    > fn f(x) -> Real "42"
-     Validator error: in definition of function `f`: cannot return value of type String from function declared to return type Real
+    > fn f(x) -> Integer "strawberry"
+     Validator error: in definition of function `f`: cannot return value of type String from function declared to return type Integer
 
-Consider the built-in `filter` function:
+That was a silly example. Let's consider the built-in `filter` function:
 
     > print(typeof(filter))
      Builtin (Function (Any) -> Boolean, Array) -> Array
@@ -724,18 +721,21 @@ Consider the built-in `filter` function:
 It has two parameters and returns an `Array`. The first parameter is a `Function` that takes
 one `Any` argument and returns a `Boolean` value. The second parameter is an `Array`.
 
+Here's how it works. The `Function` parameter is applied to each element of the `Array`
+parameter; if it returns a `true` value then that element will be added to the `Array`
+returned from the `filter` function. Like so:
+
     > filter(fn(a) a<4, [1,2,3,4,5])
      [1,2,3]
 
-Because the first parameter of the `filter` function is explicitly typed to return a `Boolean` value,
-Plang can perform strict compile-time type checking. If we pass it a function inferred instead to return
-an `Integer` we get a helpful compile-time type error:
+If a function that returns an `Integer` is passed instead, a helpful compile-time type error is produced:
 
     > filter(fn(a) 4, [1,2,3,4,5])
      Validator error: in function call for `filter`, expected Function (Any) -> Boolean
        for parameter `func` but got Function (Any) -> Integer
 
-Corrected:
+Had this been allowed to compile, the `4`, being non-zero, would have been interpreted as a `true` value on
+every element of the array. Corrected:
 
     > filter(fn(a) a==4, [1,2,3,4,5])
      4
