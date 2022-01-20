@@ -6,7 +6,6 @@ This README describes what is implemented so far.
 <details><summary>Click to show table of contents</summary>
 
 <!-- md-toc-begin -->
-* [Plang](#plang)
   * [Project structure](#project-structure)
   * [Running Plang](#running-plang)
     * [DEBUG environment variable](#debug-environment-variable)
@@ -675,9 +674,10 @@ Let's consider a simple `add` function. With no explicit type annotations and no
 the function's return type and the types of its parameters will default to the `Any` type:
 
     > fn add(a, b) a + b; print(typeof(add));
-     Function (Any, Any) -> Any
+     Function (Any, Any) -> Number
 
-This tells Plang to accept any types of values for the function call.
+This tells Plang to accept any types of values for the function call. Plang inferred a
+return type of `Number` because that's the type of the `+` operator.
 
     > fn add(a, b) a + b; add(3, 4)
      7
@@ -696,7 +696,9 @@ to `Real`:
      7
 
 This will still produce a run-time error if something that cannot be converted to `Real` is passed. If
-explicit compile-time type-checking is desired, a type annotation may be provided:
+explicit compile-time type-checking is desired, type annotations may be provided. In the following
+example, Plang infers a return type of `Real` instead of `Number` because both operands to `+` are
+of type `Real`.
 
     > fn add(a: Real, b: Real) a + b; print(typeof(add));
       Function (Real, Real) -> Real
@@ -708,9 +710,8 @@ types specified for the parameters:
      Validator error: In function call for `add`, expected Real for parameter `b` but got String
 
 The return type annotation can be omitted if it can be inferred from the parameters or function body.
-
-In the following example, Plang will throw a compile-time type error because `f` attempts to return
-a value that is not a `Real`:
+Of course, it's always possible to explicitly specify a return type annotation. In the following example,
+Plang will throw a compile-time type error because `f` attempts to return a value that is not a `Real`:
 
     > fn f(x) -> Real "42"
      Validator error: in definition of function `f`: cannot return value of type String from function declared to return type Real
