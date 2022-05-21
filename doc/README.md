@@ -154,7 +154,7 @@ Available `DEBUG` tags are: `ERRORS`, `TOKEN`, `PARSER`, `BACKTRACK`, `AST`, `TY
         |  <- Advanced Expression (prec 0)
         <- Advanced Program: Expression*
         AST: [[ADD,[LITERAL,['TYPE','Integer'],12,{'col' => 1,'line' => 1}],[LITERAL,['TYPE','Integer'],23,{'col' => 5,'line' => 1}],{'col' => 3,'line' => 1}]];
-        3
+        35
 
 <!-- -->
     $ DEBUG=ALL ./plang '1 + 2'         # all debug messages (output too verbose to show here)
@@ -176,7 +176,7 @@ It is recommended to use the `rlwrap` command-line utility for command history.
 Plang is designed to be embedded into larger Perl applications.
 
 I will get around to documenting this soon. In the meantime, take a look at [this unit-test script](../bin/runtests) and
- [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/Plugins/Plang.pm) for
+ [PBot's Plang plugin](https://github.com/pragma-/pbot/blob/master/lib/PBot/Plugin/Plang.pm) for
 general idea of how to go about it.
 
 ## Running the Unit Tests
