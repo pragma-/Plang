@@ -30,6 +30,7 @@ my %constants = (
     KEYWORD_TRY => $n++,
     KEYWORD_CATCH => $n++,
     KEYWORD_THROW => $n++,
+    KEYWORD_TYPE => $n++,
 );
 
 our @pretty_keyword = map { s/^KEYWORD_//; lc $_ } sort { $constants{$a} <=> $constants{$b} } keys %constants;

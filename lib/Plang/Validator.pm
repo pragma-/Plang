@@ -424,11 +424,17 @@ sub array_constructor {
     my $pos      = $data->[2];
     my $arrayref = [];
 
+    my @types;
+
     foreach my $entry (@$array) {
-        push @$arrayref, $self->evaluate($context, $entry);
+        my $value = $self->evaluate($context, $entry);
+        push @$arrayref, $value;
+        push @types, $value->[0];
     }
 
-    return [['TYPE', 'Array'], $arrayref, $pos];
+    my $type = $self->{types}->unite(\@types);
+
+    return [['TYPEARRAY', $type], $arrayref, $pos];
 }
 
 sub map_constructor {
@@ -436,6 +442,8 @@ sub map_constructor {
 
     my $map     = $data->[1];
     my $hashref = {};
+
+    my @props;
 
     foreach my $entry (@$map) {
         if ($entry->[0]->[0] == INSTR_IDENT) {
@@ -446,7 +454,9 @@ sub map_constructor {
             }
 
             if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-                $hashref->{$var->[1]} = $self->evaluate($context, $entry->[1]);
+                my $value = $self->evaluate($context, $entry->[1]);
+                $hashref->{$var->[1]} = $value;
+                push @props, [$var->[1], $value->[0]];
                 next;
             }
 
@@ -454,14 +464,16 @@ sub map_constructor {
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
-            $hashref->{$entry->[0]->[1]} = $self->evaluate($context, $entry->[1]);
+            my $value = $self->evaluate($context, $entry->[1]);
+            $hashref->{$entry->[0]->[1]} = $value;
+            push @props, [$entry->[0]->[1], $value->[0]];
             next;
         }
 
         $self->error($context, "cannot use type `" . $self->{types}->to_string($entry->[0]->[0]) . "` as Map key", $self->position($entry->[0]));
     }
 
-    return [['TYPE', 'Map'], $hashref];
+    return [['TYPEMAP', \@props], $hashref];
 }
 
 sub keyword_exists {

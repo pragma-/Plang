@@ -8,16 +8,16 @@
 # Arrays
 var array = ['green', 2, 3.1459, null]
 
-print(type(array))   # prints Array
-print(array[0])      # prints green
-print(array)         # prints ["green",2,3.1459,null]
+print(typeof(array))   # prints [Integer | Null | Real | String]
+print(array[0])        # prints green
+print(array)           # prints ["green",2,3.1459,null]
 
 # Maps
 var map1 = { 'name': 'Grok', 'health': 200 }
 
-print(type(map1))    # prints Map
-print(map1['name'])  # prints Grok
-print(map1)          # prints {"name": "Grok", "health": 200}
+print(typeof(map1))    # prints {'name': String, 'health': Integer}
+print(map1['name'])    # prints Grok
+print(map1)            # prints {"name": "Grok", "health": 200}
 
 # Note that conversions from Array/Map to String replaces the single-quotes
 # with double-quotes.
@@ -27,27 +27,27 @@ print(map1)          # prints {"name": "Grok", "health": 200}
 # Here's how you can convert an Array to a String:
 var string1 = String(array)
 
-print(type(string1)) # prints String
-print(string1)       # prints ["green",2,3.1459,null]
+print(typeof(string1)) # prints String
+print(string1)         # prints ["green",2,3.1459,null]
 
 # Likewise for Maps:
 var string2 = String(map1)
 
-print(type(string2)) # prints String
-print(string2)       # prints {"name": "Grok", "health": 200}
+print(typeof(string2)) # prints String
+print(string2)         # prints {"name": "Grok", "health": 200}
 
 # You can convert back from a String to an Array or a Map:
 var array2 = Array("[1,2,'blue','green']")
 
-print(type(array2))  # prints Array
-print(array2[2])     # prints blue
-print(array2)        # prints [1,2,"blue","green"]
+print(typeof(array2)) # prints [Integer | String]
+print(array2[2])      # prints blue
+print(array2)         # prints [1,2,"blue","green"]
 
 var map2 = Map("{'a': 1, 'b': 2}")
 
-print(type(map2))    # prints Map
-print(map2['b'])     # prints 2
-print(map2)          # prints {"a": 1, "b": 2}
+print(typeof(map2))   # prints {'a': Integer, 'b': Integer}
+print(map2['b'])      # prints 2
+print(map2)           # prints {"a": 1, "b": 2}
 
 # As seen in `arrays_and_maps.pl`, you can mix-and-match and
 # nest Maps and Arrays to construct useful data structures.

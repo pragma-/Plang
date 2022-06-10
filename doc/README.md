@@ -248,7 +248,7 @@ These are the operators implemented so far, from highest to lowest precedence.
 5   | -=   | Subtraction assignment   | Infix (right-to-left)
 5   | \*=  | Product assignment       | Infix (right-to-left)
 5   | /=   | Division assignment      | Infix (right-to-left)
-5   | .=   | String concat assignment | Infix (right-to-left)
+5   | ^^=  | String concat assignment | Infix (right-to-left)
 4   | ,    | Comma                    | Infix (left-to-right)
 3   | not  | Logical negation         | Prefix
 2   | and  | Logical and              | Infix (left-to-right)
@@ -301,6 +301,7 @@ delete | deletes a key from a Map
 try | try an expression with exception handling
 catch | catch an exception from a tried expression
 throw | throw an exception
+type | type declaration
 
 ### Variables
     VariableDeclaration ::= "var" Identifier [":" Type] [Initializer]
@@ -476,6 +477,9 @@ Its signature is: `Builtin (expr: Any) -> String`
 
     > typeof(3.14)
      "Real"
+
+    > typeof([1, 2, 3])
+     "[Integer]"
 
     > var a = "hello"; typeof(a)
      "String"
@@ -930,7 +934,6 @@ The `Array()` type conversion function can be used to convert the following:
 From Type | With Value | Resulting Array Value
 --- | --- | ---
 String | A String containing an [Array constructor](#array) | the constructed Array
-Array | any value | that value
 
 ##### Map
     MapConstructor ::= "{" {(IDENT | String) ":" Expression}* "}"
@@ -948,7 +951,6 @@ The `Map()` type conversion function can be used to convert the following:
 From Type | With Value | Resulting Map Value
 --- | --- | ---
 String | A String containing a [Map constructor](#map-1) | the constructed Map
-Map | any value | that value
 
 ##### Function
 The `Function` type identifies a normal function defined with the `fn` keyword. See [functions](#functions) for more information.
@@ -1141,7 +1143,9 @@ Here is the, potentially incomplete, Plang EBNF grammar.
     KeywordVar         ::= "var" IDENT [":" Type] [Initializer]
     Initializer        ::= "=" Expression
     Type               ::= TypeLiteral {"|" TypeLiteral}*
-    TypeLiteral        ::= TypeFunction | TYPE
+    TypeLiteral        ::= TypeMap | TypeArray | TypeFunction | TYPE
+    TypeMap            ::= "{" {(String | IDENT) ":" Type [","]}* "}"
+    TypeArray          ::= "[" Type "]"
     TypeFunction       ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
     TypeFunctionParams ::= "(" {Type [","]}* ")"
     TypeFunctionReturn ::= "->" TypeLiteral

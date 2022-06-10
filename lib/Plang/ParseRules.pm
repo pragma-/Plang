@@ -136,6 +136,7 @@ $keyword_dispatcher[KEYWORD_VAR]    = \&KeywordVar;
 $keyword_dispatcher[KEYWORD_TRY]    = \&KeywordTry;
 $keyword_dispatcher[KEYWORD_CATCH]  = \&CatchWithoutTry;
 $keyword_dispatcher[KEYWORD_THROW]  = \&KeywordThrow;
+$keyword_dispatcher[KEYWORD_TYPE]   = \&KeywordType;
 
 sub Keyword {
     my ($parser) = @_;
@@ -449,7 +450,7 @@ sub KeywordVar {
     my $ident_token = $parser->consume(TOKEN_IDENT);
 
     if (not $ident_token) {
-        expected($parser, 'identifier for variable name');
+        expected($parser, 'identifier for variable');
     }
 
     my $name = $ident_token->[1];
@@ -469,6 +470,53 @@ sub KeywordVar {
     my $initializer = Initializer($parser);
 
     return [INSTR_VAR, $type, $name, $initializer, token_position($var_token)];
+}
+
+# KeywordType ::= "type" IDENT "=" Type
+sub KeywordType {
+    my ($parser) = @_;
+
+    my $type_token = consume_keyword($parser, 'type');
+
+    my $ident_token = $parser->consume(TOKEN_IDENT);
+
+    if (not $ident_token) {
+        expected($parser, 'identifier for type');
+    }
+
+    my $name = $ident_token->[1];
+
+    my $subtype = 'Any';
+
+    if ($parser->consume(TOKEN_COLON)) {
+        my $subtype_token = $parser->consume(TOKEN_TYPE);
+
+        if (not $subtype_token) {
+            expected($parser, "subtype for type `$name`");
+        }
+
+        $subtype = $subtype_token->[1];
+    }
+
+    if (not $parser->consume(TOKEN_ASSIGN)) {
+        expected($parser, "\"=\" after type `$name`");
+    }
+
+    my $type = Type($parser);
+
+    if (not $type) {
+        expected($parser, "type literal for type `$name`");
+    }
+
+    # check for duplicate type definition
+    if ($parser->get_type($name)) {
+        error($parser, "cannot redefine existing type `$name`");
+    }
+
+    # add type to parser's internal list of types
+    $parser->add_type($name);
+
+    return [INSTR_TYPE, $name, $subtype, $type, token_position($type_token)];
 }
 
 # Initializer ::= "=" Expression
@@ -507,9 +555,9 @@ sub Type {
 
     $parser->try('Type');
 
-    my $typeunion = [];
-
     my $type = TypeLiteral($parser) // goto TYPE_FAIL;
+
+    my $typeunion = [];
 
     while (1) {
         push @$typeunion, $type;
@@ -538,11 +586,19 @@ sub Type {
     $parser->backtrack;
 };
 
-# TypeLiteral  ::= TypeFunction | TYPE
+# TypeLiteral  ::= TypeMap | TypeArray | TypeFunction | TYPE
 sub TypeLiteral {
     my ($parser) = @_;
 
-    my $type = TypeFunction($parser);
+    my $type;
+
+    $type = TypeMap($parser);
+    return $type if $type;
+
+    $type = TypeArray($parser);
+    return $type if $type;
+
+    $type = TypeFunction($parser);
     return $type if $type;
 
     if (my $token = $parser->consume(TOKEN_TYPE)) {
@@ -551,6 +607,84 @@ sub TypeLiteral {
     }
 
     return;
+}
+
+# TypeMap ::= "{" {(String | IDENT) ":" Type [","]}* "}"
+sub TypeMap {
+    my ($parser) = @_;
+
+    $parser->try('TypeMap');
+
+    if (my $token = $parser->consume(TOKEN_L_BRACE)) {
+        my @map;
+
+        while (1) {
+            my $parsedkey = $parser->consume(TOKEN_DQUOTE_STRING)
+                         || $parser->consume(TOKEN_SQUOTE_STRING)
+                         || $parser->consume(TOKEN_IDENT);
+
+            if ($parsedkey) {
+                my $mapkey;
+
+                if ($parsedkey->[0] == TOKEN_DQUOTE_STRING) {
+                    $parsedkey->[1] =~ s/^"|"$//g;
+                    $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
+                } elsif ($parsedkey->[0] == TOKEN_SQUOTE_STRING) {
+                    $parsedkey->[1] =~ s/^'|'$//g;
+                    $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
+                } else {
+                    $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
+                }
+
+                if (not $parser->consume(TOKEN_COLON)) {
+                    expected($parser, '":" after map key');
+                }
+
+                my $type = Type($parser);
+
+                if (not $type) {
+                    expected($parser, 'type for map value');
+                }
+
+                $parser->consume(TOKEN_COMMA);
+
+                push @map, [$mapkey->[1], $type];
+                next;
+            }
+
+            last if $parser->consume(TOKEN_R_BRACE);
+            expected($parser, 'map entry or `}` in map type');
+        }
+
+        $parser->advance;
+        return ['TYPEMAP', \@map, token_position($token)];
+    }
+
+    $parser->backtrack;
+}
+
+# TypeArray ::= "[" Type "]"
+sub TypeArray {
+    my ($parser) = @_;
+
+    $parser->try('TypeArray');
+
+    if (my $token = $parser->consume(TOKEN_L_BRACKET)) {
+        my $type = Type($parser);
+
+        if (not $type) {
+            expected($parser, 'type of elements for array type');
+        }
+
+        if (not $parser->consume(TOKEN_R_BRACKET)) {
+            expected($parser, 'closing "]" for array type');
+        }
+
+        $parser->advance;
+        return ['TYPEARRAY', $type, token_position($token)];
+    }
+
+    $parser->backtrack;
 }
 
 # TypeFunction ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
@@ -814,7 +948,7 @@ my %infix_token_precedence = (
     TOKEN_MINUS_EQ    , $precedence_table{'ASSIGNMENT'},
     TOKEN_STAR_EQ     , $precedence_table{'ASSIGNMENT'},
     TOKEN_SLASH_EQ    , $precedence_table{'ASSIGNMENT'},
-    TOKEN_DOT_EQ      , $precedence_table{'ASSIGNMENT'},
+    TOKEN_CARET_CARET_EQ, $precedence_table{'ASSIGNMENT'},
     TOKEN_DOT_DOT     , $precedence_table{'COMMA'},
     TOKEN_NOT         , $precedence_table{'LOW_NOT'},
     TOKEN_AND         , $precedence_table{'LOW_AND'},
@@ -850,7 +984,7 @@ $binop_data[TOKEN_PLUS_EQ]     = [INSTR_ADD_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_MINUS_EQ]    = [INSTR_SUB_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_STAR_EQ]     = [INSTR_MUL_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_SLASH_EQ]    = [INSTR_DIV_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_DOT_EQ]      = [INSTR_CAT_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_CARET_CARET_EQ] = [INSTR_CAT_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_DOT_DOT]     = [INSTR_RANGE,      'COMMA',       ASSOC_RIGHT];
 $binop_data[TOKEN_AND]         = [INSTR_AND,        'LOW_AND',     ASSOC_LEFT];
 $binop_data[TOKEN_OR]          = [INSTR_OR,         'LOW_OR',      ASSOC_LEFT];

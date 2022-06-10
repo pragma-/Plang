@@ -79,6 +79,7 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
     $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
     $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
+    $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
 
     # unary operators
     $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
@@ -306,6 +307,8 @@ sub map_constructor {
     my $map     = $data->[1];
     my $hashref = {};
 
+    my @props;
+
     foreach my $entry (@$map) {
         my $key   = $entry->[0];
         my $value = $entry->[1];
@@ -313,18 +316,22 @@ sub map_constructor {
         # identifier
         if ($key->[0] == INSTR_IDENT) {
             my $var = $self->get_variable($context, $key->[1]);
-            $hashref->{$var->[1]} = $self->evaluate($context, $value);
+            my $value = $self->evaluate($context, $value);
+            $hashref->{$var->[1]} = $value;
+            push @props, [$var->[1], $value->[0]];
             next;
         }
 
         # string
         if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
-            $hashref->{$key->[1]} = $self->evaluate($context, $value);
+            my $value = $self->evaluate($context, $value);
+            $hashref->{$key->[1]} = $value;
+            push @props, [$key->[1], $value->[0]];
             next;
         }
     }
 
-    return [['TYPE', 'Map'], $hashref];
+    return [['TYPEMAP', \@props], $hashref];
 }
 
 sub array_constructor {
@@ -333,11 +340,17 @@ sub array_constructor {
     my $array    = $data->[1];
     my $arrayref = [];
 
+    my @types;
+
     foreach my $entry (@$array) {
-        push @$arrayref, $self->evaluate($context, $entry);
+        my $value = $self->evaluate($context, $entry);
+        push @$arrayref,  $value;
+        push @types, $value->[0];
     }
 
-    return [['TYPE', 'Array'], $arrayref];
+    my $type = $self->{types}->unite(\@types);
+
+    return [['TYPEARRAY', $type], $arrayref];
 }
 
 sub keyword_exists {
@@ -482,6 +495,19 @@ sub keyword_while {
     }
 
     return [['TYPE', 'Null'], undef];
+}
+
+sub keyword_type {
+    my ($self, $context, $data) = @_;
+
+    my $name    = $data->[1];
+    my $subtype = $data->[2];
+    my $type    = $data->[3];
+
+    $self->{types}->add($subtype, $name);
+    $self->{types}->add_alias($name, $type);
+
+    return $type;
 }
 
 sub add_assign {
@@ -850,7 +876,7 @@ my %function_builtins = (
     'typeof' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'String'],
-        subref => \&function_builtin_type,
+        subref => \&function_builtin_typeof,
     },
     'whatis' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
@@ -900,13 +926,13 @@ my %function_builtins = (
         vsubref => \&validate_builtin_Boolean,
     },
     'Array' => {
-        params => [[['TYPEUNION', [['TYPE', 'String'], ['TYPE', 'Array']]], 'expr', undef]],
+        params => [[['TYPE', 'String'], 'expr', undef]],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_Array,
         vsubref => \&validate_builtin_Array,
     },
     'Map' => {
-        params => [[['TYPEUNION', [['TYPE', 'String'], ['TYPE', 'Map']]], 'expr', undef]],
+        params => [[['TYPE', 'String'], 'expr', undef]],
         ret    => ['TYPE', 'Map'],
         subref => \&function_builtin_Map,
         vsubref => \&validate_builtin_Map,
@@ -971,8 +997,8 @@ sub function_builtin_print {
     return [['TYPE', 'Null'], undef];
 }
 
-# builtin type
-sub function_builtin_type {
+# builtin typeof
+sub function_builtin_typeof {
     my ($self, $context, $name, $arguments) = @_;
     my ($expr) = ($arguments->[0]);
     return [['TYPE', 'String'], $self->{types}->to_string($expr->[0])];
@@ -1216,7 +1242,7 @@ sub function_builtin_Map {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
-        my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
+        my $mapinit = $self->parse_string($expr->[1])->[0];
 
         if ($mapinit->[0] != INSTR_MAPINIT) {
             $self->error($context, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
@@ -1244,13 +1270,13 @@ sub function_builtin_Array {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
-        my $mapinit = $self->parse_string($expr->[1])->[0]->[1];
+        my $arrayinit = $self->parse_string($expr->[1])->[0];
 
-        if ($mapinit->[0] != INSTR_ARRAYINIT) {
+        if ($arrayinit->[0] != INSTR_ARRAYINIT) {
             $self->error($context, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
         }
 
-        return $self->evaluate($context, $mapinit);
+        return $self->evaluate($context, $arrayinit);
     }
 
     $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");

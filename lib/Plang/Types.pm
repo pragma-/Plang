@@ -35,6 +35,10 @@ sub initialize {
         $self->{clean}  = sub {''};
     }
 
+    $self->{types}   = {};
+    $self->{aliases} = {};
+    $self->{rank}    = {};
+
     # root type is Any
     $self->add('Any');
 
@@ -78,6 +82,18 @@ sub add {
     }
 }
 
+# add a type alias
+sub add_alias {
+    my ($self, $name, $type) = @_;
+    $self->{aliases}->{$name} = $type;
+}
+
+# get an existing type alias
+sub get_alias {
+    my ($self, $name) = @_;
+    return $self->{aliases}->{$name};
+}
+
 # return flat list of type names
 sub as_list {
     my ($self) = @_;
@@ -96,7 +112,29 @@ sub to_string {
     my ($self, $type) = @_;
 
     if ($type->[0] eq 'TYPE') {
-        return $type->[1];
+        my $type_alias = $self->{aliases}->{$type->[1]};
+
+        if ($type_alias) {
+            return "$type->[1] aka " . $self->to_string($type_alias);
+        } else {
+            return $type->[1];
+        }
+    }
+
+    if ($type->[0] eq 'TYPEARRAY') {
+        return '[' . $self->to_string($type->[1]) . ']';
+    }
+
+    if ($type->[0] eq 'TYPEMAP') {
+        my @types;
+
+        foreach my $entry (@{$type->[1]}) {
+            my ($key, $type) = @$entry;
+
+            push @types, "'$key': " . $self->to_string($type);
+        }
+
+        return '{' . join(', ', @types) . '}';
     }
 
     if ($type->[0] eq 'TYPEUNION') {
@@ -149,6 +187,26 @@ sub exists {
 sub has_subtype {
     my ($self, $type, $subtype) = @_;
 
+    my $type_alias = $self->{aliases}->{$type};
+
+    if ($type_alias) {
+        if ($type_alias->[0] eq 'TYPE') {
+            $type = $type_alias->[1];
+        } else {
+            return 0;
+        }
+    }
+
+    my $subtype_alias = $self->{aliases}->{$subtype};
+
+    if ($subtype_alias) {
+        if ($subtype_alias->[0] eq 'TYPE') {
+            $subtype = $subtype_alias->[1];
+        } else {
+            return 0;
+        }
+    }
+
     return 1 if $type eq $subtype;
     return 1 if exists $self->{types}->{$type}->{$subtype};
 
@@ -163,7 +221,8 @@ sub has_subtype {
 sub is_subtype {
     my ($self, $subtype, $type) = @_;
 
-    if ($subtype->[0] eq 'TYPEUNION' or $type->[0] eq 'TYPEUNION') {
+    # only basic types can be subtypes of another
+    if ($subtype->[0] ne 'TYPE' or $type->[0] ne 'TYPE') {
         return 0;
     }
 
@@ -183,7 +242,6 @@ sub is_arithmetic {
 
     if ($type->[0] eq 'TYPE') {
         return 1 if $self->has_subtype('Number', $type->[1]);
-        return 1 if $self->has_subtype('Boolean', $type->[1]);
     }
 
     if ($type->[0] eq 'TYPEUNION') {
@@ -219,12 +277,49 @@ sub is_equal {
     # a type
     if ($type1->[0] eq 'TYPE') {
         if ($type2->[0] eq 'TYPE') {
-            return 1 if $type1->[1] eq $type2->[1];
+            my $type1_alias = $self->{aliases}->{$type1->[1]};
+            my $type2_alias = $self->{aliases}->{$type2->[1]};
+
+            if ($type1_alias && $type2_alias) {
+                return $self->is_equal($type1_alias, $type2_alias);
+            } elsif ($type1_alias) {
+                return $self->is_equal($type1_alias, $type2);
+            } elsif ($type2_alias) {
+                return $self->is_equal($type1, $type2_alias);
+            } else {
+                return 1 if $type1->[1] eq $type2->[1];
+            }
         }
         return 0;
     }
 
-    # a list of types
+    # an array of types
+    if ($type1->[0] eq 'TYPEARRAY') {
+        return 0 if $type2->[0] ne 'TYPEARRAY';
+        return 1 if $self->is_equal($type1->[1], $type2->[1]);
+        return 0;
+    }
+
+    # a map of types
+    if ($type1->[0] eq 'TYPEMAP') {
+        return 0 if $type2->[0] ne 'TYPEMAP';
+
+        my $type1_props = $type1->[1];
+        my $type2_props = $type2->[1];
+
+        return 0 if @$type1_props != @$type2_props;
+
+        for (my $i = 0; $i < @$type1_props; ++$i) {
+            # compare prop name
+            return 0 if not $type1_props->[$i]->[0] eq $type2_props->[$i]->[0];
+            # compare prop type
+            return 0 if not $self->is_equal($type1_props->[$i]->[1], $type2_props->[$i]->[1]);
+        }
+
+        return 1;
+    }
+
+    # a union of types
     if ($type1->[0] eq 'TYPEUNION') {
         return 0 if $type2->[0] ne 'TYPEUNION';
         return 0 if @{$type1->[1]} != @{$type2->[1]};
@@ -264,7 +359,23 @@ sub is_equal {
         return $self->is_equal($type1_return, $type_return);
     }
 
-    die "unknown type\n";
+    die "[is_equal] unknown type\n";
+}
+
+sub resolve_alias {
+    my ($self, $type) = @_;
+
+    my $alias = $self->{aliases}->{$type->[1]};
+
+    if ($alias) {
+        if ($alias->[0] eq 'TYPE') {
+            return $self->resolve_alias($alias);
+        } else {
+            return $alias;
+        }
+    }
+
+    return $type;
 }
 
 # type-checking
@@ -273,18 +384,65 @@ sub check {
 
     if ($self->{debug}) {
         $Data::Dumper::Terse = 1;
+        $Data::Dumper::Indent = 0;
         $self->{dprint}->('TYPES', "type check ", Dumper($guard), " vs ", Dumper($type), "\n");
+
+        if (grep { $_ eq 'TYPES' } @{$self->{debug}}) {
+            use Devel::StackTrace;
+            my $trace = Devel::StackTrace->new(indent => 1, ignore_class => ['Plang::Interpreter', 'main']);
+            print "  at ", $trace->as_string(), "\n";
+        }
     }
+
+    # check for aliases
+    # we wrap these resolve_alias() calls with a check for 'TYPE'
+    # to avoid an unnecessary subcall
+    if ($guard->[0] eq 'TYPE') {
+        $guard = $self->resolve_alias($guard);
+    }
+
+    if ($type->[0] eq 'TYPE') {
+        $type  = $self->resolve_alias($type);
+    }
+
+    $self->{dprint}->('TYPES', "type check after alias resolve", Dumper($guard), " vs ", Dumper($type), "\n");
 
     # a type
     if ($guard->[0] eq 'TYPE') {
         return 1 if $guard->[1] eq 'Any';
+        return 1 if $guard->[1] eq 'Array' and $type->[0] eq 'TYPEARRAY';
+        return 1 if $guard->[1] eq 'Map'   and $type->[0] eq 'TYPEMAP';
         return 0 if $type->[0] ne 'TYPE';
         return 0 if not $self->has_subtype($guard->[1], $type->[1]);
         return 1;
     }
 
-    # a list of types
+    # an array of types
+    if ($guard->[0] eq 'TYPEARRAY') {
+        return 0 if $type->[0] ne 'TYPEARRAY';
+        return $self->check($guard->[1], $type->[1]);
+    }
+
+    # a map of types
+    if ($guard->[0] eq 'TYPEMAP') {
+        return 0 if $type->[0] ne 'TYPEMAP';
+
+        my $guard_props = $guard->[1];
+        my $type_props  = $type->[1];
+
+        return 0 if @$guard_props != @$type_props; # arity of properties do not match
+
+        for (my $i = 0; $i < @$guard_props; ++$i) {
+            # compare prop name
+            return 0 if not $guard_props->[$i]->[0] eq $type_props->[$i]->[0];
+            # compare prop type
+            return 0 if not $self->check($guard_props->[$i]->[1], $type_props->[$i]->[1]);
+        }
+
+        return 1;
+    }
+
+    # an union of types
     if ($guard->[0] eq 'TYPEUNION') {
         if ($type->[0] eq 'TYPEUNION') {
             return $self->is_equal($guard, $type);
@@ -325,7 +483,7 @@ sub check {
         return $self->check($guard_return, $type_return);
     }
 
-    die "unknown type\n";
+    die "[check] unknown type\n";
 }
 
 sub unite {

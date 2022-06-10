@@ -89,7 +89,7 @@ sub initialize {
         [TOKEN_PIPE,             qr{\G(   \|                  )}x],
         [TOKEN_AMP_AMP,          qr{\G(   &&                  )}x],
 # !used [TOKEN_AMP,              qr{\G(   &                   )}x],
-# !used [TOKEN_CARET_CARET_EQ,   qr{\G(   \^\^=               )}x],
+        [TOKEN_CARET_CARET_EQ,   qr{\G(   \^\^=               )}x],
         [TOKEN_CARET_CARET,      qr{\G(   \^\^                )}x],
         [TOKEN_CARET,            qr{\G(   \^                  )}x],
         [TOKEN_PERCENT,          qr{\G(   %                   )}x],
@@ -126,7 +126,7 @@ sub initialize {
 
     $self->{types} = Plang::Types->new(debug => $conf{debug});
 
-    $self->{parser}->define_types($self->{types}->as_list);
+    $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
 
     $self->{validator} = Plang::Validator->new(debug => $conf{debug}, types => $self->{types});
 

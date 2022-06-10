@@ -48,7 +48,7 @@ sub initialize {
 
     $self->{rules}    = [];
     $self->{keywords} = [];
-    $self->{types}    = [];
+    $self->{types}    = {};
 }
 
 # define our keywords
@@ -60,7 +60,19 @@ sub define_keywords {
 # define our types
 sub define_types {
     my $self = shift;
-    @{$self->{types}} = @_;
+    %{$self->{types}} = @_;
+}
+
+# add a new type
+sub add_type {
+    my ($self, $name) = @_;
+    $self->{types}->{$name} = 1;
+}
+
+# get an existing type
+sub get_type {
+    my ($self, $name) = @_;
+    return $self->{types}->{$name};
 }
 
 # try a rule (pushes the current token index onto the backtrack)
@@ -178,11 +190,8 @@ sub next_token {
             }
 
             # is this identifier a type?
-            foreach my $type (@{$self->{types}}) {
-                if ($token->[1] eq $type) {
-                    $token->[0] = TOKEN_TYPE;
-                    last;
-                }
+            if (exists $self->{types}->{$token->[1]}) {
+                $token->[0] = TOKEN_TYPE;
             }
         }
     }

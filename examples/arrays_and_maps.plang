@@ -4,9 +4,9 @@
 # Basic Array
 var array = ["red", "green", 1, 2]
 
-print(type(array)) # prints Array
-print(array[1])    # prints green
-print(array)       # prints ["red","green",1,2]
+print(typeof(array)) # prints [Integer | String]
+print(array[1])      # prints green
+print(array)         # prints ["red","green",1,2]
 
 # Basic Map
 var map1 = {
@@ -15,7 +15,7 @@ var map1 = {
     'iq'     : 75
 }
 
-print(type(map1))    # prints Map
+print(typeof(map1))  # prints {'name': String, 'health': Integer, 'iq': Integer}
 print(map1['name'])  # prints Grok
 print(map1)          # prints {"name": "Grok", "health": 200, "iq": 75}
 
