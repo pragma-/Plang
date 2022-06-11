@@ -29,21 +29,11 @@ sub initialize {
 
     $self->{token_iter} = $conf{token_iter};
 
-    $self->{debug} = $conf{debug} // $ENV{DEBUG} // 0;
+    $self->{debug} = $conf{debug};
 
-    # set up internal debugging subroutines
     if ($self->{debug}) {
-        my @tags = split /,/, $self->{debug};
-        $self->{debug} = \@tags;
-        $self->{clean} = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub {
-            my $tag = shift;
-            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
-        };
         $self->{indent} = 0;
-    } else {
-        $self->{dprint} = sub {};
-        $self->{clean} = sub {''};
+        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
     }
 
     $self->{rules}    = [];
@@ -82,15 +72,15 @@ sub try {
     push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
-        $self->{dprint}->('PARSER', "+-> Trying $dbg_msg\n");
+        $self->{debug}->{print}->('PARSER', "+-> Trying $dbg_msg\n", $self->{indent});
         push @{$self->{current_rule}}, $dbg_msg;
         $self->{indent}++;
 
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->('BACKTRACK', "[$count] saving posiition $self->{current_token}\n");
+        $self->{debug}->{print}->('BACKTRACK', "[$count] saving posiition $self->{current_token}\n", $self->{indent});
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        $self->{dprint}->('TOKEN', "Trying token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
+        $self->{debug}->{print}->('TOKEN', "Trying token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n", $self->{indent}) if defined $token;
     }
 }
 
@@ -102,14 +92,14 @@ sub backtrack {
 
     if ($self->{debug}) {
         my $count = @{$self->{backtrack}} + 1;
-        $self->{dprint}->('BACKTRACK', "[$count] backtracking to position $self->{current_token}\n");
+        $self->{debug}->{print}->('BACKTRACK', "[$count] backtracking to position $self->{current_token}\n", $self->{indent});
 
         my $token = $self->{read_tokens}->[$self->{current_token}];
-        $self->{dprint}->('TOKEN', "Backtracked to token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n") if defined $token;
+        $self->{debug}->{print}->('TOKEN', "Backtracked to token [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n", $self->{indent}) if defined $token;
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
-        $self->{dprint}->('PARSER', "<- Backtracked $rule\n");
+        $self->{debug}->{print}->('PARSER', $self->{indent}, "<- Backtracked $rule\n");
     }
 
     return;
@@ -123,11 +113,12 @@ sub advance {
 
     if ($self->{debug}) {
         my $count = @{$self->{backtrack}};
-        $self->{dprint}->('BACKTRACK', "[$count] popped a backtrack\n");
+        $self->{debug}->{print}->('BACKTRACK', $self->{indent}, "[$count] popped a backtrack\n");
 
         $self->{indent}--;
+
         my $rule = pop @{$self->{current_rule}};
-        $self->{dprint}->('PARSER', "<- Advanced $rule\n") if defined $rule; # TODO: this is a band-aid; fix this properly
+        $self->{debug}->{print}->('PARSER', "<- Advanced $rule\n", $self->{indent}) if defined $rule;
     }
 }
 
@@ -147,9 +138,9 @@ sub next_token {
 
     if ($self->{debug}) {
         if ($opt eq 'peek') {
-            $self->{dprint}->('TOKEN', "Peeking next token:\n");
+            $self->{debug}->{print}->('TOKEN', "Peeking next token:\n", $self->{indent});
         } else {
-            $self->{dprint}->('TOKEN', "Fetching next token:\n");
+            $self->{debug}->{print}->('TOKEN', "Fetching next token:\n", $self->{indent});
         }
     }
 
@@ -161,7 +152,7 @@ sub next_token {
             $token = $self->{read_tokens}->[$self->{current_token}];
 
             if ($self->{debug} && defined $token) {
-                $self->{dprint}->('TOKEN', "Peeked existing token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n");
+                $self->{debug}->{print}->('TOKEN', "Peeked existing token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "]\n", $self->{indent});
             }
 
             if (defined $token) {
@@ -203,7 +194,7 @@ sub next_token {
     $self->consume unless $opt eq 'peek';
 
     if ($self->{debug}) {
-        $self->{dprint}->('TOKEN', "Got new token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "], position: $self->{current_token}\n");
+        $self->{debug}->{print}->('TOKEN', "Got new token: [" . $pretty_token[$token->[0]] . ", " . $self->{clean}->($token->[1]) . "], position: $self->{current_token}\n", $self->{indent});
     }
 
     return $token;
@@ -231,15 +222,15 @@ sub consume {
         return $token;
     }
 
-    $self->{dprint}->('PARSER', "Looking for " . $pretty_token[$wanted] . "\n") if $debug;
+    $self->{debug}->{print}->('PARSER', "Looking for " . $pretty_token[$wanted] . "\n", $self->{indent}) if $debug;
 
     if ($token->[0] == $wanted) {
-        $self->{dprint}->('PARSER', "Got it (" . $self->{clean}->($token->[1]) . ")\n") if $debug;
+        $self->{debug}->{print}->('PARSER', "Got it (" . $self->{clean}->($token->[1]) . ")\n", $self->{indent}) if $debug;
         $self->{current_token}++;
         return $token;
     }
 
-    $self->{dprint}->('PARSER', "Got " . $pretty_token[$token->[0]] . " instead\n") if $debug;
+    $self->{debug}->{print}->('PARSER', "Got " . $pretty_token[$token->[0]] . " instead\n", $self->{indent}) if $debug;
     return;
 }
 
@@ -250,19 +241,19 @@ sub consume_to {
 
     my $debug = $self->{debug};
 
-    $self->{dprint}->('PARSER', "Consuming until $pretty_token[$target]\n") if $debug;
+    $self->{debug}->{print}->('PARSER', "Consuming until $pretty_token[$target]\n", $self->{indent}) if $debug;
 
     while (1) {
         my $token = $self->next_token('peek');
 
-        $self->{dprint}->('PARSER', "Peeked EOF\n") if $debug and not defined $token;
+        $self->{debug}->{print}->('PARSER', "Peeked EOF\n", $self->{indent}) if $debug and not defined $token;
         return if not defined $token;
 
-        $self->{dprint}->('PARSER', "Consumed $pretty_token[$token->[0]] at position $self->{current_token}\n") if $debug;
+        $self->{debug}->{print}->('PARSER', "Consumed $pretty_token[$token->[0]] at position $self->{current_token}\n", $self->{indent}) if $debug;
         $self->consume;
 
         if ($token->[0] == $target) {
-            $self->{dprint}->('PARSER', "Got target.\n") if $debug;
+            $self->{debug}->{print}->('PARSER', "Got target.\n", $self->{indent}) if $debug;
             return;
         }
     }
@@ -282,7 +273,7 @@ sub add_error {
     my ($self, $text) = @_;
     push @{$self->{errors}}, $text;
     $self->set_error;
-    $self->{dprint}->('PARSER', "Added error: $text\n") if $self->{debug};
+    $self->{debug}->{print}->('PARSER', "Added error: $text\n", $self->{indent}) if $self->{debug};
 }
 
 # was there an error in the last parse?
@@ -290,7 +281,7 @@ sub errored {
     my ($self) = @_;
 
     if ($self->{got_error}) {
-        $self->{dprint}->('PARSER', "Got error.\n") if $self->{debug};
+        $self->{debug}->{print}->('PARSER', "Got error.\n", $self->{indent}) if $self->{debug};
         $self->advance;
         return 1;
     }
@@ -301,14 +292,14 @@ sub errored {
 # set the error flag
 sub set_error {
     my ($self) = @_;
-    $self->{dprint}->('PARSER', "Error set.\n") if $self->{debug};
+    $self->{debug}->{print}->('PARSER', "Error set.\n", $self->{indent}) if $self->{debug};
     $self->{got_error} = 1;
 }
 
 # clear the error flag
 sub clear_error {
     my ($self) = @_;
-    $self->{dprint}->('PARSER', "Error cleared.\n") if $self->{debug};
+    $self->{debug}->{print}->('PARSER', "Error cleared.\n", $self->{indent}) if $self->{debug};
     $self->{got_error} = 0;
 }
 

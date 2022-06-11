@@ -34,20 +34,21 @@ sub initialize {
     $self->{debug}    = $conf{debug};
 
     if ($self->{debug}) {
-        my @tags = split /,/, $self->{debug};
-        $self->{debug}  = \@tags;
-        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub {
-            my $tag = shift;
-            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
+        my %tags = map { $_ => 1 } split /,/, $self->{debug};
+
+        $self->{debug} = {
+            tags  => \%tags,
+            print => sub {
+                my ($tag, $message, $indent) = @_;
+                if ($tags{$tag} || $tags{ALL}) {
+                    print "|  " x $indent if defined $indent;
+                    print $message;
+                }
+            }
         };
-        $self->{indent} = 0;
-    } else {
-        $self->{dprint} = sub {};
-        $self->{clean}  = sub {''};
     }
 
-    $self->{lexer} = Plang::Lexer->new(debug => $conf{debug});
+    $self->{lexer} = Plang::Lexer->new(debug => $self->{debug});
 
     $self->{lexer}->define_tokens(
         # [ TOKEN_TYPE,  MATCH REGEX,  OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
@@ -118,19 +119,19 @@ sub initialize {
         [TOKEN_OTHER,            qr{\G(   .                   )}x],
     );
 
-    $self->{parser} = Plang::Parser->new(debug => $conf{debug});
+    $self->{parser} = Plang::Parser->new(debug => $self->{debug});
 
     $self->{parser}->add_rule(\&Program);
 
     $self->{parser}->define_keywords(@pretty_keyword);
 
-    $self->{types} = Plang::Types->new(debug => $conf{debug});
+    $self->{types} = Plang::Types->new(debug => $self->{debug});
 
     $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
 
-    $self->{validator} = Plang::Validator->new(debug => $conf{debug}, types => $self->{types});
+    $self->{validator} = Plang::Validator->new(debug => $self->{debug}, types => $self->{types});
 
-    $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $conf{debug}, types => $self->{types});
+    $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $self->{debug}, types => $self->{types});
 }
 
 # discard token

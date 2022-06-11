@@ -29,7 +29,7 @@ sub initialize {
 
     $self->{ast}      = $conf{ast};
     $self->{embedded} = $conf{embedded} // 0;
-    $self->{debug}    = $conf{debug}    // 0;
+    $self->{debug}    = $conf{debug};
 
     $self->{max_recursion}  = $conf{max_recursion}  // 10000;
     $self->{recursions}     = 0;
@@ -101,28 +101,13 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
-
-    # set up debugging helpers
-    if ($self->{debug}) {
-        my @tags = split /,/, $self->{debug};
-        $self->{debug}  = \@tags;
-        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub {
-            my $tag = shift;
-            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
-        };
-        $self->{indent} = 0;
-    } else {
-        $self->{dprint} = sub {};
-        $self->{clean}  = sub {''};
-    }
 }
 
 sub dispatch_instruction {
     my ($self, $instr, $context, $data) = @_;
 
     if ($self->{debug}) {
-        $self->{dprint}->('INSTR', "Dispatching instruction $pretty_instr[$instr]\n");
+        $self->{debug}->{print}->('INSTR', "Dispatching instruction $pretty_instr[$instr]\n");
     }
 
     # main instructions
@@ -137,7 +122,7 @@ sub dispatch_instruction {
 sub error {
     my ($self, $context, $err_msg) = @_;
     chomp $err_msg;
-    $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
+    $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Runtime error: $err_msg\n";
 }
 
@@ -154,19 +139,19 @@ sub declare_variable {
     my ($self, $context, $type, $name, $value) = @_;
     $context->{guards}->{$name} = $type;
     $context->{locals}->{$name} = $value;
-    $self->{dprint}->('VARS', "declare_variable $name with value " . Dumper($value) ."\n") if $self->{debug};
+    $self->{debug}->{print}->('VARS', "declare_variable $name with value " . Dumper($value) ."\n") if $self->{debug};
 }
 
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
     $context->{locals}->{$name} = $value;
-    $self->{dprint}->('VARS', "set_variable $name to value " . Dumper($value) . "\n") if $self->{debug};
+    $self->{debug}->{print}->('VARS', "set_variable $name to value " . Dumper($value) . "\n") if $self->{debug};
 }
 
 sub get_variable {
     my ($self, $context, $name, %opt) = @_;
 
-    $self->{dprint}->('VARS', "get_variable: $name has value " . Dumper($context->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
+    $self->{debug}->{print}->('VARS', "get_variable: $name has value " . Dumper($context->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
 
     # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
@@ -232,7 +217,7 @@ sub function_call {
     my $func;
 
     if ($target->[0] == INSTR_IDENT) {
-        $self->{dprint}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->get_variable($context, $target->[1]);
 
         if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
@@ -240,10 +225,10 @@ sub function_call {
             return $self->call_builtin_function($context, $data, $target->[1]);
         }
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $self->{dprint}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
     } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->evaluate($context, $target);
     }
 
@@ -1535,7 +1520,7 @@ sub execute {
 
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
-        $self->{dprint}->('AST', "interpet ast: " . Dumper ($ast) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('AST', "interpet ast: " . Dumper ($ast) . "\n");
         $Data::Dumper::Indent = 1;
     }
 
@@ -1554,13 +1539,11 @@ sub execute {
 
                 if ($self->{debug}) {
                     $Data::Dumper::Indent = 0;
-                    $self->{dprint}->('EXPR', "Expression result: " . Dumper($result) . "\n");
+                    $self->{debug}->{print}->('EXPR', "Expression result: " . Dumper($result) . "\n");
                     $Data::Dumper::Indent = 1;
                 }
             } else {
-                if ($self->{debug}) {
-                    $self->{dprint}->('EXPR', "Expression result: none\n");
-                }
+                $self->{debug}->{print}->('EXPR', "Expression result: none\n") if $self->{debug};
             }
         }
     }
@@ -1579,7 +1562,7 @@ sub evaluate {
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
         $Data::Dumper::Terse = 1;
-        $self->{dprint}->('EVAL', "eval $pretty_instr[$ins]: " . Dumper($data) . "\n");
+        $self->{debug}->{print}->('EVAL', "eval $pretty_instr[$ins]: " . Dumper($data) . "\n");
         $Data::Dumper::Indent = 1;
     }
 
@@ -1587,7 +1570,16 @@ sub evaluate {
         return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
     }
 
-    return $self->dispatch_instruction($ins, $context, $data);
+    my $result = $self->dispatch_instruction($ins, $context, $data);
+
+    if ($self->{debug}) {
+        $Data::Dumper::Indent = 0;
+        $Data::Dumper::Terse = 1;
+        $self->{debug}->{print}->('EVAL', "done $pretty_instr[$ins]: " . Dumper($result) . "\n");
+        $Data::Dumper::Indent = 1;
+    }
+
+    return $result;
 }
 
 # handles one expression result
@@ -1596,7 +1588,7 @@ sub handle_expression_result {
 
     $print_any ||= 0;
 
-    $self->{dprint}->('RESULT', "handle result: " . Dumper($result) . "\n") if $self->{debug};
+    $self->{debug}->{print}->('RESULT', "handle result: " . Dumper($result) . "\n") if $self->{debug};
 
     # if Plang is embedded into a larger app return the result
     # to the larger app so it can handle it itself

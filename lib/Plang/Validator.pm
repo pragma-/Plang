@@ -97,7 +97,7 @@ sub error {
         }
     }
 
-    $self->{dprint}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
+    $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Validator error: $err_msg\n";
 }
 
@@ -404,7 +404,7 @@ sub variable_declaration {
 sub set_variable {
     my ($self, $context, $name, $value) = @_;
 
-    $self->{dprint}->('VARS', "set_variable $name to " . Dumper($value) . "\n") if $self->{debug};
+    $self->{debug}->{print}->('VARS', "set_variable $name to " . Dumper($value) . "\n") if $self->{debug};
 
     my $guard = $context->{guards}->{$name};
 
@@ -859,18 +859,18 @@ sub function_call {
         }
 
         if ($func->[0]->[1] eq 'Builtin') {
-            $self->{dprint}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+            $self->{debug}->{print}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
             $func = $self->get_builtin_function($name);
             return $self->type_check_builtin_function_call($context, $func, $data, $name);
         } else {
-            $self->{dprint}->('FUNCS', "Calling user-defined function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+            $self->{debug}->{print}->('FUNCS', "Calling user-defined function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         }
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $self->{dprint}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
         $name = "anonymous-1";
     } else {
-        $self->{dprint}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+        $self->{debug}->{print}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $self->evaluate($context, $target);
         $name = "anonymous-2";
 
@@ -911,7 +911,7 @@ sub function_call {
     $new_context->{current_function} = $name;
     foreach my $expression (@$expressions) {
         $return_value = $self->evaluate($new_context, $expression);
-        last if $expression->[0] == INSTR_RET;
+        last if $expression->[0] == INSTR_RET; # XXX - handle all returns and final expression
     }
 
     # handle the return value/type

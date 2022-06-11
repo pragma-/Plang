@@ -11,7 +11,7 @@ use Data::Dumper;
 
 sub new {
     my ($class, %args) = @_;
-    my $self  = bless {}, $class;
+    my $self = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
@@ -20,20 +20,6 @@ sub initialize {
     my ($self, %conf) = @_;
 
     $self->{debug} = $conf{debug};
-
-    if ($self->{debug}) {
-        my @tags = split /,/, $self->{debug};
-        $self->{debug}  = \@tags;
-        $self->{clean}  = sub { $_[0] =~ s/\n/\\n/g; $_[0] };
-        $self->{dprint} = sub {
-            my $tag = shift;
-            print "|  " x $self->{indent}, @_ if grep { $_ eq $tag } @{$self->{debug}} or $self->{debug}->[0] eq 'ALL';
-        };
-        $self->{indent} = 0;
-    } else {
-        $self->{dprint} = sub {};
-        $self->{clean}  = sub {''};
-    }
 
     $self->{types}   = {};
     $self->{aliases} = {};
@@ -402,9 +388,10 @@ sub check {
     if ($self->{debug}) {
         $Data::Dumper::Terse = 1;
         $Data::Dumper::Indent = 0;
-        $self->{dprint}->('TYPES', "type check ", Dumper($guard), " vs ", Dumper($type), "\n");
 
-        if (grep { $_ eq 'TYPES' } @{$self->{debug}}) {
+        $self->{debug}->{print}->('TYPES', "type check " . Dumper($guard) . " vs " . Dumper($type) . "\n");
+
+        if ($self->{debug}->{tags}->{TYPES}) {
             use Devel::StackTrace;
             my $trace = Devel::StackTrace->new(indent => 1, ignore_class => ['Plang::Interpreter', 'main']);
             print "  at ", $trace->as_string(), "\n";
@@ -421,8 +408,6 @@ sub check {
     if ($type->[0] eq 'TYPE') {
         $type  = $self->resolve_alias($type);
     }
-
-    $self->{dprint}->('TYPES', "type check after alias resolve", Dumper($guard), " vs ", Dumper($type), "\n");
 
     # a type
     if ($guard->[0] eq 'TYPE') {
