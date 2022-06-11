@@ -1356,7 +1356,8 @@ sub map_to_string {
     my $string = '{';
 
     my @entries;
-    while (my ($key, $value) = each %$hash) {
+    foreach my $key (sort keys %$hash) {
+        my $value = $hash->{$key};
         $key = $self->output_string_literal($key);
         my $entry = "$key: ";
         $entry .= $self->output_value($value, literal => 1);
@@ -1412,10 +1413,6 @@ sub output_value {
         return $value->[1];
     }
 
-    if ($self->{repl}) {
-        $result .= "[" . $self->{types}->to_string($value->[0]) . "] ";
-    }
-
     # booleans
     if ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
         if ($value->[1] == 0) {
@@ -1453,6 +1450,21 @@ sub output_value {
             }
         } else {
             $result .= $value->[1] if defined $value->[1];
+        }
+    }
+
+    # append type if in REPL mode
+    if ($self->{repl}) {
+        my $show_type = 0;
+
+        if ($opts{literal}) {
+            $show_type = 1;
+        } else {
+            $show_type = 1 if defined $value->[1];
+        }
+
+        if ($show_type) {
+            $result .= ': ' . $self->{types}->to_string($value->[0]);
         }
     }
 

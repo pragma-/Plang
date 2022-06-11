@@ -6,80 +6,81 @@ This README describes what is implemented so far.
 <details><summary>Click to show table of contents</summary>
 
 <!-- md-toc-begin -->
-  * [Project structure](#project-structure)
-  * [Running Plang](#running-plang)
-    * [DEBUG environment variable](#debug-environment-variable)
-    * [REPL](#repl)
-  * [Embedding Plang](#embedding-plang)
-  * [Running the Unit Tests](#running-the-unit-tests)
-  * [Example Plang scripts](#example-plang-scripts)
-  * [The Plang Language (so far)](#the-plang-language-so-far)
-      * [Operators](#operators)
-      * [Truthiness](#truthiness)
-    * [Identifiers](#identifiers)
-      * [Keywords](#keywords)
-    * [Variables](#variables)
-    * [Functions](#functions)
-      * [Optional type annotations](#optional-type-annotations)
-      * [Default arguments](#default-arguments)
-      * [Named arguments](#named-arguments)
-      * [Anonymous functions](#anonymous-functions)
-      * [Closures](#closures)
-      * [Currying](#currying)
-      * [Lazy evaluation](#lazy-evaluation)
-    * [Built-in functions](#built-in-functions)
-      * [Input/Output](#inputoutput)
-        * [print](#print)
-      * [Introspection](#introspection)
-        * [typeof](#typeof)
-        * [whatis](#whatis)
-      * [Data and structures](#data-and-structures)
-        * [length](#length)
-        * [map](#map)
-        * [filter](#filter)
-        * [Type conversion functions](#type-conversion-functions)
-    * [Scoping](#scoping)
-    * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
-      * [if/then/else](#ifthenelse)
-      * [while/next/last](#whilenextlast)
-      * [try/catch/throw](#trycatchthrow)
-    * [Type-checking](#type-checking)
-      * [Optional type annotations](#optional-type-annotations-1)
-      * [Type narrowing during inference](#type-narrowing-during-inference)
-      * [Type conversion](#type-conversion)
-      * [Type unions](#type-unions)
-      * [Types](#types)
-        * [Any](#any)
-        * [Null](#null)
-        * [Boolean](#boolean)
-        * [Number](#number)
-        * [Integer](#integer)
-        * [Real](#real)
-        * [String](#string)
-        * [Array](#array)
-        * [Map](#map-1)
-        * [Function](#function)
-        * [Builtin](#builtin)
-    * [String operations](#string-operations)
-      * [Relational operations](#relational-operations)
-      * [Interpolation](#interpolation)
-      * [Concatenation](#concatenation)
-      * [Substring search](#substring-search)
-      * [Indexing](#indexing)
-      * [Substring](#substring)
-      * [Regular expressions](#regular-expressions)
-    * [Array operations](#array-operations)
-      * [Creating and accessing arrays](#creating-and-accessing-arrays)
-      * [map](#map-2)
-      * [filter](#filter-1)
-    * [Map operations](#map-operations)
-      * [Creating and accessing maps](#creating-and-accessing-maps)
-      * [keys](#keys)
-      * [values](#values)
-      * [exists](#exists)
-      * [delete](#delete)
-    * [JSON compatibility/serialization](#json-compatibilityserialization)
-    * [Plang EBNF Grammar](#plang-ebnf-grammar)
+    * [Project structure](#project-structure)
+    * [Running Plang](#running-plang)
+      * [DEBUG environment variable](#debug-environment-variable)
+      * [REPL](#repl)
+    * [Embedding Plang](#embedding-plang)
+    * [Running the Unit Tests](#running-the-unit-tests)
+    * [Example Plang scripts](#example-plang-scripts)
+    * [The Plang Language (so far)](#the-plang-language-so-far)
+        * [Operators](#operators)
+        * [Truthiness](#truthiness)
+      * [Identifiers](#identifiers)
+        * [Keywords](#keywords)
+      * [Variables](#variables)
+      * [Functions](#functions)
+        * [Optional type annotations](#optional-type-annotations)
+        * [Default arguments](#default-arguments)
+        * [Named arguments](#named-arguments)
+        * [Anonymous functions](#anonymous-functions)
+        * [Closures](#closures)
+        * [Currying](#currying)
+        * [Lazy evaluation](#lazy-evaluation)
+      * [Built-in functions](#built-in-functions)
+        * [Input/Output](#inputoutput)
+          * [print](#print)
+        * [Introspection](#introspection)
+          * [typeof](#typeof)
+          * [whatis](#whatis)
+        * [Data and structures](#data-and-structures)
+          * [length](#length)
+          * [map](#map)
+          * [filter](#filter)
+          * [Type conversion functions](#type-conversion-functions)
+      * [Scoping](#scoping)
+      * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
+        * [if/then/else](#ifthenelse)
+        * [while/next/last](#whilenextlast)
+        * [try/catch/throw](#trycatchthrow)
+      * [Type-checking](#type-checking)
+        * [Optional type annotations](#optional-type-annotations-1)
+        * [Type narrowing during inference](#type-narrowing-during-inference)
+        * [Type conversion](#type-conversion)
+        * [Type unions](#type-unions)
+        * [Defining new types](#defining-new-types)
+        * [Types](#types)
+          * [Any](#any)
+          * [Null](#null)
+          * [Boolean](#boolean)
+          * [Number](#number)
+          * [Integer](#integer)
+          * [Real](#real)
+          * [String](#string)
+          * [Array](#array)
+          * [Map](#map-1)
+          * [Function](#function)
+          * [Builtin](#builtin)
+      * [String operations](#string-operations)
+        * [Relational operations](#relational-operations)
+        * [Interpolation](#interpolation)
+        * [Concatenation](#concatenation)
+        * [Substring search](#substring-search)
+        * [Indexing](#indexing)
+        * [Substring](#substring)
+        * [Regular expressions](#regular-expressions)
+      * [Array operations](#array-operations)
+        * [Creating and accessing arrays](#creating-and-accessing-arrays)
+        * [map](#map-2)
+        * [filter](#filter-1)
+      * [Map operations](#map-operations)
+        * [Creating and accessing maps](#creating-and-accessing-maps)
+        * [keys](#keys)
+        * [values](#values)
+        * [exists](#exists)
+        * [delete](#delete)
+      * [JSON compatibility/serialization](#json-compatibilityserialization)
+      * [Plang EBNF Grammar](#plang-ebnf-grammar)
 <!-- md-toc-end -->
 
 </details>
@@ -788,6 +789,26 @@ For example, the signature of the `length()` built-in function is:
 This tells the compiler (and us) that the function is a `Builtin` that takes either
 `Array`, `Map` or `String` and returns an `Integer`.
 
+#### Defining new types
+Use the `type` keyword to define new types.
+
+To define a `Person` type that is a Map with two properties:
+
+```
+    type Person = {
+       "name" : String,
+       "age"  : Integer
+     }
+```
+
+Then you can use it any place you'd use a type annotation. For instance, instead of writing
+
+    var x: {"name": String, "age": Integer} = {"name": "Bob", "age": 42}
+
+you can more concisely write
+
+    var x: Person = {"name": "Bob", "age": 42}
+
 #### Types
 The currently implemented types and their subtypes are:
 
@@ -922,7 +943,7 @@ Map | any value | A String containing a constructor of that Map
 ##### Array
     ArrayConstructor ::= "[" {Expression [","]}* "]"
 
-An `Array` is a collection of values. Array elements can be any type. *TODO: Optional type annotation to constrain Array elements to a single type.*
+An `Array` is a collection of values. Array elements can be any type.
 
 For more details see:
 
@@ -939,7 +960,7 @@ String | A String containing an [Array constructor](#array) | the constructed Ar
     MapConstructor ::= "{" {(IDENT | String) ":" Expression}* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
-values can be any type. *TODO: Optional interface syntax to ensure that maps contain specific key, as well as values of a specific type.*
+values can be any type.
 
 For more details see:
 
@@ -1014,13 +1035,17 @@ You can assign to the above notation to replace the substring instead.
 #### Regular expressions
 Coming soon. You may use regular expressions on strings with the `~=` operator.
 
-
 ### Array operations
 #### Creating and accessing arrays
 Creating an array and accessing an element:
 
     > var array = ["red, "green", 3, 4]; array[1]
      "green"
+
+Use a type annotation to constrain the type of elements:
+
+    > var array: [Integer] = [1, 2, "hi"]
+     Validator error: cannot initialize `x` with value of type [Integer | String] (expected [Integer]) at line 1, col 1
 
 #### map
 See the documentation for the builtin [map](#map) function.
@@ -1034,6 +1059,22 @@ To create a map use curly braces optionally containing a list of key/value pairs
 formatted as `key: value` where `key` is of type `String`.
 
     > var x = {"y": 42, "z": true}
+
+Use a type annotation to ensure a key exists and to constrain the type of its value:
+
+    > var x: {"y": Integer, "z": Boolean} = {"y": 42, "z": 3.14}
+     Validator error: cannot initialize `x` with value of type {"y": Integer, "z": Real} (expected {"y": Integer, "z": Boolean}) at line 1, col 1
+
+To make this easier to read, you can use the `type` keyword to create a type alias:
+
+```
+    type Person = {
+       "name" : String,
+       "age"  : Integer
+     }
+
+     var x: Person = {"name": "Bob", "age": 42}
+```
 
 There are two syntactical ways to set/access map keys. The first, and core, way
 is to use a value of type `String` enclosed in square brackets.

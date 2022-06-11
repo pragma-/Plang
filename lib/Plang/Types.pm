@@ -39,6 +39,18 @@ sub initialize {
     $self->{aliases} = {};
     $self->{rank}    = {};
 
+    $self->add_default_types;
+
+    # ranks for promotions
+    $self->{rank}->{Null}    = 5;
+    $self->{rank}->{Boolean} = 10;
+    $self->{rank}->{Integer} = 15;
+    $self->{rank}->{Real}    = 20;
+}
+
+sub add_default_types {
+    my ($self) = @_;
+
     # root type is Any
     $self->add('Any');
 
@@ -57,12 +69,6 @@ sub initialize {
 
     # subtype of Function
     $self->add('Function', 'Builtin');
-
-    # ranks for promotions
-    $self->{rank}->{Null}    = 5;
-    $self->{rank}->{Boolean} = 10;
-    $self->{rank}->{Integer} = 15;
-    $self->{rank}->{Real}    = 20;
 }
 
 # add a type name
@@ -88,10 +94,37 @@ sub add_alias {
     $self->{aliases}->{$name} = $type;
 }
 
-# get an existing type alias
+# get an existing type alias by name
 sub get_alias {
     my ($self, $name) = @_;
     return $self->{aliases}->{$name};
+}
+
+# resolve a type to an alias
+sub resolve_alias {
+    my ($self, $type) = @_;
+
+    my $alias = $self->{aliases}->{$type->[1]};
+
+    if ($alias) {
+        if ($alias->[0] eq 'TYPE') {
+            return $self->resolve_alias($alias);
+        } else {
+            return $alias;
+        }
+    }
+
+    return $type;
+}
+
+# reset type aliases
+sub reset_types {
+    my ($self) = @_;
+
+    $self->{types}   = {};
+    $self->{aliases} = {};
+
+    $self->add_default_types;
 }
 
 # return flat list of type names
@@ -128,10 +161,10 @@ sub to_string {
     if ($type->[0] eq 'TYPEMAP') {
         my @types;
 
-        foreach my $entry (@{$type->[1]}) {
+        foreach my $entry (sort { $a->[0] cmp $b->[0] } @{$type->[1]}) {
             my ($key, $type) = @$entry;
 
-            push @types, "'$key': " . $self->to_string($type);
+            push @types, "\"$key\": " . $self->to_string($type);
         }
 
         return '{' . join(', ', @types) . '}';
@@ -246,7 +279,7 @@ sub is_arithmetic {
 
     if ($type->[0] eq 'TYPEUNION') {
         foreach my $t (@{$type->[1]}) {
-            return $self->is_arithmetic($t);
+            return 1 if $self->is_arithmetic($t);
         }
     }
 
@@ -360,22 +393,6 @@ sub is_equal {
     }
 
     die "[is_equal] unknown type\n";
-}
-
-sub resolve_alias {
-    my ($self, $type) = @_;
-
-    my $alias = $self->{aliases}->{$type->[1]};
-
-    if ($alias) {
-        if ($alias->[0] eq 'TYPE') {
-            return $self->resolve_alias($alias);
-        } else {
-            return $alias;
-        }
-    }
-
-    return $type;
 }
 
 # type-checking
@@ -497,12 +514,28 @@ sub unite {
 
         if ($type->[0] eq 'TYPEUNION') {
             foreach my $t (@{$type->[1]}) {
-                push @union, $t unless exists $uniq{$t->[1]};
-                $uniq{$t->[1]} = 1;
+                my $string;
+
+                if ($t->[0] eq 'TYPE') {
+                    $string = $t->[1];
+                } else {
+                    $string = $self->to_string($t);
+                }
+
+                push @union, $t unless exists $uniq{$string};
+                $uniq{$string} = 1;
             }
         } else {
-            push @union, $type unless exists $uniq{$type->[1]};
-            $uniq{$type->[1]} = 1;
+            my $string;
+
+            if ($type->[0] eq 'TYPE') {
+                $string = $type->[1];
+            } else {
+                $string = $self->to_string($type);
+            }
+
+            push @union, $type unless exists $uniq{$string};
+            $uniq{$string} = 1;
         }
     }
 

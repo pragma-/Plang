@@ -36,7 +36,13 @@ my %commands = (
         func => \&cmd_help,
         help => 'Provides help.',
     },
+    '.repl' => {
+        func => \&cmd_repl,
+        help => 'Toggles REPL mode on/off (preservation of environment in between commands).',
+    },
 );
+
+my $repl_mode = 1;
 
 # start REPL loop
 repl_loop('> ');
@@ -50,12 +56,12 @@ sub repl_loop {
         defined (my $input = <STDIN>) or print "Good-bye.\n" and exit;
         next if process_command($input);
 
-        my $result = eval { $plang->interpret_string($input, repl => 1) };
+        my $result = eval { $plang->interpret_string($input, repl => $repl_mode) };
 
         if ($@) {
             print $@, "\n";
         } else {
-            print $plang->{interpreter}->output_value($result, repl => 1), "\n";
+            print $plang->{interpreter}->output_value($result, repl => $repl_mode), "\n";
         }
     }
 }
@@ -103,5 +109,11 @@ sub cmd_help {
     }
 
     print $commands{$command}->{help}, "\n";
+    return 1;
+}
+
+sub cmd_repl {
+    $repl_mode = !$repl_mode;
+    print 'REPL mode ', $repl_mode ? 'enabled.' : 'disabled.', "\n";
     return 1;
 }

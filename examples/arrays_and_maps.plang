@@ -22,8 +22,9 @@ print(map1)          # prints {"name": "Grok", "health": 200, "iq": 75}
 # Array of anonymous Arrays
 var arrays = [[1,2], [3,4], [5,6]]
 
-print(arrays[2][1]) # prints 6
-print(arrays)       # prints [[1,2],[3,4],[5,6]]
+print(arrays[2][1])   # prints 6
+print(arrays)         # prints [[1,2],[3,4],[5,6]]
+print(typeof(arrays)) # prints [[Integer]]
 
 # Map of anonymous Arrays:
 var map_arrays = {

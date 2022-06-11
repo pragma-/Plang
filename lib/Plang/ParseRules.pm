@@ -481,7 +481,7 @@ sub KeywordType {
     my $ident_token = $parser->consume(TOKEN_IDENT);
 
     if (not $ident_token) {
-        expected($parser, 'identifier for type');
+        expected($parser, 'identifier for new type');
     }
 
     my $name = $ident_token->[1];
@@ -492,20 +492,20 @@ sub KeywordType {
         my $subtype_token = $parser->consume(TOKEN_TYPE);
 
         if (not $subtype_token) {
-            expected($parser, "subtype for type `$name`");
+            expected($parser, "subtype for new type `$name`");
         }
 
         $subtype = $subtype_token->[1];
     }
 
     if (not $parser->consume(TOKEN_ASSIGN)) {
-        expected($parser, "\"=\" after type `$name`");
+        expected($parser, "\"=\" after new type `$name`");
     }
 
     my $type = Type($parser);
 
     if (not $type) {
-        expected($parser, "type literal for type `$name`");
+        expected($parser, "type literal for new type `$name`");
     }
 
     # check for duplicate type definition
@@ -1001,7 +1001,7 @@ sub UnaryOp {
 
     if (my $token = $parser->consume($op)) {
         my $expr = Expression($parser, $precedence_table{'PREFIX'});
-        return $expr ? [$ins, $expr, token_position($token)] : expected($parser, 'expression');
+        return $expr ? [$ins, $expr, token_position($token)] : expected($parser, "expression after unary operator `" . $pretty_token[$op] . "`");
     }
 }
 
@@ -1013,7 +1013,7 @@ sub BinaryOp {
 
     if (my $token = $parser->consume($op)) {
         my $right = Expression($parser, $precedence_table{$precedence} - $right_associative);
-        return $right ? [$ins, $left, $right, token_position($token)] : expected($parser, 'expression');
+        return $right ? [$ins, $left, $right, token_position($token)] : expected($parser, "expression after binary operator `" . $pretty_token[$op] . "`");
     }
 }
 
@@ -1168,7 +1168,7 @@ sub PrefixMinusMinus {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_MINUS_MINUS);
     my $expr = Expression($parser, $precedence_table{'PREFIX'});
-    expected($parser, 'expression') if not defined $expr;
+    expected($parser, 'expression after prefix `--`') if not defined $expr;
     return [INSTR_PREFIX_SUB, $expr, token_position($token)];
 }
 
@@ -1176,7 +1176,7 @@ sub PrefixPlusPlus {
     my ($parser) = @_;
     my $token = $parser->consume(TOKEN_PLUS_PLUS);
     my $expr = Expression($parser, $precedence_table{'PREFIX'});
-    expected($parser, 'expression') if not defined $expr;
+    expected($parser, 'expression after prefix `++`') if not defined $expr;
     return [INSTR_PREFIX_ADD, $expr, token_position($token)];
 }
 

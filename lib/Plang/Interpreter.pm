@@ -212,6 +212,12 @@ sub reset_parser {
     $self->{lexer}->reset_lexer;
 }
 
+sub reset_types {
+    my ($self) = @_;
+    $self->{types}->reset_types;
+    $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
+}
+
 sub validate {
     my ($self, $ast, %opt) = @_;
     return $self->{validator}->validate($ast, %opt);
@@ -249,12 +255,14 @@ sub interpret {
 
 sub interpret_stream {
     my ($self, $stream, %opt) = @_;
+    $self->reset_types unless $opt{repl};
     $self->parse_stream($stream);
     return $self->interpret(%opt);
 }
 
 sub interpret_string {
     my ($self, $string, %opt) = @_;
+    $self->reset_types unless $opt{repl};
     $self->parse_string($string);
     return $self->interpret(%opt);
 }

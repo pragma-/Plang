@@ -3,6 +3,12 @@ test_eq(typeof("hi"), 'String')
 test_eq(typeof(42),   'Integer')
 test_eq(typeof(null), 'Null')
 
+test_eq(typeof([1,2,3,4]), "[Integer]")
+
+test_eq(typeof([["a","b"],["c","d"]]), "[[String]]")
+
+test_eq(typeof({"a": 42, "b": 3.14, "c": "hi"}), '{"a": Integer, "b": Real, "c": String}')
+
 test_eq(typeof(fn null), 'Function () -> Null')
 test_eq(whatis(fn null), 'Function () -> Null')
 
