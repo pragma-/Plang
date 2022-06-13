@@ -250,7 +250,7 @@ sub interpret {
     if (my $exception = $@) {
         chomp $exception;
         $exception =~ s/ at.*// if $exception =~ /\.pm line \d+/; # strip Perl info
-        die "Run-time error: unhandled exception: ", $self->{interpreter}->output_value($exception), "\n";
+        die "Run-time error: unhandled exception: $exception\n";
     }
 
     return $result;
