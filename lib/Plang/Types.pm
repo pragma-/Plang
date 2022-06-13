@@ -182,7 +182,11 @@ sub to_string {
         return "$kind $param_string -> $return_string";
     }
 
-    return $type->[0];
+    if ($type->[0] eq 'SPCL') {
+        return $type->[1];
+    }
+
+    die "[to-string] unknown type\n";
 }
 
 # check if a type name exists

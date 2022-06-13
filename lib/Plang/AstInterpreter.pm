@@ -80,6 +80,7 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
     $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
     $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
+    $self->{instr_dispatch}->[INSTR_STRING_I]    = \&string_interpolation;
 
     # unary operators
     $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
@@ -457,29 +458,45 @@ sub keyword_return {
 
 sub keyword_next {
     my ($self, $context, $data) = @_;
-    return [INSTR_NEXT, undef];
+    return ['SPCL', 'NEXT'];
 }
 
 sub keyword_last {
     my ($self, $context, $data) = @_;
-    return [INSTR_LAST, undef];
+    return ['SPCL', 'LAST'];
 }
 
 sub keyword_while {
     my ($self, $context, $data) = @_;
 
-    while ($self->is_truthy($context, $data->[1])) {
+    my $final_result = [['TYPE', 'Null'], undef];
+
+    my $cond = $data->[1];
+    my $body = $data->[2];
+
+    while ($self->is_truthy($context, $cond)) {
         if (++$self->{iterations} > $self->{max_iterations}) {
             $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
         }
 
-        my $result = $self->evaluate($context, $data->[2]);
+        my $result = $self->evaluate($context, $body);
 
-        next if $result->[0] == INSTR_NEXT;
-        last if $result->[0] == INSTR_LAST;
+        if ($result->[0] eq 'SPCL') {
+            if ($result->[1] eq 'LAST') {
+                $final_result = $result->[2];
+                last;
+            }
+
+            if ($result->[1] eq 'NEXT') {
+                $final_result = $result-[2];
+                next;
+            }
+        }
+
+        $final_result = $result;
     }
 
-    return [['TYPE', 'Null'], undef];
+    return $final_result;
 }
 
 sub keyword_type {
@@ -492,7 +509,7 @@ sub keyword_type {
     $self->{types}->add($subtype, $name);
     $self->{types}->add_alias($name, $type);
 
-    return $type;
+    return [['SPCL', 'NEWTYPE'], $name, $subtype, $type];
 }
 
 sub add_assign {
@@ -563,6 +580,11 @@ sub postfix_decrement {
     my $temp_var = [$var->[0], $var->[1]];
     $var->[1]--;
     return $temp_var;
+}
+
+sub string_interpolation {
+    my ($self, $context, $data) = @_;
+    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
 }
 
 # ?: ternary conditional operator
@@ -943,7 +965,7 @@ sub call_builtin_function {
     return $func->($self, $context, $name, $evaled_args);
 }
 
-# just like type() except include function parameter identifiers and default values
+# just like typeof() except include function parameter identifiers and default values
 sub introspect {
     my ($self, $data) = @_;
 
@@ -1389,17 +1411,19 @@ sub output_string_literal {
 sub output_value {
     my ($self, $value, %opts) = @_;
 
-    return $value if not ref $value;
-
     my $result = '';;
 
-    # identifiers
-    if ($value->[0] == INSTR_IDENT) {
-        return $value->[1];
+    # specials
+    if ($value->[0][0] eq 'SPCL') {
+        if ($value->[0][1] eq 'NEWTYPE') {
+            $result .= "type $value->[1] = " . $self->{types}->to_string($value->[3]);
+        } else {
+            die "Unknown special $value->[0][1]";
+        }
     }
 
     # booleans
-    if ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
+    elsif ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
         if ($value->[1] == 0) {
             $result .= 'false';
         } else {
@@ -1511,8 +1535,14 @@ sub run {
     # return success if there's no result to print
     return if not defined $result;
 
-    # handle final expression (print last value of program if not Null)
-    return $self->handle_expression_result($result, 1);
+    # print the result if defined
+    unless ($opt{silent}) {
+        if (defined $result->[1]) {
+            print $self->output_value($result, literal => 1), "\n";
+        }
+    }
+
+    return $result;
 }
 
 sub execute {
@@ -1524,31 +1554,28 @@ sub execute {
         $Data::Dumper::Indent = 1;
     }
 
-    my $result;
+    my $final_result;
 
     foreach my $node (@$ast) {
         my $instruction = $node->[0];
 
         if ($instruction == INSTR_EXPR_GROUP) {
             return $self->execute($context, $node->[1]);
-        } else {
-            $result = $self->evaluate($context, $node);
+        }
 
-            if (defined $result) {
-                $result = $self->handle_expression_result($result);
+        my $result = $self->evaluate($context, $node);
 
-                if ($self->{debug}) {
-                    $Data::Dumper::Indent = 0;
-                    $self->{debug}->{print}->('EXPR', "Expression result: " . Dumper($result) . "\n");
-                    $Data::Dumper::Indent = 1;
-                }
-            } else {
-                $self->{debug}->{print}->('EXPR', "Expression result: none\n") if $self->{debug};
+        if ($result->[0] eq 'SPCL') {
+            if ($result->[1] eq 'NEXT' or $result->[1] eq 'LAST') {
+                $result->[2] = $final_result;
+                return $result;
             }
         }
+
+        $final_result = $result;
     }
 
-    return $result // [['TYPE', 'Null'], undef];
+    return $final_result // [['TYPE', 'Null'], undef];
 }
 
 sub evaluate {
@@ -1566,10 +1593,6 @@ sub evaluate {
         $Data::Dumper::Indent = 1;
     }
 
-    if ($ins == INSTR_STRING_I) {
-        return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
-    }
-
     my $result = $self->dispatch_instruction($ins, $context, $data);
 
     if ($self->{debug}) {
@@ -1580,33 +1603,6 @@ sub evaluate {
     }
 
     return $result;
-}
-
-# handles one expression result
-sub handle_expression_result {
-    my ($self, $result, $print_any) = @_;
-
-    $print_any ||= 0;
-
-    $self->{debug}->{print}->('RESULT', "handle result: " . Dumper($result) . "\n") if $self->{debug};
-
-    # if Plang is embedded into a larger app return the result
-    # to the larger app so it can handle it itself
-    return $result if $self->{embedded};
-
-    # return result unless we should print any result
-    return $result unless $print_any;
-
-    # print the result if possible and then consume it
-    if (defined $result->[1]) {
-        if ($self->{types}->check(['TYPE', 'String'], $result->[0])) {
-            print $self->output_string_literal($result->[1]), "\n";;
-        } else {
-            print $self->output_value($result), "\n";
-        }
-    }
-
-    return;
 }
 
 1;

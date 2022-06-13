@@ -312,12 +312,23 @@ sub type_check_op_assign {
         return $right;
     }
 
-    if (not $self->{types}->is_arithmetic($left->[0])) {
-        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos_left);
-    }
+    if ($op eq 'CAT') {
+        if (not $self->{types}->check($left->[0], ['TYPE', 'String'])) {
+            $self->error($context, "cannot apply operator $op to type " . $self->{types}->to_string($left->[0]) . " (expected String)", $pos_left);
+        }
 
-    if (not $self->{types}->is_arithmetic($right->[0])) {
-        $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos_right);
+        if (not $self->{types}->check($right->[0], ['TYPE', 'String'])) {
+            $self->error($context, "cannot apply operator $op to type " . $self->{types}->to_string($right->[0]) . " (expected String)", $pos_right);
+        }
+
+    } else {
+        if (not $self->{types}->is_arithmetic($left->[0])) {
+            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos_left);
+        }
+
+        if (not $self->{types}->is_arithmetic($right->[0])) {
+            $self->error($context, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($right->[0]), $pos_right);
+        }
     }
 
     if ($self->{types}->check($left->[0], $right->[0])) {
@@ -345,6 +356,11 @@ sub mul_assign {
 sub div_assign {
     my ($self, $context, $data) = @_;
     $self->type_check_op_assign($context, $data, 'DIV');
+}
+
+sub cat_assign {
+    my ($self, $context, $data) = @_;
+    $self->type_check_op_assign($context, $data, 'CAT');
 }
 
 sub identifier {
@@ -1258,15 +1274,10 @@ sub array_index_notation {
     $self->error($context, "cannot use postfix [] on type " . $self->{types}->to_string($var->[0]));
 }
 
-sub handle_expression_result {
-    my ($self, $result) = @_;
-    return $result;
-}
-
 # validate the program
 sub validate {
     my ($self, $ast, %opt) = @_;
-    $self->run($ast, %opt);
+    $self->run($ast, %opt, 'silent' => 1);
     return; # explicit return so we do not return value of run()
 }
 

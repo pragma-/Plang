@@ -230,6 +230,7 @@ sub interpret {
     my $errors = $self->handle_parse_errors;
     die $errors if defined $errors;
 
+    print "-- Validator --\n" if $self->{debug};
     $errors = $self->validate($self->{ast}, %opt);
 
     if ($errors) {
@@ -243,6 +244,7 @@ sub interpret {
         }
     }
 
+    print "-- Interpreter --\n" if $self->{debug};
     my $result = eval { $self->{interpreter}->run($self->{ast}, %opt) };
 
     if (my $exception = $@) {

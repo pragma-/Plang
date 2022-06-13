@@ -495,7 +495,8 @@ sub KeywordType {
             expected($parser, "subtype for new type `$name`");
         }
 
-        $subtype = $subtype_token->[1];
+        # XXX - fix subtyping
+        # $subtype = $subtype_token->[1];
     }
 
     if (not $parser->consume(TOKEN_ASSIGN)) {
