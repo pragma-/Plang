@@ -9,6 +9,7 @@ package Plang::Interpreter;
 
 use warnings;
 use strict;
+use feature 'signatures';
 
 use Plang::Lexer;
 use Plang::Parser;
@@ -20,16 +21,13 @@ use Plang::AstInterpreter;
 use Plang::Constants::Tokens   ':all';
 use Plang::Constants::Keywords ':all';
 
-sub new {
-    my ($class, %args) = @_;
+sub new($class, %args) {
     my $self  = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
 
-sub initialize {
-    my ($self, %conf) = @_;
-
+sub initialize($self, %conf) {
     $self->{embedded} = $conf{embedded};
     $self->{debug}    = $conf{debug};
 
@@ -138,9 +136,7 @@ sub initialize {
 sub discard {''}
 
 # sub-lexer for a multi-line comment token
-sub multiline_comment {
-    my ($lexer, $input, $text, $tokentype, $buf, $tokenbuilder) = @_;
-
+sub multiline_comment($lexer, $input, $text, $tokentype, $buf, $tokenbuilder) {
     while (1) {
         $lexer->{line}++, $$text = $input->() if not defined $$text;
 
@@ -159,13 +155,11 @@ sub multiline_comment {
     }
 }
 
-sub add_builtin_function {
-    my $self = shift;
-    $self->{interpreter}->add_builtin_function(@_);
+sub add_builtin_function($self, @args) {
+    $self->{interpreter}->add_builtin_function(@args);
 }
 
-sub parse {
-    my ($self, $input_iter) = @_;
+sub parse($self, $input_iter) {
     $self->reset_parser;
     # iterates over tokens returned by lexer
     my $token_iter = $self->{lexer}->tokens($input_iter);
@@ -173,23 +167,20 @@ sub parse {
     return $self->{ast};
 }
 
-sub parse_stream {
-    my ($self, $stream) = @_;
+sub parse_stream($self, $stream) {
     # iterates over lines of the stream
     my $input_iter = sub { <$stream> };
     return $self->parse($input_iter);
 }
 
-sub parse_string {
-    my ($self, $string) = @_;
+sub parse_string($self, $string) {
     # iterates over lines of the string
     my @lines = split /\n/, $string;
     my $input_iter = sub { shift @lines };
     return $self->parse($input_iter);
 }
 
-sub handle_parse_errors {
-    my ($self) = @_;
+sub handle_parse_errors($self) {
     # were there any parse errors?
     if (my $count = @{$self->{parser}->{errors}}) {
         if (not $self->{embedded}) {
@@ -208,25 +199,20 @@ sub handle_parse_errors {
     return;
 }
 
-sub reset_parser {
-    my ($self) = @_;
+sub reset_parser($self) {
     $self->{lexer}->reset_lexer;
 }
 
-sub reset_types {
-    my ($self) = @_;
+sub reset_types($self) {
     $self->{types}->reset_types;
     $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
 }
 
-sub validate {
-    my ($self, $ast, %opt) = @_;
+sub validate($self, $ast, %opt) {
     return $self->{validator}->validate($ast, %opt);
 }
 
-sub interpret {
-    my ($self, %opt) = @_;
-
+sub interpret($self, %opt) {
     my $errors = $self->handle_parse_errors;
     die $errors if defined $errors;
 
@@ -257,15 +243,13 @@ sub interpret {
     return $result;
 }
 
-sub interpret_stream {
-    my ($self, $stream, %opt) = @_;
+sub interpret_stream($self, $stream, %opt) {
     $self->reset_types unless $opt{repl};
     $self->parse_stream($stream);
     return $self->interpret(%opt);
 }
 
-sub interpret_string {
-    my ($self, $string, %opt) = @_;
+sub interpret_string($self, $string, %opt) {
     $self->reset_types unless $opt{repl};
     $self->parse_string($string);
     return $self->interpret(%opt);

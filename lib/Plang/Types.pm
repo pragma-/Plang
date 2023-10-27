@@ -6,19 +6,17 @@ package Plang::Types;
 
 use warnings;
 use strict;
+use feature 'signatures';
 
 use Data::Dumper;
 
-sub new {
-    my ($class, %args) = @_;
+sub new($class, %args) {
     my $self = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
 
-sub initialize {
-    my ($self, %conf) = @_;
-
+sub initialize($self, %conf) {
     $self->{debug} = $conf{debug};
 
     $self->{types}   = {};
@@ -34,9 +32,7 @@ sub initialize {
     $self->{rank}->{Real}    = 20;
 }
 
-sub add_default_types {
-    my ($self) = @_;
-
+sub add_default_types($self) {
     # root type is Any
     $self->add('Any');
 
@@ -58,9 +54,7 @@ sub add_default_types {
 }
 
 # add a type name
-sub add {
-    my ($self, $type, $subtype) = @_;
-
+sub add($self, $type, $subtype = undef) {
     if (not defined $subtype) {
         if (not exists $self->{types}->{$type}) {
             $self->{types}->{$type} = {};
@@ -75,21 +69,17 @@ sub add {
 }
 
 # add a type alias
-sub add_alias {
-    my ($self, $name, $type) = @_;
+sub add_alias($self, $name, $type) {
     $self->{aliases}->{$name} = $type;
 }
 
 # get an existing type alias by name
-sub get_alias {
-    my ($self, $name) = @_;
+sub get_alias($self, $name) {
     return $self->{aliases}->{$name};
 }
 
 # resolve a type to an alias
-sub resolve_alias {
-    my ($self, $type) = @_;
-
+sub resolve_alias($self, $type) {
     my $alias = $self->{aliases}->{$type->[1]};
 
     if ($alias) {
@@ -104,9 +94,7 @@ sub resolve_alias {
 }
 
 # reset type aliases
-sub reset_types {
-    my ($self) = @_;
-
+sub reset_types($self) {
     $self->{types}   = {};
     $self->{aliases} = {};
 
@@ -114,8 +102,7 @@ sub reset_types {
 }
 
 # return flat list of type names
-sub as_list {
-    my ($self) = @_;
+sub as_list($self) {
     my %types;
     foreach my $t (keys %{$self->{types}}) {
         $types{$t} = 1;
@@ -127,9 +114,7 @@ sub as_list {
 }
 
 # convert a type structure into a string
-sub to_string {
-    my ($self, $type) = @_;
-
+sub to_string($self, $type) {
     if ($type->[0] eq 'TYPE') {
         my $type_alias = $self->{aliases}->{$type->[1]};
 
@@ -190,9 +175,7 @@ sub to_string {
 }
 
 # check if a type name exists
-sub exists {
-    my ($self, $type) = @_;
-
+sub exists($self, $type) {
     return 1 if exists $self->{types}->{$type};
 
     foreach my $t (keys %{$self->{types}}) {
@@ -207,9 +190,7 @@ sub exists {
 }
 
 # check if a type name has a subtype name
-sub has_subtype {
-    my ($self, $type, $subtype) = @_;
-
+sub has_subtype($self, $type, $subtype) {
     my $type_alias = $self->{aliases}->{$type};
 
     if ($type_alias) {
@@ -241,9 +222,7 @@ sub has_subtype {
 }
 
 # return true if a type is a subtype of another type
-sub is_subtype {
-    my ($self, $subtype, $type) = @_;
-
+sub is_subtype($self, $subtype, $type) {
     # only basic types can be subtypes of another
     if ($subtype->[0] ne 'TYPE' or $type->[0] ne 'TYPE') {
         return 0;
@@ -253,16 +232,13 @@ sub is_subtype {
 }
 
 # check if a type is a specific type name
-sub name_is {
-    my ($self, $type, $name) = @_;
+sub name_is($self, $type, $name) {
     return 0 if ref $type ne 'ARRAY';
     return $type->[0] eq $name;
 }
 
 # return true if a type is arithmetic
-sub is_arithmetic {
-    my ($self, $type) = @_;
-
+sub is_arithmetic($self, $type) {
     # subtype of Number is arithmetic
     if ($type->[0] eq 'TYPE') {
         return 1 if $self->has_subtype('Number', $type->[1]);
@@ -281,9 +257,7 @@ sub is_arithmetic {
 }
 
 # returns higher ranked type
-sub get_promoted_type {
-    my ($self, $type1, $type2) = @_;
-
+sub get_promoted_type($self, $type1, $type2) {
     if ($self->is_subtype($type1, $type2)) {
         if (exists $self->{rank}->{$type1->[1]} and exists $self->{rank}->{$type2->[1]}) {
             if ($self->{rank}->{$type1->[1]} > $self->{rank}->{$type2->[1]}) {
@@ -298,9 +272,7 @@ sub get_promoted_type {
 }
 
 # returns true if one type is identical to another
-sub is_equal {
-    my ($self, $type1, $type2) = @_;
-
+sub is_equal($self, $type1, $type2) {
     # a type
     if ($type1->[0] eq 'TYPE') {
         if ($type2->[0] eq 'TYPE') {
@@ -390,9 +362,7 @@ sub is_equal {
 }
 
 # type-checking
-sub check {
-    my ($self, $guard, $type) = @_;
-
+sub check($self, $guard, $type) {
     if ($self->{debug}) {
         $Data::Dumper::Terse = 1;
         $Data::Dumper::Indent = 0;
@@ -495,9 +465,7 @@ sub check {
     die "[check] unknown type\n";
 }
 
-sub unite {
-    my ($self, $types) = @_;
-
+sub unite($self, $types) {
     my @union;
     my %uniq;
 
@@ -540,8 +508,7 @@ sub unite {
     return $self->make_typeunion(\@union);
 }
 
-sub make_typeunion {
-    my ($self, $types) = @_;
+sub make_typeunion($self, $types) {
     my @union = sort { $a->[1] cmp $b->[1] } @$types;
     return ['TYPEUNION', \@union];
 }

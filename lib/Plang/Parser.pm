@@ -14,19 +14,17 @@ package Plang::Parser;
 
 use warnings;
 use strict;
+use feature 'signatures';
 
 use Plang::Constants::Tokens ':all';
 
-sub new {
-    my ($class, %args) = @_;
+sub new($class, %args) {
     my $self = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
 
-sub initialize {
-    my ($self, %conf) = @_;
-
+sub initialize($self, %conf) {
     $self->{token_iter} = $conf{token_iter};
 
     $self->{debug} = $conf{debug};
@@ -42,33 +40,27 @@ sub initialize {
 }
 
 # define our keywords
-sub define_keywords {
-    my $self = shift;
-    @{$self->{keywords}} = @_;
+sub define_keywords($self, @args) {
+    @{$self->{keywords}} = @args;
 }
 
 # define our types
-sub define_types {
-    my $self = shift;
-    %{$self->{types}} = @_;
+sub define_types($self, @args) {
+    %{$self->{types}} = @args;
 }
 
 # add a new type
-sub add_type {
-    my ($self, $name) = @_;
+sub add_type($self, $name) {
     $self->{types}->{$name} = 1;
 }
 
 # get an existing type
-sub get_type {
-    my ($self, $name) = @_;
+sub get_type($self, $name) {
     return $self->{types}->{$name};
 }
 
 # try a rule (pushes the current token index onto the backtrack)
-sub try {
-    my ($self, $dbg_msg) = @_;
-
+sub try($self, $dbg_msg) {
     push @{$self->{backtrack}}, $self->{current_token};
 
     if ($self->{debug}) {
@@ -85,9 +77,7 @@ sub try {
 }
 
 # backtrack to the previous try point
-sub backtrack {
-    my ($self) = @_;
-
+sub backtrack($self) {
     $self->{current_token} = pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
@@ -106,9 +96,7 @@ sub backtrack {
 }
 
 # advance to the next rule (pops and discards one backtrack)
-sub advance {
-    my ($self) = @_;
-
+sub advance($self) {
     pop @{$self->{backtrack}};
 
     if ($self->{debug}) {
@@ -123,19 +111,14 @@ sub advance {
 }
 
 # alternate to another variant (backtrack and try another variant)
-sub alternate {
-    my ($self, $dbg_msg) = @_;
+sub alternate($self, $dbg_msg) {
     $self->backtrack;
     $self->try($dbg_msg);
 }
 
 # gets the next token from the token iterator
 # if the first argument is 'peek' then the token will be returned unconsumed
-sub next_token {
-    my ($self, $opt) = @_;
-
-    $opt ||= '';
-
+sub next_token($self, $opt = '') {
     if ($self->{debug}) {
         if ($opt eq 'peek') {
             $self->{debug}->{print}->('TOKEN', "Peeking next token:\n", $self->{indent});
@@ -202,16 +185,13 @@ sub next_token {
 
 # gets the current token from the backtrack without consuming it
 # next_token() must have been invoked at least once
-sub current_token {
-    my ($self) = @_;
+sub current_token($self) {
     return $self->{read_tokens}->[$self->{current_token}];
 }
 
 # if no arguments passed, consumes the current token
 # otherwise, consumes and returns token only if token matches argument
-sub consume {
-    my ($self, $wanted) = @_;
-
+sub consume($self, $wanted = undef) {
     my $debug = $self->{debug};
 
     my $token = $self->next_token('peek');
@@ -236,9 +216,7 @@ sub consume {
 
 # consumes and discards tokens until target is reached,
 # whereupon target is consumed as well
-sub consume_to {
-    my ($self, $target) = @_;
-
+sub consume_to($self, $target) {
     my $debug = $self->{debug};
 
     $self->{debug}->{print}->('PARSER', "Consuming until $pretty_token[$target]\n", $self->{indent}) if $debug;
@@ -260,26 +238,21 @@ sub consume_to {
 }
 
 # rewrites the backtrack to the current token position
-sub rewrite_backtrack {
-    my ($self) = @_;
-
+sub rewrite_backtrack($self) {
     foreach my $backtrack (@{$self->{backtrack}}) {
         $backtrack = $self->{current_token};
     }
 }
 
 # add an error message
-sub add_error {
-    my ($self, $text) = @_;
+sub add_error($self, $text) {
     push @{$self->{errors}}, $text;
     $self->set_error;
     $self->{debug}->{print}->('PARSER', "Added error: $text\n", $self->{indent}) if $self->{debug};
 }
 
 # was there an error in the last parse?
-sub errored {
-    my ($self) = @_;
-
+sub errored($self) {
     if ($self->{got_error}) {
         $self->{debug}->{print}->('PARSER', "Got error.\n", $self->{indent}) if $self->{debug};
         $self->advance;
@@ -290,35 +263,29 @@ sub errored {
 }
 
 # set the error flag
-sub set_error {
-    my ($self) = @_;
+sub set_error($self) {
     $self->{debug}->{print}->('PARSER', "Error set.\n", $self->{indent}) if $self->{debug};
     $self->{got_error} = 1;
 }
 
 # clear the error flag
-sub clear_error {
-    my ($self) = @_;
+sub clear_error($self) {
     $self->{debug}->{print}->('PARSER', "Error cleared.\n", $self->{indent}) if $self->{debug};
     $self->{got_error} = 0;
 }
 
 # remove existing rules
-sub clear_rules {
-    my ($self) = @_;
+sub clear_rules($self) {
     $self->{rules} = [];
 }
 
 # add a rule to the parser engine
-sub add_rule {
-    my ($self, $rule) = @_;
+sub add_rule($self, $rule) {
     push @{$self->{rules}}, $rule;
 }
 
 # parse the rules
-sub parse {
-    my ($self, $token_iter) = @_;
-
+sub parse($self, $token_iter = undef) {
     $self->{token_iter} = $token_iter if defined $token_iter;
 
     $self->{read_tokens}   = [];

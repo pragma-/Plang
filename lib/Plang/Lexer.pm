@@ -10,17 +10,15 @@ package Plang::Lexer;
 
 use warnings;
 use strict;
+use feature 'signatures';
 
-sub new {
-    my ($class, %args) = @_;
+sub new($class, %args) {
     my $self  = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
 
-sub initialize {
-    my ($self, %conf) = @_;
-
+sub initialize($self, %conf) {
     $self->{tokentypes} = [];
 
     $self->{line} = 0;
@@ -29,21 +27,17 @@ sub initialize {
 }
 
 # define our tokentypes
-sub define_tokens {
-    my $self = shift;
-    @{$self->{tokentypes}} = @_;
+sub define_tokens($self, @args) {
+    @{$self->{tokentypes}} = @args;
 }
 
-sub reset_lexer {
-    my ($self) = @_;
+sub reset_lexer($self) {
     $self->{line} = 0;
     $self->{col}  = 0;
     $self->{eof}  = 0;
 }
 
-sub tokens {
-    my ($self, $input, $tokentypes) = @_;
-
+sub tokens($self, $input, $tokentypes = undef) {
     # allow overriding list of tokentypes and matchers
     $tokentypes ||= $self->{tokentypes};
 

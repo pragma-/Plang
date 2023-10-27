@@ -1,0 +1,7 @@
+var i = 42
+
+fn inc i = i + 1
+
+inc() inc() inc()
+
+test_eq(i, 45)

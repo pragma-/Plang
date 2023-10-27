@@ -12,22 +12,20 @@ package Plang::AstInterpreter;
 
 use warnings;
 use strict;
+use feature 'signatures';
 
 use Data::Dumper;
 use Devel::StackTrace;
 
 use Plang::Constants::Instructions ':all';
 
-sub new {
-    my ($class, %args) = @_;
-    my $self  = bless {}, $class;
+sub new($class, %args) {
+    my $self = bless {}, $class;
     $self->initialize(%args);
     return $self;
 }
 
-sub initialize {
-    my ($self, %conf) = @_;
-
+sub initialize($self, %conf) {
     $self->{ast}      = $conf{ast};
     $self->{embedded} = $conf{embedded} // 0;
     $self->{debug}    = $conf{debug};
@@ -38,7 +36,7 @@ sub initialize {
     $self->{max_iterations} = $conf{max_iterations} // 25000;
     $self->{iterations}     = 0;
 
-    $self->{repl_context}   = undef; # persistent repl context
+    $self->{repl_scope}     = undef; # persistent repl scope
 
     $self->{types} = $conf{types} // die 'Missing types';
 
@@ -105,126 +103,110 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
 }
 
-sub reset {
-    my ($self) = @_;
+sub reset($self) {
     $self->{recursions} = 0;
     $self->{iterations} = 0;
 }
 
-sub dispatch_instruction {
-    my ($self, $instr, $context, $data) = @_;
-
+sub dispatch_instruction($self, $instr, $scope, $data) {
     if ($self->{debug}) {
         $self->{debug}->{print}->('INSTR', "Dispatching instruction $pretty_instr[$instr]\n");
     }
 
     # main instructions
     if ($instr < INSTR_NOT) {
-        return $self->{instr_dispatch}->[$instr]->($self, $context, $data);
+        return $self->{instr_dispatch}->[$instr]->($self, $scope, $data);
     }
 
     # unary and binary operators
-    return $self->{instr_dispatch}->[$instr]->($self, $instr, $context, $data);
+    return $self->{instr_dispatch}->[$instr]->($self, $instr, $scope, $data);
 }
 
-sub error {
-    my ($self, $context, $err_msg) = @_;
+sub error($self, $scope, $err_msg) {
     chomp $err_msg;
     $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Runtime error: $err_msg\n";
 }
 
-sub new_context {
-    my ($self, $parent) = @_;
-
+sub new_scope($self, $parent = undef) {
     return {
         locals => {},
         parent => $parent,
     };
 }
 
-sub declare_variable {
-    my ($self, $context, $type, $name, $value) = @_;
-    $context->{guards}->{$name} = $type;
-    $context->{locals}->{$name} = $value;
+sub declare_variable($self, $scope, $type, $name, $value) {
+    $scope->{guards}->{$name} = $type;
+    $scope->{locals}->{$name} = $value;
     $self->{debug}->{print}->('VARS', "declare_variable $name with value " . Dumper($value) ."\n") if $self->{debug};
 }
 
-sub set_variable {
-    my ($self, $context, $name, $value) = @_;
-    $context->{locals}->{$name} = $value;
+sub set_variable($self, $scope, $name, $value) {
+    $scope->{locals}->{$name} = $value;
     $self->{debug}->{print}->('VARS', "set_variable $name to value " . Dumper($value) . "\n") if $self->{debug};
 }
 
-sub get_variable {
-    my ($self, $context, $name, %opt) = @_;
-
-    $self->{debug}->{print}->('VARS', "get_variable: $name has value " . Dumper($context->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
+sub get_variable($self, $scope, $name, %opt) {
+    $self->{debug}->{print}->('VARS', "get_variable: $name has value " . Dumper($scope->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
 
     # look for variables in current scope
-    if (exists $context->{locals}->{$name}) {
-        my $var = $context->{locals}->{$name};
-        return ($var, $context);
+    if (exists $scope->{locals}->{$name}) {
+        my $var = $scope->{locals}->{$name};
+        return ($var, $scope);
     }
 
     # check for closure
-    if (defined $context->{closure}) {
-        my ($var, $scope) = $self->get_variable($context->{closure}, $name);
-        return ($var, $scope) if defined $var;
+    if (defined $scope->{closure}) {
+        my ($var, $var_scope) = $self->get_variable($scope->{closure}, $name);
+        return ($var, $var_scope) if defined $var;
     }
 
     # look for variables in enclosing scopes
-    if (!$opt{locals_only} and defined $context->{parent}) {
-        my ($var, $scope) = $self->get_variable($context->{parent}, $name);
-        return ($var, $scope) if defined $var;
+    if (!$opt{locals_only} and defined $scope->{parent}) {
+        my ($var, $var_scope) = $self->get_variable($scope->{parent}, $name);
+        return ($var, $var_scope) if defined $var;
     }
 
     # otherwise it's an undefined variable
-    return (undef, undef);
+    return (undef);
 }
 
-sub variable_declaration {
-    my ($self, $context, $data) = @_;
-
+sub variable_declaration($self, $scope, $data) {
     my $type        = $data->[1];
     my $name        = $data->[2];
     my $initializer = $data->[3];
     my $right_value = undef;
 
     if ($initializer) {
-        $right_value = $self->evaluate($context, $initializer);
+        $right_value = $self->evaluate($scope, $initializer);
     } else {
         $right_value = [['TYPE', 'Null'], undef];
     }
 
-    $self->declare_variable($context, $type, $name, $right_value);
+    $self->declare_variable($scope, $type, $name, $right_value);
     return $right_value;
 }
 
-sub process_function_call_arguments {
-    my ($self, $context, $name, $parameters, $arguments) = @_;
-
+sub process_function_call_arguments($self, $scope, $name, $parameters, $arguments) {
     my $evaluated_arguments;
 
     for (my $i = 0; $i < @$parameters; $i++) {
         if (not defined $arguments->[$i]) {
             # no argument provided, but there's guaranteed to be a default
             # argument here since validator caught missing arguments, etc
-            $evaluated_arguments->[$i] = $self->evaluate($context, $parameters->[$i]->[2]);
-            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $evaluated_arguments->[$i] = $self->evaluate($scope, $parameters->[$i]->[2]);
+            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         } else {
             # argument provided
-            $evaluated_arguments->[$i] = $self->evaluate($context, $arguments->[$i]);
-            $context->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $evaluated_arguments->[$i] = $self->evaluate($scope, $arguments->[$i]);
+            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
         }
     }
 
     return $evaluated_arguments;
 }
 
-sub function_call {
-    my ($self, $context, $data) = @_;
-
+sub function_call($self, $scope, $data) {
     $Data::Dumper::Indent = 0;
 
     my $target    = $data->[1];
@@ -233,18 +215,18 @@ sub function_call {
 
     if ($target->[0] == INSTR_IDENT) {
         $self->{debug}->{print}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        ($func) = $self->get_variable($context, $target->[1]);
+        ($func) = $self->get_variable($scope, $target->[1]);
 
         if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
             # builtin function
-            return $self->call_builtin_function($context, $data, $target->[1]);
+            return $self->call_builtin_function($scope, $data, $target->[1]);
         }
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $self->{debug}->{print}->('FUNCS', "Calling anonymous-1 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
     } else {
         $self->{debug}->{print}->('FUNCS', "Calling anonymous-2 function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->evaluate($context, $target);
+        $func = $self->evaluate($scope, $target);
     }
 
     my $closure     = $func->[1]->[0];
@@ -252,38 +234,36 @@ sub function_call {
     my $parameters  = $func->[1]->[2];
     my $expressions = $func->[1]->[3];
 
-    if ($closure != $context) {
-        $context->{closure} = $closure;
+    if ($closure != $scope) {
+        $scope->{closure} = $closure;
     }
 
-    # create new context to set function arguments
-    my $new_context = $self->new_context($context);
+    # create new scope to set function arguments
+    my $func_scope = $self->new_scope($scope);
 
-    $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
+    $self->process_function_call_arguments($func_scope, $target->[1], $parameters, $arguments);
 
     # check for recursion limit
     if (++$self->{recursions} > $self->{max_recursion}) {
-        $self->error($context, "Max recursion limit ($self->{max_recursion}) reached.");
+        $self->error($scope, "Max recursion limit ($self->{max_recursion}) reached.");
     }
 
     my $result;
 
     # invoke the function
     foreach my $expression (@$expressions) {
-        $result = $self->evaluate($new_context, $expression);
+        $result = $self->evaluate($func_scope, $expression);
         last if $expression->[0] == INSTR_RET;
     }
 
     $self->{recursion}--;
 
-    $context->{closure} = undef;
+    $scope->{closure} = undef;
 
     return $result;
 }
 
-sub function_definition {
-    my ($self, $context, $data) = @_;
-
+sub function_definition($self, $scope, $data) {
     my $ret_type    = $data->[1];
     my $name        = $data->[2];
     my $parameters  = $data->[3];
@@ -295,19 +275,17 @@ sub function_definition {
         push @$param_types, $param->[0];
     }
 
-    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$context, $ret_type, $parameters, $expressions]];
+    my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$scope, $ret_type, $parameters, $expressions]];
 
     if ($name eq '#anonymous') {
         $name = "anonfunc$func";
     }
 
-    $context->{locals}->{$name} = $func;
+    $scope->{locals}->{$name} = $func;
     return $func;
 }
 
-sub map_constructor {
-    my ($self, $context, $data) = @_;
-
+sub map_constructor($self, $scope, $data) {
     my $map     = $data->[1];
     my $hashref = {};
 
@@ -319,8 +297,8 @@ sub map_constructor {
 
         # identifier
         if ($key->[0] == INSTR_IDENT) {
-            my ($var) = $self->get_variable($context, $key->[1]);
-            my $value = $self->evaluate($context, $value);
+            my ($var) = $self->get_variable($scope, $key->[1]);
+            my $value = $self->evaluate($scope, $value);
             $hashref->{$var->[1]} = $value;
             push @props, [$var->[1], $value->[0]];
             next;
@@ -328,7 +306,7 @@ sub map_constructor {
 
         # string
         if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
-            my $value = $self->evaluate($context, $value);
+            my $value = $self->evaluate($scope, $value);
             $hashref->{$key->[1]} = $value;
             push @props, [$key->[1], $value->[0]];
             next;
@@ -338,16 +316,14 @@ sub map_constructor {
     return [['TYPEMAP', \@props], $hashref];
 }
 
-sub array_constructor {
-    my ($self, $context, $data) = @_;
-
+sub array_constructor($self, $scope, $data) {
     my $array    = $data->[1];
     my $arrayref = [];
 
     my @types;
 
     foreach my $entry (@$array) {
-        my $value = $self->evaluate($context, $entry);
+        my $value = $self->evaluate($scope, $entry);
         push @$arrayref,  $value;
         push @types, $value->[0];
     }
@@ -357,11 +333,9 @@ sub array_constructor {
     return [['TYPEARRAY', $type], $arrayref];
 }
 
-sub keyword_exists {
-    my ($self, $context, $data) = @_;
-
-    my $var = $self->evaluate($context, $data->[1]->[1]);
-    my $key = $self->evaluate($context, $data->[1]->[2]);
+sub keyword_exists($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]->[1]);
+    my $key = $self->evaluate($scope, $data->[1]->[2]);
 
     if (exists $var->[1]->{$key->[1]}) {
         return [['TYPE', 'Boolean'], 1];
@@ -370,13 +344,11 @@ sub keyword_exists {
     }
 }
 
-sub keyword_delete {
-    my ($self, $context, $data) = @_;
-
+sub keyword_delete($self, $scope, $data) {
     # delete one key in map
     if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->evaluate($context, $data->[1]->[1]);
-        my $key = $self->evaluate($context, $data->[1]->[2]);
+        my $var = $self->evaluate($scope, $data->[1]->[1]);
+        my $key = $self->evaluate($scope, $data->[1]->[2]);
 
         my $val = delete $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef] if not defined $val;
@@ -385,16 +357,14 @@ sub keyword_delete {
 
     # delete all keys in map
     if ($data->[1]->[0] == INSTR_IDENT) {
-        my ($var) = $self->get_variable($context, $data->[1]->[1]);
+        my ($var) = $self->get_variable($scope, $data->[1]->[1]);
         $var->[1] = {};
         return $var;
     }
 }
 
-sub keyword_keys {
-    my ($self, $context, $data) = @_;
-
-    my $map = $self->evaluate($context, $data->[1]);
+sub keyword_keys($self, $scope, $data) {
+    my $map = $self->evaluate($scope, $data->[1]);
 
     my $hash = $map->[1];
     my $list = [];
@@ -406,10 +376,8 @@ sub keyword_keys {
     return [['TYPE', 'Array'], $list];
 }
 
-sub keyword_values {
-    my ($self, $context, $data) = @_;
-
-    my $map = $self->evaluate($context, $data->[1]);
+sub keyword_values($self, $scope, $data) {
+    my $map = $self->evaluate($scope, $data->[1]);
 
     my $hash = $map->[1];
     my $list = [];
@@ -421,14 +389,12 @@ sub keyword_values {
     return [['TYPE', 'Array'], $list];
 }
 
-sub keyword_try {
-    my ($self, $context, $data) = @_;
-
+sub keyword_try($self, $scope, $data) {
     my $expr     = $data->[1];
     my $catchers = $data->[2];
 
     my $result = eval {
-        $self->evaluate($context, $expr);
+        $self->evaluate($scope, $expr);
     };
 
     if (my $exception = $@) {
@@ -448,7 +414,7 @@ sub keyword_try {
                 last;
             }
 
-            $cond = $self->evaluate($context, $cond);
+            $cond = $self->evaluate($scope, $cond);
 
             if ($cond->[1] eq $exception->[1]) {
                 $catch = $body;
@@ -456,49 +422,43 @@ sub keyword_try {
             }
         }
 
-        my $new_context = $self->new_context($context);
-        $self->declare_variable($new_context, ['TYPE', 'String'], 'e', $exception);
-        return $self->evaluate($new_context, $catch);
+        my $try_scope = $self->new_scope($scope);
+        $self->declare_variable($try_scope, ['TYPE', 'String'], 'e', $exception);
+        return $self->evaluate($try_scope, $catch);
     }
 
     return $result;
 }
 
-sub keyword_throw {
-    my ($self, $context, $data) = @_;
-    my $value = $self->evaluate($context, $data->[1]);
+sub keyword_throw($self, $scope, $data) {
+    my $value = $self->evaluate($scope, $data->[1]);
     die $value->[1]; # guaranteed to be a String as per Validator.pm
 }
 
-sub keyword_return {
-    my ($self, $context, $data) = @_;
-    return $self->evaluate($context, $data->[1]);
+sub keyword_return($self, $scope, $data) {
+    return $self->evaluate($scope, $data->[1]);
 }
 
-sub keyword_next {
-    my ($self, $context, $data) = @_;
+sub keyword_next($self, $scope, $data) {
     return ['SPCL', 'NEXT'];
 }
 
-sub keyword_last {
-    my ($self, $context, $data) = @_;
+sub keyword_last($self, $scope, $data) {
     return ['SPCL', 'LAST'];
 }
 
-sub keyword_while {
-    my ($self, $context, $data) = @_;
-
+sub keyword_while($self, $scope, $data) {
     my $final_result = [['TYPE', 'Null'], undef];
 
     my $cond = $data->[1];
     my $body = $data->[2];
 
-    while ($self->is_truthy($context, $cond)) {
+    while ($self->is_truthy($scope, $cond)) {
         if (++$self->{iterations} > $self->{max_iterations}) {
-            $self->error($context, "Max iteration limit ($self->{max_iterations}) reached.");
+            $self->error($scope, "Max iteration limit ($self->{max_iterations}) reached.");
         }
 
-        my $result = $self->evaluate($context, $body);
+        my $result = $self->evaluate($scope, $body);
 
         if ($result->[0] eq 'SPCL') {
             if ($result->[1] eq 'LAST') {
@@ -518,9 +478,7 @@ sub keyword_while {
     return $final_result;
 }
 
-sub keyword_type {
-    my ($self, $context, $data) = @_;
-
+sub keyword_type($self, $scope, $data) {
     my $name    = $data->[1];
     my $subtype = $data->[2];
     my $type    = $data->[3];
@@ -531,156 +489,137 @@ sub keyword_type {
     return [['SPCL', 'NEWTYPE'], $name, $subtype, $type];
 }
 
-sub add_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub add_assign($self, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
     $left->[1] += $right->[1];
     return $left;
 }
 
-sub sub_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub sub_assign($self, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
     $left->[1] -= $right->[1];
     return $left;
 }
 
-sub mul_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub mul_assign($self, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
     $left->[1] *= $right->[1];
     return $left;
 }
 
-sub div_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub div_assign($self, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
     $left->[1] /= $right->[1];
     return $left;
 }
 
-sub cat_assign {
-    my ($self, $context, $data) = @_;
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub cat_assign($self, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
     $left->[1] .= $right->[1];
     return $left;
 }
 
-sub prefix_increment {
-    my ($self, $context, $data) = @_;
-    my $var = $self->evaluate($context, $data->[1]);
+sub prefix_increment($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
     $var->[1]++;
     return $var;
 }
 
-sub prefix_decrement {
-    my ($self, $context, $data) = @_;
-    my $var = $self->evaluate($context, $data->[1]);
+sub prefix_decrement($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
     $var->[1]--;
     return $var;
 }
 
-sub postfix_increment {
-    my ($self, $context, $data) = @_;
-    my $var = $self->evaluate($context, $data->[1]);
+sub postfix_increment($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
     my $temp_var = [$var->[0], $var->[1]];
     $var->[1]++;
     return $temp_var;
 }
 
-sub postfix_decrement {
-    my ($self, $context, $data) = @_;
-    my $var = $self->evaluate($context, $data->[1]);
+sub postfix_decrement($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
     my $temp_var = [$var->[0], $var->[1]];
     $var->[1]--;
     return $temp_var;
 }
 
-sub string_interpolation {
-    my ($self, $context, $data) = @_;
-    return [['TYPE', 'String'], $self->interpolate_string($context, $data->[1])];
+sub string_interpolation($self, $scope, $data) {
+    return [['TYPE', 'String'], $self->interpolate_string($scope, $data->[1])];
 }
 
 # ?: ternary conditional operator
-sub conditional {
-    my ($self, $context, $data) = @_;
-    return $self->keyword_if($context, $data);
+sub conditional($self, $scope, $data) {
+    return $self->keyword_if($scope, $data);
 }
 
-sub keyword_if {
-    my ($self, $context, $data) = @_;
-
-    if ($self->is_truthy($context, $data->[1])) {
-        return $self->evaluate($context, $data->[2]);
+sub keyword_if($self, $scope, $data) {
+    if ($self->is_truthy($scope, $data->[1])) {
+        return $self->evaluate($scope, $data->[2]);
     } else {
-        return $self->evaluate($context, $data->[3]);
+        return $self->evaluate($scope, $data->[3]);
     }
 }
 
-sub logical_and {
-    my ($self, $context, $data) = @_;
-    my $left_value = $self->evaluate($context, $data->[1]);
-    return $left_value if not $self->is_truthy($context, $left_value);
-    return $self->evaluate($context, $data->[2]);
+sub logical_and($self, $scope, $data) {
+    my $left_value = $self->evaluate($scope, $data->[1]);
+    return $left_value if not $self->is_truthy($scope, $left_value);
+    return $self->evaluate($scope, $data->[2]);
 }
 
-sub logical_or {
-    my ($self, $context, $data) = @_;
-    my $left_value = $self->evaluate($context, $data->[1]);
-    return $left_value if $self->is_truthy($context, $left_value);
-    return $self->evaluate($context, $data->[2]);
+sub logical_or($self, $scope, $data) {
+    my $left_value = $self->evaluate($scope, $data->[1]);
+    return $left_value if $self->is_truthy($scope, $left_value);
+    return $self->evaluate($scope, $data->[2]);
 }
 
-sub range_operator {
-    my ($self, $context, $data) = @_;
-
+sub range_operator($self, $scope, $data) {
     my ($to, $from) = ($data->[1], $data->[2]);
 
-    $to   = $self->evaluate($context, $to);
-    $from = $self->evaluate($context, $from);
+    $to   = $self->evaluate($scope, $to);
+    $from = $self->evaluate($scope, $from);
 
     return [INSTR_RANGE, $to, $from];
 }
 
 # lvalue assignment
-sub assignment {
-    my ($self, $context, $data) = @_;
-
+sub assignment($self, $scope, $data) {
     my $left_value  = $data->[1];
-    my $right_value = $self->evaluate($context, $data->[2]);
+    my $right_value = $self->evaluate($scope, $data->[2]);
 
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
-        my ($var, $new_context) = $self->get_variable($context, $left_value->[1]);
-        $self->set_variable($new_context, $left_value->[1], $right_value);
+        my ($var, $var_scope) = $self->get_variable($scope, $left_value->[1]);
+        $self->set_variable($var_scope, $left_value->[1], $right_value);
         return $right_value;
     }
 
     # lvalue array/map access
     if ($left_value->[0] == INSTR_ACCESS) {
-        my $var = $self->evaluate($context, $left_value->[1]);
+        my $var = $self->evaluate($scope, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->evaluate($context, $left_value->[2]);
-            my $val = $self->evaluate($context, $right_value);
+            my $key = $self->evaluate($scope, $left_value->[2]);
+            my $val = $self->evaluate($scope, $right_value);
             $var->[1]->{$key->[1]} = $val;
             return $val;
         }
 
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-            my $index = $self->evaluate($context, $left_value->[2]);
-            my $val = $self->evaluate($context, $right_value);
+            my $index = $self->evaluate($scope, $left_value->[2]);
+            my $val = $self->evaluate($scope, $right_value);
             $var->[1]->[$index->[1]] = $val;
             return $val;
         }
 
         if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-            my $value = $self->evaluate($context, $left_value->[2]);
+            my $value = $self->evaluate($scope, $left_value->[2]);
 
             if ($value->[0] == INSTR_RANGE) {
                 my $from = $value->[1];
@@ -712,14 +651,12 @@ sub assignment {
 }
 
 # rvalue array/map access
-sub access_notation {
-    my ($self, $context, $data) = @_;
-
-    my $var = $self->evaluate($context, $data->[1]);
+sub access_notation($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
 
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        my $key = $self->evaluate($context, $data->[2]);
+        my $key = $self->evaluate($scope, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef] if not defined $val;
         return $val;
@@ -727,7 +664,7 @@ sub access_notation {
 
     # array index
     if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
-        my $index = $self->evaluate($context, $data->[2]);
+        my $index = $self->evaluate($scope, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
@@ -740,7 +677,7 @@ sub access_notation {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->evaluate($context, $data->[2]);
+        my $value = $self->evaluate($scope, $data->[2]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
@@ -755,10 +692,8 @@ sub access_notation {
     }
 }
 
-sub unary_op {
-    my ($self, $instr, $context, $data) = @_;
-
-    my $value = $self->evaluate($context, $data->[1]);
+sub unary_op($self, $instr, $scope, $data) {
+    my $value = $self->evaluate($scope, $data->[1]);
 
     my $result;
 
@@ -777,11 +712,9 @@ sub unary_op {
     return $result;
 }
 
-sub binary_op {
-    my ($self, $instr, $context, $data) = @_;
-
-    my $left  = $self->evaluate($context, $data->[1]);
-    my $right = $self->evaluate($context, $data->[2]);
+sub binary_op($self, $instr, $scope, $data) {
+    my $left  = $self->evaluate($scope, $data->[1]);
+    my $right = $self->evaluate($scope, $data->[2]);
 
     # String operations
     if ($self->{types}->check(['TYPE', 'String'], $left->[0])
@@ -843,14 +776,12 @@ sub binary_op {
     return $result;
 }
 
-sub identifier {
-    my ($self, $context, $data) = @_;
-    my ($var) = $self->get_variable($context, $data->[1]);
+sub identifier($self, $scope, $data) {
+    my ($var) = $self->get_variable($scope, $data->[1]);
     return $var;
 }
 
-sub literal {
-    my ($self, $context, $data) = @_;
+sub literal($self, $scope, $data) {
     my $type  = $data->[1];
     my $value = $data->[2];
     return [$type, $value];
@@ -860,15 +791,12 @@ sub null_op {
     return [['TYPE', 'Null'], undef];
 }
 
-sub expression_group {
-    my ($self, $context, $data) = @_;
-    return $self->execute($self->new_context($context), $data->[1]);
+sub expression_group($self, $scope, $data) {
+    return $self->execute($self->new_scope($scope), $data->[1]);
 }
 
-sub is_truthy {
-    my ($self, $context, $expr) = @_;
-
-    my $result = $self->evaluate($context, $expr);
+sub is_truthy($self, $scope, $expr) {
+    my $result = $self->evaluate($scope, $expr);
 
     if ($self->{types}->check(['TYPE', 'Null'], $result->[0])) {
         return 0;
@@ -886,7 +814,7 @@ sub is_truthy {
         return $result->[1] != 0;
     }
 
-    $self->error($context, "cannot use value of type " . $self->{types}->to_string($result->[0]) . " as conditional");
+    $self->error($scope, "cannot use value of type " . $self->{types}->to_string($result->[0]) . " as conditional");
 }
 
 # builtin functions
@@ -965,29 +893,24 @@ my %function_builtins = (
     },
 );
 
-sub add_builtin_function {
-    my ($self, $name, $parameters, $return_type, $subref, $validate_subref) = @_;
+sub add_builtin_function($self, $name, $parameters, $return_type, $subref, $validate_subref = undef) {
     $function_builtins{$name} = { params => $parameters, ret => $return_type, subref => $subref, vsubref => $validate_subref };
 }
 
-sub get_builtin_function {
-    my ($self, $name) = @_;
+sub get_builtin_function($self, $name) {
     return $function_builtins{$name};
 }
 
-sub call_builtin_function {
-    my ($self, $context, $data, $name) = @_;
+sub call_builtin_function($self, $scope, $data, $name) {
     my $parameters  = $function_builtins{$name}->{params};
     my $func        = $function_builtins{$name}->{subref};
     my $arguments   = $data->[2];
-    my $evaled_args = $self->process_function_call_arguments($context, $name, $parameters, $arguments);
-    return $func->($self, $context, $name, $evaled_args);
+    my $evaled_args = $self->process_function_call_arguments($scope, $name, $parameters, $arguments);
+    return $func->($self, $scope, $name, $evaled_args);
 }
 
 # just like typeof() except include function parameter identifiers and default values
-sub introspect {
-    my ($self, $data) = @_;
-
+sub introspect($self, $data) {
     my $type  = $data->[0];
     my $value = $data->[1];
 
@@ -998,7 +921,7 @@ sub introspect {
         foreach my $param (@{$value->[2]}) {
             my $param_type = $self->{types}->to_string($param->[0]);
             if (defined $param->[2]) {
-                my $default_value = $self->evaluate($self->new_context, $param->[2]);
+                my $default_value = $self->evaluate($self->new_scope, $param->[2]);
                 push @params, "$param->[1]: $param_type = " . $self->output_value($default_value, literal => 1);
             } else {
                 push @params, "$param->[1]: $param_type";
@@ -1016,30 +939,26 @@ sub introspect {
 }
 
 # builtin print
-sub function_builtin_print {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_print($self, $scope, $name, $arguments) {
     my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
     print "$text$end";
     return [['TYPE', 'Null'], undef];
 }
 
 # builtin typeof
-sub function_builtin_typeof {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_typeof($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
     return [['TYPE', 'String'], $self->{types}->to_string($expr->[0])];
 }
 
 # builtin whatis
-sub function_builtin_whatis {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_whatis($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
     return [['TYPE', 'String'], $self->introspect($expr)];
 }
 
 # builtin length
-sub function_builtin_length {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_length($self, $scope, $name, $arguments) {
     my ($val) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'String'], $val->[0])) {
@@ -1056,23 +975,21 @@ sub function_builtin_length {
 }
 
 # builtin map
-sub function_builtin_map {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_map($self, $scope, $name, $arguments) {
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, undef];
 
     foreach my $val (@{$list->[1]}) {
         $data->[2] = [$val];
-        $val = $self->function_call($context, $data);
+        $val = $self->function_call($scope, $data);
     }
 
     return $list;
 }
 
 # builtin filter
-sub function_builtin_filter {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_filter($self, $scope, $name, $arguments) {
     my ($func, $list) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, undef];
@@ -1081,7 +998,7 @@ sub function_builtin_filter {
 
     foreach my $val (@{$list->[1]}) {
         $data->[2] = [$val];
-        my $result = $self->function_call($context, $data);
+        my $result = $self->function_call($scope, $data);
 
         if ($result->[1]) {
             push @$new_list, $val;
@@ -1096,8 +1013,7 @@ sub validate_builtin_print {
     return [['TYPE', 'Null'], undef];
 }
 
-sub validate_builtin_length {
-     my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_length($self, $scope, $name, $arguments) {
      my ($val) = ($arguments->[0]);
 
      my $type = $val->[0];
@@ -1107,12 +1023,11 @@ sub validate_builtin_length {
          return [['TYPE', 'Number'], 0];
      }
 
-     $self->error($context, "cannot get length of a " . $self->{types}->to_string($val->[0]));
+     $self->error($scope, "cannot get length of a " . $self->{types}->to_string($val->[0]));
 }
 
 # cast functions
-sub function_builtin_Integer {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_Integer($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
@@ -1131,22 +1046,20 @@ sub function_builtin_Integer {
         return [['TYPE', 'Integer'], $expr->[1]];
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Integer");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Integer");
 }
 
-sub validate_builtin_Integer {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_Integer($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_Integer($context, $name, $arguments);
+    return $self->function_builtin_Integer($scope, $name, $arguments);
 }
 
-sub function_builtin_Real {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_Real($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
@@ -1165,22 +1078,20 @@ sub function_builtin_Real {
         return [['TYPE', 'Real'], sprintf "%f", $expr->[1]];
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Real");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Real");
 }
 
-sub validate_builtin_Real {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_Real($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_Real($context, $name, $arguments);
+    return $self->function_builtin_Real($scope, $name, $arguments);
 }
 
-sub function_builtin_String {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_String($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
@@ -1207,22 +1118,20 @@ sub function_builtin_String {
         return [['TYPE', 'String'], $self->array_to_string($expr)];
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to String");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to String");
 }
 
-sub validate_builtin_String {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_String($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_String($context, $name, $arguments);
+    return $self->function_builtin_String($scope, $name, $arguments);
 }
 
-sub function_builtin_Boolean {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_Boolean($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'Null'], $expr->[0])) {
@@ -1230,7 +1139,7 @@ sub function_builtin_Boolean {
     }
 
     if ($self->{types}->check(['TYPE', 'Number'], $expr->[0])) {
-        if ($self->is_truthy($context, $expr)) {
+        if ($self->is_truthy($scope, $expr)) {
             return [['TYPE', 'Boolean'], 1];
         } else {
             return [['TYPE', 'Boolean'], 0];
@@ -1238,7 +1147,7 @@ sub function_builtin_Boolean {
     }
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
-        if (not $self->is_truthy($context, $expr)) {
+        if (not $self->is_truthy($scope, $expr)) {
             return [['TYPE', 'Boolean'], 0];
         } else {
             return [['TYPE', 'Boolean'], 1];
@@ -1249,79 +1158,72 @@ sub function_builtin_Boolean {
         return $expr;
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Boolean");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Boolean");
 }
 
-sub validate_builtin_Boolean {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_Boolean($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_Boolean($context, $name, $arguments);
+    return $self->function_builtin_Boolean($scope, $name, $arguments);
 }
 
-sub function_builtin_Map {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_Map($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0];
 
         if ($mapinit->[0] != INSTR_MAPINIT) {
-            $self->error($context, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
+            $self->error($scope, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
         }
 
-        return $self->evaluate($context, $mapinit);
+        return $self->evaluate($scope, $mapinit);
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Map");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Map");
 }
 
-sub validate_builtin_Map {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_Map($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_Map($context, $name, $arguments);
+    return $self->function_builtin_Map($scope, $name, $arguments);
 }
 
-sub function_builtin_Array {
-    my ($self, $context, $name, $arguments) = @_;
+sub function_builtin_Array($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $arrayinit = $self->parse_string($expr->[1])->[0];
 
         if ($arrayinit->[0] != INSTR_ARRAYINIT) {
-            $self->error($context, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
+            $self->error($scope, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
         }
 
-        return $self->evaluate($context, $arrayinit);
+        return $self->evaluate($scope, $arrayinit);
     }
 
-    $self->error($context, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
+    $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to Array");
 }
 
-sub validate_builtin_Array {
-    my ($self, $context, $name, $arguments) = @_;
+sub validate_builtin_Array($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
         return $expr;
     }
 
-    return $self->function_builtin_Array($context, $name, $arguments);
+    return $self->function_builtin_Array($scope, $name, $arguments);
 }
 
-sub identical_objects {
-    my ($self, $obj1, $obj2) = @_;
-
+sub identical_objects($self, $obj1, $obj2) {
     return 0 if not $self->{types}->is_equal($obj1->[0], $obj2->[0]);
 
     if ($self->{types}->is_subtype(['TYPE', 'String'], $obj1->[0])) {
@@ -1350,21 +1252,18 @@ sub identical_objects {
 
 use Plang::Interpreter;
 
-sub parse_string {
-    my ($self, $string) = @_;
+sub parse_string($self, $string) {
     my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
     my $program = $interpreter->parse_string($string);
     return $program->[0]->[1];
 }
 
-sub interpolate_string {
-    my ($self, $context, $string) = @_;
-
+sub interpolate_string($self, $scope, $string) {
     my $new_string = "";
     while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
         my ($text, $interpolate) = ($1, $2);
         my $ast = $self->parse_string($interpolate);
-        my $result = $self->execute($context, $ast);
+        my $result = $self->execute($scope, $ast);
         $new_string .= $text . $self->output_value($result);
     }
 
@@ -1375,9 +1274,7 @@ sub interpolate_string {
 
 # converts a map to a string
 # note: trusts $var to be Map type
-sub map_to_string {
-    my ($self, $var) = @_;
-
+sub map_to_string($self, $var) {
     my $hash = $var->[1];
     my $string = '{';
 
@@ -1397,9 +1294,7 @@ sub map_to_string {
 
 # converts an array to a string
 # note: trusts $var to be Array type
-sub array_to_string {
-    my ($self, $var) = @_;
-
+sub array_to_string($self, $var) {
     my $array = $var->[1];
     my $string = '[';
 
@@ -1414,9 +1309,7 @@ sub array_to_string {
 }
 
 # TODO: do this more efficiently
-sub output_string_literal {
-    my ($self, $text) = @_;
-
+sub output_string_literal($self, $text) {
     $Data::Dumper::Indent = 0;
     $Data::Dumper::Terse  = 1;
     $Data::Dumper::Useqq  = 1;
@@ -1427,10 +1320,8 @@ sub output_string_literal {
     return $text;
 }
 
-sub output_value {
-    my ($self, $value, %opts) = @_;
-
-    my $result = '';;
+sub output_value($self, $value, %opts) {
+    my $result = '';
 
     # specials
     if ($value->[0][0] eq 'SPCL') {
@@ -1500,9 +1391,7 @@ sub output_value {
 }
 
 # runs a new Plang program with a fresh environment
-sub run {
-    my ($self, $ast, %opt) = @_;
-
+sub run($self, $ast = undef, %opt) {
     # ast can be supplied via new() or via this run() subroutine
     $ast ||= $self->{ast};
 
@@ -1513,14 +1402,14 @@ sub run {
     }
 
     # set up the global environment
-    my $context;
+    my $scope;
 
     if ($opt{repl}) {
-        $self->{repl_context} ||= $self->new_context;
-        $context = $self->{repl_context};
+        $self->{repl_scope} ||= $self->new_scope;
+        $scope = $self->{repl_scope};
         $self->{repl} = 1;
     } else {
-        $context = $self->new_context;
+        $scope = $self->new_scope;
         $self->{repl} = 0;
     }
 
@@ -1536,9 +1425,9 @@ sub run {
         }
 
         my $type = ['TYPEFUNC', 'Builtin', $param_types, $ret_type];
-        my $data = [$context, $ret_type, $param_whatis, undef];
+        my $data = [$scope, $ret_type, $param_whatis, undef];
 
-        $self->set_variable($context, $builtin, [$type, $data]);
+        $self->set_variable($scope, $builtin, [$type, $data]);
     }
 
     # grab our program's expressions
@@ -1546,7 +1435,7 @@ sub run {
     my $expressions = $program->[1];
 
     # interpret the expressions
-    my $result = $self->execute($context, $expressions);
+    my $result = $self->execute($scope, $expressions);
 
     # return result to parent program if we're embedded
     return $result if $self->{embedded};
@@ -1564,9 +1453,7 @@ sub run {
     return $result;
 }
 
-sub execute {
-    my ($self, $context, $ast) = @_;
-
+sub execute($self, $scope, $ast) {
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
         $self->{debug}->{print}->('AST', "interpret ast: " . Dumper ($ast) . "\n");
@@ -1579,10 +1466,10 @@ sub execute {
         my $instruction = $node->[0];
 
         if ($instruction == INSTR_EXPR_GROUP) {
-            return $self->execute($context, $node->[1]);
+            return $self->execute($scope, $node->[1]);
         }
 
-        my $result = $self->evaluate($context, $node);
+        my $result = $self->evaluate($scope, $node);
 
         if ($result && $result->[0] eq 'SPCL') {
             if ($result->[1] eq 'NEXT' or $result->[1] eq 'LAST') {
@@ -1597,9 +1484,7 @@ sub execute {
     return $final_result // [['TYPE', 'Null'], undef];
 }
 
-sub evaluate {
-    my ($self, $context, $data) = @_;
-
+sub evaluate($self, $scope, $data) {
     return if not $data;
 
     my $ins = $data->[0];
@@ -1620,7 +1505,7 @@ sub evaluate {
         $Data::Dumper::Indent = 1;
     }
 
-    my $result = $self->dispatch_instruction($ins, $context, $data);
+    my $result = $self->dispatch_instruction($ins, $scope, $data);
 
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
