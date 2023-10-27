@@ -245,6 +245,7 @@ sub interpret {
     }
 
     print "-- Interpreter --\n" if $self->{debug};
+    $self->{interpreter}->reset; # reset recursion and iteration counters
     my $result = eval { $self->{interpreter}->run($self->{ast}, %opt) };
 
     if (my $exception = $@) {

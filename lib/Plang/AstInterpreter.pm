@@ -14,6 +14,7 @@ use warnings;
 use strict;
 
 use Data::Dumper;
+use Devel::StackTrace;
 
 use Plang::Constants::Instructions ':all';
 
@@ -104,6 +105,12 @@ sub initialize {
     $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
 }
 
+sub reset {
+    my ($self) = @_;
+    $self->{recursions} = 0;
+    $self->{iterations} = 0;
+}
+
 sub dispatch_instruction {
     my ($self, $instr, $context, $data) = @_;
 
@@ -156,17 +163,24 @@ sub get_variable {
 
     # look for variables in current scope
     if (exists $context->{locals}->{$name}) {
-        return $context->{locals}->{$name};
+        my $var = $context->{locals}->{$name};
+        return ($var, $context);
+    }
+
+    # check for closure
+    if (defined $context->{closure}) {
+        my ($var, $scope) = $self->get_variable($context->{closure}, $name);
+        return ($var, $scope) if defined $var;
     }
 
     # look for variables in enclosing scopes
     if (!$opt{locals_only} and defined $context->{parent}) {
-        my $var = $self->get_variable($context->{parent}, $name);
-        return $var if defined $var;
+        my ($var, $scope) = $self->get_variable($context->{parent}, $name);
+        return ($var, $scope) if defined $var;
     }
 
     # otherwise it's an undefined variable
-    return undef;
+    return (undef, undef);
 }
 
 sub variable_declaration {
@@ -219,7 +233,7 @@ sub function_call {
 
     if ($target->[0] == INSTR_IDENT) {
         $self->{debug}->{print}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
-        $func = $self->get_variable($context, $target->[1]);
+        ($func) = $self->get_variable($context, $target->[1]);
 
         if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
             # builtin function
@@ -238,10 +252,12 @@ sub function_call {
     my $parameters  = $func->[1]->[2];
     my $expressions = $func->[1]->[3];
 
-    # wedge closure in between current scope and previous scope
-    my $new_context = $self->new_context($closure);
-    $new_context->{locals} = { %{$context->{locals}} }; # assign copy of current scope's locals so we don't recurse into its parent
-    $new_context = $self->new_context($new_context);    # make new current empty scope with previous current scope as parent
+    if ($closure != $context) {
+        $context->{closure} = $closure;
+    }
+
+    # create new context to set function arguments
+    my $new_context = $self->new_context($context);
 
     $self->process_function_call_arguments($new_context, $target->[1], $parameters, $arguments);
 
@@ -259,6 +275,8 @@ sub function_call {
     }
 
     $self->{recursion}--;
+
+    $context->{closure} = undef;
 
     return $result;
 }
@@ -301,7 +319,7 @@ sub map_constructor {
 
         # identifier
         if ($key->[0] == INSTR_IDENT) {
-            my $var = $self->get_variable($context, $key->[1]);
+            my ($var) = $self->get_variable($context, $key->[1]);
             my $value = $self->evaluate($context, $value);
             $hashref->{$var->[1]} = $value;
             push @props, [$var->[1], $value->[0]];
@@ -367,7 +385,7 @@ sub keyword_delete {
 
     # delete all keys in map
     if ($data->[1]->[0] == INSTR_IDENT) {
-        my $var = $self->get_variable($context, $data->[1]->[1]);
+        my ($var) = $self->get_variable($context, $data->[1]->[1]);
         $var->[1] = {};
         return $var;
     }
@@ -448,7 +466,8 @@ sub keyword_try {
 
 sub keyword_throw {
     my ($self, $context, $data) = @_;
-    die $self->evaluate($context, $data->[1]);
+    my $value = $self->evaluate($context, $data->[1]);
+    die $value->[1]; # guaranteed to be a String as per Validator.pm
 }
 
 sub keyword_return {
@@ -637,8 +656,8 @@ sub assignment {
 
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
-        my $var = $self->get_variable($context, $left_value->[1]);
-        $self->set_variable($context, $left_value->[1], $right_value);
+        my ($var, $new_context) = $self->get_variable($context, $left_value->[1]);
+        $self->set_variable($new_context, $left_value->[1], $right_value);
         return $right_value;
     }
 
@@ -826,7 +845,7 @@ sub binary_op {
 
 sub identifier {
     my ($self, $context, $data) = @_;
-    my $var = $self->get_variable($context, $data->[1]);
+    my ($var) = $self->get_variable($context, $data->[1]);
     return $var;
 }
 
@@ -1550,7 +1569,7 @@ sub execute {
 
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
-        $self->{debug}->{print}->('AST', "interpet ast: " . Dumper ($ast) . "\n");
+        $self->{debug}->{print}->('AST', "interpret ast: " . Dumper ($ast) . "\n");
         $Data::Dumper::Indent = 1;
     }
 
@@ -1565,7 +1584,7 @@ sub execute {
 
         my $result = $self->evaluate($context, $node);
 
-        if ($result->[0] eq 'SPCL') {
+        if ($result && $result->[0] eq 'SPCL') {
             if ($result->[1] eq 'NEXT' or $result->[1] eq 'LAST') {
                 $result->[2] = $final_result;
                 return $result;
@@ -1584,7 +1603,15 @@ sub evaluate {
     return if not $data;
 
     my $ins = $data->[0];
-    return $data if $ins !~ /^\d+$/;
+
+    if ($ins !~ /^\d+$/) {
+        if ($self->{debug}) {
+            print "Unknown instruction ", Dumper($ins), "\n";
+            my $trace = Devel::StackTrace->new;
+            print $trace->as_string;
+        }
+        return $data;
+    }
 
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;

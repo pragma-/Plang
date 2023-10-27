@@ -141,6 +141,10 @@ print "Running ", scalar @selected_tests, " test file", @selected_tests == 1 ? '
 use Encode;
 
 foreach my $test (@selected_tests) {
+    if (-d $test) {
+        die "Failed to open $test; expected file but got directory.";
+    }
+
     open my $fh, '<', $test or die "Failed to open $test: $!";
     my $code = do { local $/; <$fh> };
     close $fh;

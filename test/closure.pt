@@ -1,5 +1,5 @@
 # closure test
-fn counter() {
+fn counter {
   var i = 0  # counter variable
   fn ++i     # final statement returns anonymous function taking no arguments, with one statement body `++i`
 }

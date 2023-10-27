@@ -99,7 +99,7 @@ sub backtrack {
 
         $self->{indent}--;
         my $rule = pop @{$self->{current_rule}};
-        $self->{debug}->{print}->('PARSER', $self->{indent}, "<- Backtracked $rule\n");
+        $self->{debug}->{print}->('PARSER', "<- Backtracked $rule\n", $self->{indent});
     }
 
     return;
@@ -113,7 +113,7 @@ sub advance {
 
     if ($self->{debug}) {
         my $count = @{$self->{backtrack}};
-        $self->{debug}->{print}->('BACKTRACK', $self->{indent}, "[$count] popped a backtrack\n");
+        $self->{debug}->{print}->('BACKTRACK', "[$count] popped a backtrack\n", $self->{indent});
 
         $self->{indent}--;
 

@@ -365,7 +365,7 @@ sub cat_assign {
 
 sub identifier {
     my ($self, $context, $data) = @_;
-    my $var = $self->get_variable($context, $data->[1]);
+    my ($var) = $self->get_variable($context, $data->[1]);
     $self->error($context, "undeclared variable `$data->[1]`", $data->[2]) if not defined $var;
     return $var;
 }
@@ -392,8 +392,9 @@ sub variable_declaration {
         $right_value = [['TYPE', 'Null'], undef];
     }
 
-    if (!$self->{repl} and (my $var = $self->get_variable($context, $name, locals_only => 1))) {
-        if ($var->[0] ne 'Builtin') {
+    if (!$self->{repl}) {
+        my ($var) = $self->get_variable($context, $name, locals_only => 1);
+        if ($var && $var->[0] ne 'Builtin') {
             $self->error($context, "cannot redeclare existing local `$name`", $self->position($data));
         }
     }
@@ -463,7 +464,7 @@ sub map_constructor {
 
     foreach my $entry (@$map) {
         if ($entry->[0]->[0] == INSTR_IDENT) {
-            my $var = $self->get_variable($context, $entry->[0]->[1]);
+            my ($var) = $self->get_variable($context, $entry->[0]->[1]);
 
             if (not defined $var) {
                 $self->error($context, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key", $self->position($entry->[0]));
@@ -858,7 +859,7 @@ sub function_call {
 
     if ($target->[0] == INSTR_IDENT) {
         $name = $target->[1];
-        $func = $self->get_variable($context, $name);
+        ($func) = $self->get_variable($context, $name);
 
         if (not defined $func) {
             # undefined function
@@ -1120,9 +1121,9 @@ sub assignment {
 
     # lvalue variable
     if ($left_value->[0] == INSTR_IDENT) {
-        my $var = $self->get_variable($context, $left_value->[1]);
+        my ($var, $new_context) = $self->get_variable($context, $left_value->[1]);
         $var // $self->error($context, "cannot assign to undeclared variable `$left_value->[1]`", $left_value->[2]);
-        $self->set_variable($context, $left_value->[1], $right_value);
+        $self->set_variable($new_context, $left_value->[1], $right_value);
         return $right_value;
     }
 

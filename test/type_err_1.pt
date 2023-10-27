@@ -1,0 +1,7 @@
+type A = Integer
+type B = A
+type C = B
+
+var x: [C] = ["42"]
+
+# Validator error: cannot initialize `x` with value of type [String] (expected [C aka B aka A aka Integer]) at line 5, col 1

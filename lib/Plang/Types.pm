@@ -259,20 +259,24 @@ sub name_is {
     return $type->[0] eq $name;
 }
 
-# return true if a type name is arithmetic
+# return true if a type is arithmetic
 sub is_arithmetic {
     my ($self, $type) = @_;
 
+    # subtype of Number is arithmetic
     if ($type->[0] eq 'TYPE') {
         return 1 if $self->has_subtype('Number', $type->[1]);
     }
 
+    # every type in union must be arithmetic
     if ($type->[0] eq 'TYPEUNION') {
         foreach my $t (@{$type->[1]}) {
-            return 1 if $self->is_arithmetic($t);
+            return 0 if !$self->is_arithmetic($t);
         }
+        return 1;
     }
 
+    # not arithmetic
     return 0;
 }
 
@@ -402,9 +406,8 @@ sub check {
         }
     }
 
-    # check for aliases
-    # we wrap these resolve_alias() calls with a check for 'TYPE'
-    # to avoid an unnecessary subcall
+    # check for aliases (we wrap these resolve_alias() calls with a check for
+    # 'TYPE' to avoid an unnecessary subcall)
     if ($guard->[0] eq 'TYPE') {
         $guard = $self->resolve_alias($guard);
     }

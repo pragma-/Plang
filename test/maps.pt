@@ -1,0 +1,11 @@
+var map1 = {'a': 1, 'b': 2, 'c': 3}
+
+var k = keys map1
+
+# XXX test_eq(k, ['a', 'b', 'c'])
+
+var map2 = {}
+map2.'i love spaces' = 42
+print(map2)
+
+test_stdout('{"i love spaces": 42}\n');
