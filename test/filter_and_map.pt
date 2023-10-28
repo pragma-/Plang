@@ -1,0 +1,18 @@
+test_eq(filter(fn(x) x>4, [1,2,3,4,5,6,7,8]), [5,6,7,8])
+
+test_eq(map(fn(x) x*=2, [1,2,3]), [2,4,6])
+
+fn add(a) fn(b) a+b
+test_eq(map(add(3), [1,2,3]), [4,5,6])
+
+var list1 = [
+   { "type": "dog", "name": "sparky" },
+   { "type": "cat", "name": "whiskers" },
+   { "type": "dog", "name": "fido" },
+   { "type": "bird", "name": "chirpy" },
+   { "type": "cat", "name": "princess" },
+]
+
+test_eq(filter(fn (x) x["type"] == "dog", list1), [{"type": "dog", "name": "sparky"}, {"type": "dog", "name": "fido"}])
+test_eq(filter(fn (x) x["type"] == "cat", list1), [{"type": "cat", "name": "whiskers"}, {"type": "cat", "name": "princess"}])
+test_eq(filter(fn (x) x["type"] == "bird", list1), [{"type": "bird", "name": "chirpy"}])

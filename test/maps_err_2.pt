@@ -1,0 +1,3 @@
+var n = 42
+values n
+# Validator error: values must be used on Maps (got Integer) at line 2, col 8

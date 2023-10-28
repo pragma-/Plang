@@ -618,7 +618,7 @@ sub function_definition($self, $scope, $data) {
     }
 
     $scope->{locals}->{$name} = $func;
-    my $new_scope = $self->new_scope($scope);
+    my $func_scope = $self->new_scope($scope);
 
     # validate parameters
     my $got_default_value = 0;
@@ -627,23 +627,23 @@ sub function_definition($self, $scope, $data) {
 
         push @$param_types, $type;
 
-        my $value = $self->evaluate($new_scope, $default_value);
+        my $value = $self->evaluate($func_scope, $default_value);
 
         if (not defined $value) {
             if ($got_default_value) {
-                $self->error($new_scope, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value", $self->position($param));
+                $self->error($func_scope, "in definition of function `$name`: missing default value for parameter `$ident` after previous parameter was declared with default value", $self->position($param));
             }
 
-            $value = [$type, 0];
+            $value = [$type, $self->{types}->default_value($type), $self->position($param)];
         } else {
             $got_default_value = 1;
 
             if (not $self->{types}->check($type, $value->[0])) {
-                $self->error($new_scope, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]), $self->position($value));
+                $self->error($func_scope, "in definition of function `$name`: parameter `$ident` declared as " . $self->{types}->to_string($type) . " but default value has type " . $self->{types}->to_string($value->[0]), $self->position($value));
             }
         }
 
-        $self->declare_variable($new_scope, $type, $ident, $value);
+        $self->declare_variable($func_scope, $type, $ident, $value);
     }
 
     # collect returned values to infer return type
@@ -651,11 +651,11 @@ sub function_definition($self, $scope, $data) {
     my $result;
     my $expr_pos;
 
-    $new_scope->{current_function} = $name;
+    $func_scope->{current_function} = $name;
 
     foreach my $expression (@$expressions) {
         $expr_pos = $self->position($expression);
-        $result = $self->evaluate($new_scope, $expression);
+        $result = $self->evaluate($func_scope, $expression);
 
         # make note of a returned value
         if ($expression->[0] == INSTR_RET) {
@@ -663,7 +663,7 @@ sub function_definition($self, $scope, $data) {
         }
     }
 
-    delete $new_scope->{current_function};
+    delete $func_scope->{current_function};
 
     # add final statement to return values
     push @return_values, [$result, $expr_pos];
@@ -679,7 +679,7 @@ sub function_definition($self, $scope, $data) {
 
         # check for self-referential return value
         if ($ret_is_any && $type->[0] eq 'TYPEFUNC' && $type->[3] == $func_type->[3]) {
-            $self->error($new_scope, "in definition of function `$name`: self-referential return type", $pos);
+            $self->error($func_scope, "in definition of function `$name`: self-referential return type", $pos);
         }
 
         # add type to list of return types
@@ -689,7 +689,7 @@ sub function_definition($self, $scope, $data) {
     my $type = $self->{types}->unite(\@return_types);
 
     if (not $self->{types}->check($ret_type, $type)) {
-        $self->error($new_scope, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type), $pos);
+        $self->error($func_scope, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type), $pos);
     }
 
     # update with inferred return type if original return type is Any
@@ -852,25 +852,27 @@ sub function_call($self, $scope, $data) {
     my $expressions  = $func->[1]->[3];
     my $return_value;
 
-    my $new_scope = $self->new_scope($closure);
-    $new_scope->{locals} = { %{$scope->{locals}} };
-    $new_scope = $self->new_scope($new_scope);
+    if ($scope != $closure) {
+        $scope->{closure} = $closure;
+    }
 
-    my $evaled_args = $self->process_function_call_arguments($new_scope, $name, $parameters, $arguments, $data);
+    my $func_scope = $self->new_scope($scope);
+
+    my $evaled_args = $self->process_function_call_arguments($func_scope, $name, $parameters, $arguments, $data);
 
     # type-check arguments
     if (defined $parameters) {
         for (my $i = 0; $i < @$parameters; $i++) {
-            $self->validate_function_argument_type($scope, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
+            $self->validate_function_argument_type($func_scope, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
         }
     }
 
-    $new_scope->{typed}->{"$func"} = [['TYPE', 'Any'], 0];
+    $func_scope->{typed}->{"$func"} = [['TYPE', 'Any'], 0];
 
     # invoke the function
-    $new_scope->{current_function} = $name;
+    $func_scope->{current_function} = $name;
     foreach my $expression (@$expressions) {
-        $return_value = $self->evaluate($new_scope, $expression);
+        $return_value = $self->evaluate($func_scope, $expression);
         last if $expression->[0] == INSTR_RET; # XXX - handle all returns and final expression
     }
 
@@ -890,7 +892,9 @@ sub function_call($self, $scope, $data) {
         $func->[0]->[3] = $return_value->[0];
     }
 
-    $scope->{typed}->{"$func"} = $return_value;
+    $scope->{closure} = undef;
+
+    $scope->{typed}->{$func} = $return_value;
     return $return_value;
 }
 
@@ -1033,6 +1037,10 @@ sub access_notation($self, $scope, $data) {
             my $index = $value->[1];
             return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
         }
+    }
+
+    if ($self->{types}->check(['TYPE', 'Any'], $var->[0])) {
+        return [['TYPE', 'Any'], 0];
     }
 
     $self->error($scope, "cannot use ACCESS notation on object of type " . $self->{types}->to_string($var->[0]), $self->position($var));

@@ -53,6 +53,54 @@ sub add_default_types($self) {
     $self->add('Function', 'Builtin');
 }
 
+sub default_value($self, $type) {
+    #print "get def val for ", Dumper($type), "\n";
+    $type = $self->resolve_alias($type);
+    #print "resolved to ", Dumper($type), "\n";
+
+    my $val;
+
+    if ($type->[0] eq 'TYPEMAP') {
+        $val = {};
+
+        foreach my $key (@{$type->[1]}) {
+            $val->{$key->[0]} = $self->default_value($key->[1]);
+        }
+    }
+
+    elsif ($type->[0] eq 'TYPEARRAY') {
+    }
+
+    elsif ($type->[0] eq 'TYPE') {
+        if ($type->[1] eq 'Null') {
+            $val = [['TYPE', 'Null'], undef];
+        } elsif ($type->[1] eq 'Number') {
+            $val = [['TYPE', 'Number'], 0];
+        } elsif ($type->[1] eq 'Boolean') {
+            $val = [['TYPE', 'Boolean'], 0];
+        } elsif ($type->[1] eq 'Real') {
+            $val = [['TYPE', 'Real'], 0.0];
+        } elsif ($type->[1] eq 'Integer') {
+            $val = [['TYPE', 'Integer'], 0];
+        } elsif ($type->[1] eq 'String') {
+            $val = [['TYPE', 'String'], ''];
+        } elsif ($type->[1] eq 'Any') {
+            $val = [['TYPE', 'Any'], 0];
+        } else {
+            die "[default-value] unknown type for TYPE ($type->[1])\n";
+        }
+    }
+
+    elsif ($type->[0] eq 'TYPEUNION') {
+    }
+
+    else {
+        die "[default-value] unknown type ($type->[0])\n";
+    }
+
+    return $val;
+}
+
 # add a type name
 sub add($self, $type, $subtype = undef) {
     if (not defined $subtype) {

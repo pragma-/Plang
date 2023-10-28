@@ -1246,11 +1246,25 @@ sub PostfixLBracket($parser, $left) {
     return [INSTR_ACCESS, $left, $expression, token_position($token)];
 }
 
+sub PostfixDot($parser, $left) {
+    my $token = $parser->consume(TOKEN_DOT);
+
+    my $expression = Expression($parser);
+
+    if (not $expression) {
+        expected($parser, 'expression after postfix .');
+    }
+
+    return [INSTR_ACCESS, $left, $expression, token_position($token)];
+}
+
+
 my @postfix_dispatcher;
 $postfix_dispatcher[TOKEN_PLUS_PLUS]   = \&PostfixPlusPlus;
 $postfix_dispatcher[TOKEN_MINUS_MINUS] = \&PostfixMinusMinus;
 $postfix_dispatcher[TOKEN_L_PAREN]     = \&PostfixLParen;
 $postfix_dispatcher[TOKEN_L_BRACKET]   = \&PostfixLBracket;
+$postfix_dispatcher[TOKEN_DOT]         = \&PostfixDot;
 
 sub Postfix($parser, $left, $precedence) {
     # peek at upcoming token

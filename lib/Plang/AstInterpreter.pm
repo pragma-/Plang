@@ -369,11 +369,11 @@ sub keyword_keys($self, $scope, $data) {
     my $hash = $map->[1];
     my $list = [];
 
-    foreach my $key (keys %$hash) {
+    foreach my $key (sort keys %$hash) {
         push @$list, [['TYPE', 'String'], $key];
     }
 
-    return [['TYPE', 'Array'], $list];
+    return [['TYPEARRAY', ['TYPE', 'String']], $list];
 }
 
 sub keyword_values($self, $scope, $data) {
@@ -381,12 +381,17 @@ sub keyword_values($self, $scope, $data) {
 
     my $hash = $map->[1];
     my $list = [];
+    my @types;
 
-    foreach my $value (values %$hash) {
+    foreach my $key (sort keys %$hash) {
+        my $value = $hash->{$key};
         push @$list, $value;
+        push @types, $value->[0];
     }
 
-    return [['TYPE', 'Array'], $list];
+    my $type = $self->{types}->unite(\@types);
+
+    return [['TYPEARRAY', $type], $list];
 }
 
 sub keyword_try($self, $scope, $data) {
@@ -995,6 +1000,7 @@ sub function_builtin_filter($self, $scope, $name, $arguments) {
     my $data = ['CALL', $func, undef];
 
     my $new_list = [];
+    my @types;
 
     foreach my $val (@{$list->[1]}) {
         $data->[2] = [$val];
@@ -1002,10 +1008,13 @@ sub function_builtin_filter($self, $scope, $name, $arguments) {
 
         if ($result->[1]) {
             push @$new_list, $val;
+            push @types, $val->[0];
         }
     }
 
-    return [['TYPE', 'Array'], $new_list];
+    my $type = $self->{types}->unite(\@types);
+
+    return [['TYPEARRAY', $type], $new_list];
 }
 
 # builtin function validators
@@ -1234,9 +1243,19 @@ sub identical_objects($self, $obj1, $obj2) {
         return $obj1->[1] == $obj2->[1];
     } elsif ($self->{types}->is_subtype(['TYPE', 'Function'], $obj1->[0])) {
         return 0;
-    } elsif ($self->{types}->is_subtype(['TYPE', 'Map'], $obj1->[0])) {
-        # TODO
-    } elsif ($self->{types}->is_subtype(['TYPE', 'Array'], $obj1->[0])) {
+    } elsif ($obj1->[0]->[0] eq 'TYPEMAP') {
+        my %h1 = %{$obj1->[1]};
+        my %h2 = %{$obj2->[1]};
+
+        my @keys1 = keys %h1;
+        my @keys2 = keys %h2;
+
+        return 0 if @keys1 != @keys2;
+
+        foreach my $key (sort @keys1) {
+            return 0 if !$self->identical_objects($h1{$key}, $h2{$key});
+        }
+    } elsif ($obj1->[0]->[0] eq 'TYPEARRAY') {
         my @a1 = @{$obj1->[1]};
         my @a2 = @{$obj2->[1]};
 
@@ -1248,6 +1267,7 @@ sub identical_objects($self, $obj1, $obj2) {
     } else {
         return $obj1->[1] == $obj2->[1];
     }
+    return 1;
 }
 
 use Plang::Interpreter;

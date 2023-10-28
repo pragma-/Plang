@@ -1,11 +1,17 @@
-var map1 = {'a': 1, 'b': 2, 'c': 3}
-
+var map1 = {'a': 1, 'b': 2, 'c': "hello"}
 var k = keys map1
-
-# XXX test_eq(k, ['a', 'b', 'c'])
+test_eq(k, ['a', 'b', 'c'])
+var v = values map1
+test_eq(v, [1, 2, "hello"]);
 
 var map2 = {}
 map2.'i love spaces' = 42
 print(map2)
-
 test_stdout('{"i love spaces": 42}\n');
+
+
+type Player = {'health': Integer, 'name': String}
+fn die(p: Player) p.health = 0
+var p: Player = { 'health': 100, 'name': 'bob' }
+die(p)
+test_eq(p, {'health': 0, 'name': 'bob'})
