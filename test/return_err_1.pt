@@ -1,0 +1,2 @@
+return 42
+# Validator error: cannot use `return` outside of function at line 1, col 1

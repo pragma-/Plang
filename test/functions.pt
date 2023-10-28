@@ -32,3 +32,9 @@ test_eq(force(lazy1), 2, "lazy evaluation")
 fn id(x) x
 var lazy2 = fn 1 + id(2)
 test_eq(force(lazy2), 3, "lazy evaluation")
+
+fn f4(a, b) return a + b
+test_eq(f4(3,5), 8, "return statement")
+
+fn f5(a, b) { return a + b }
+test_eq(f5(3,5), 8, "return statement in block")

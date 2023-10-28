@@ -210,6 +210,7 @@ sub binary_op($self, $instr, $scope, $data) {
 sub expression_group($self, $scope, $data) {
     my $new_scope = $self->new_scope($scope);
     $new_scope->{while_loop} = $scope->{while_loop};
+    $new_scope->{current_function} = $scope->{current_function};
     return $self->execute($new_scope, $data->[1]);
 }
 
@@ -999,12 +1000,20 @@ sub access_notation($self, $scope, $data) {
 
     # map index
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        # desugar x.y to x['y']
+        my $key;
+
+        # desugar x.y to x['y'] if ident does not exist
         if ($data->[2]->[0] == INSTR_IDENT) {
-            $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
+            ($key) = $self->get_variable($scope, $data->[2]->[1]);
+
+            if (not defined $key) {
+                $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
+                $key = $self->evaluate($scope, $data->[2]);
+            }
+        } else {
+            $key = $self->evaluate($scope, $data->[2]);
         }
 
-        my $key = $self->evaluate($scope, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
         return $val;
@@ -1040,7 +1049,7 @@ sub access_notation($self, $scope, $data) {
     }
 
     if ($self->{types}->check(['TYPE', 'Any'], $var->[0])) {
-        return [['TYPE', 'Any'], 0];
+        return [['TYPE', 'Any'], 0, $self->position($var)];
     }
 
     $self->error($scope, "cannot use ACCESS notation on object of type " . $self->{types}->to_string($var->[0]), $self->position($var));

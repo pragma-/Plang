@@ -1,6 +1,12 @@
 var player = { "name": "Grok", "health": 100, "iq": 75 }
 test_eq(player["iq"],  75, "map entry")
 test_eq(player.iq,  75, "map entry (dot)")
+test_eq(player."iq", 75, "map entry (dot string literal)")
+test_eq(player[iq], 75, "map entry (bracket identifier)")
+
+var k = "iq"
+test_eq(player.k, 75, "map entry (dot variable)")
+test_eq(player[k], 75, "map entry (bracket variable)")
 
 var map1 = {}
 map1["color"] = "blue"
