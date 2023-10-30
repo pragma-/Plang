@@ -20,6 +20,7 @@ This README describes what is implemented so far.
     * [Keywords](#keywords)
   * [Variables](#variables)
   * [Functions](#functions)
+    * [Uniform function call syntax](#uniform-function-call-syntax)
     * [Optional type annotations](#optional-type-annotations)
     * [Default arguments](#default-arguments)
     * [Named arguments](#named-arguments)
