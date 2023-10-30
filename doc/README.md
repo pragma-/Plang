@@ -354,6 +354,14 @@ parentheses.
 
 The `fn` expression evaluates to a reference to the newly defined function.
 
+#### Uniform function call syntax
+Functions may be invoked using uniform call syntax with dot notation. This
+means that `x.f()` will be converted into `f(x)` during compilation. For
+example, `[2,4,8].map(fn (x) x * 2)` will be converted into
+`map([2,4,8], fn (x) x * 2)`. This allows better ergonomics and readability
+of composed functions. Instead of writing `add(mul(2, 4), 8)` we can write
+`2.mul(4).add(8)`.
+
 #### Optional type annotations
 Function definitions may optionally include type annotations for the function signature.
 Compile-time errors will be generated if the types of values provided to or returned from

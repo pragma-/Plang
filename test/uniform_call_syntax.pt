@@ -1,5 +1,5 @@
 test_eq(map([2,4,8], fn (x) x * 2), [4,8,16], "normal function call syntax")
-test_eq([2,4,8].map(fn (x) x * 2), [4,8,16], "universal function call syntax")
+test_eq([2,4,8].map(fn (x) x * 2), [4,8,16], "uniform function call syntax")
 
 fn add(a, b) a + b
 

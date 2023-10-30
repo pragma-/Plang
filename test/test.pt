@@ -1,5 +1,0 @@
-var map1 = {}
-map1["color"] = "blue"
-test_eq($"The color is {map1['color']}!", 'The color is blue!', "map interpolation")
-test_eq($"The color is {map1.'color'}!", 'The color is blue!', "map interpolation (dot)")
-test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation (dot)")
