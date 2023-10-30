@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Interprets a Plang abstract syntax tree. Run-time type-checking and semantic
-# validation is kept to a minimum (this is handled at compile-time in
-# Validator.pm). The AST is pruned to the program data; source file line/col
-# information, etc, is not retained.
+# Interprets a Plang abstract syntax tree.
+#
+# Run-time type-checking and semantic validation is kept to a minimum (this
+# is handled at compile-time in Validator.pm). The AST is pruned to the
+# program data; source file line/col information, etc, is not retained.
 #
 # The error() function in this module produces run-time errors (without
 # line/col information).
@@ -16,6 +17,7 @@ use feature 'signatures';
 
 use Data::Dumper;
 use Devel::StackTrace;
+use Plang::AstDumper;
 
 use Plang::Constants::Instructions ':all';
 
@@ -40,6 +42,8 @@ sub initialize($self, %conf) {
 
     $self->{types} = $conf{types} // die 'Missing types';
 
+    $self->{dumper} = Plang::AstDumper->new(types => $self->{types}, debug => $self->{debug});
+
     $self->{instr_dispatch} = [];
 
     # main instructions
@@ -47,8 +51,8 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
     $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
-    $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
-    $self->{instr_dispatch}->[INSTR_ARRAYINIT]   = \&array_constructor;
+    $self->{instr_dispatch}->[INSTR_MAPCONS]     = \&map_constructor;
+    $self->{instr_dispatch}->[INSTR_ARRAYCONS]   = \&array_constructor;
     $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
     $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
     $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
@@ -75,7 +79,8 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
     $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
     $self->{instr_dispatch}->[INSTR_RANGE]       = \&range_operator;
-    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+    $self->{instr_dispatch}->[INSTR_DOT_ACCESS]  = \&access;
+    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
     $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
     $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
     $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
@@ -606,7 +611,7 @@ sub assignment($self, $scope, $data) {
     }
 
     # lvalue array/map access
-    if ($left_value->[0] == INSTR_ACCESS) {
+    if ($left_value->[0] == INSTR_ACCESS || $left_value->[0] == INSTR_DOT_ACCESS) {
         my $var = $self->evaluate($scope, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
@@ -656,7 +661,7 @@ sub assignment($self, $scope, $data) {
 }
 
 # rvalue array/map access
-sub access_notation($self, $scope, $data) {
+sub access($self, $scope, $data) {
     my $var = $self->evaluate($scope, $data->[1]);
 
     # map index
@@ -826,8 +831,10 @@ sub is_truthy($self, $scope, $expr) {
 my %function_builtins = (
     'print'   => {
         # [[[param type], 'param name', [default value]], ...]
-        params => [[['TYPE',    'Any'], 'expr', undef],
-                   [['TYPE', 'String'], 'end',  [['TYPE', 'String'], "\n"]]],
+        params => [
+                    [['TYPE',    'Any'], 'expr', undef],
+                    [['TYPE', 'String'], 'end',  [INSTR_LITERAL, ['TYPE', 'String'], "\n"]],
+                  ],
         ret    => ['TYPE', 'Null'],
         subref => \&function_builtin_print,
         vsubref => \&validate_builtin_print,
@@ -849,14 +856,18 @@ my %function_builtins = (
         vsubref => \&validate_builtin_length,
     },
     'map' => {
-        params => [[['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
-                   [['TYPE', 'Array'], 'list', undef]],
+        params => [
+                    [['TYPE', 'Array'], 'list', undef],
+                    [['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Any']], 'func', undef],
+                  ],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_map,
     },
     'filter' => {
-        params => [[['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
-                   [['TYPE', 'Array'], 'list', undef]],
+        params => [
+                    [['TYPE', 'Array'], 'list', undef],
+                    [['TYPEFUNC', 'Builtin', [['TYPE', 'Any']], ['TYPE', 'Boolean']], 'func', undef],
+                  ],
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_filter,
     },
@@ -981,7 +992,7 @@ sub function_builtin_length($self, $scope, $name, $arguments) {
 
 # builtin map
 sub function_builtin_map($self, $scope, $name, $arguments) {
-    my ($func, $list) = ($arguments->[0], $arguments->[1]);
+    my ($list, $func) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, undef];
 
@@ -995,7 +1006,7 @@ sub function_builtin_map($self, $scope, $name, $arguments) {
 
 # builtin filter
 sub function_builtin_filter($self, $scope, $name, $arguments) {
-    my ($func, $list) = ($arguments->[0], $arguments->[1]);
+    my ($list, $func) = ($arguments->[0], $arguments->[1]);
 
     my $data = ['CALL', $func, undef];
 
@@ -1186,7 +1197,7 @@ sub function_builtin_Map($self, $scope, $name, $arguments) {
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $mapinit = $self->parse_string($expr->[1])->[0];
 
-        if ($mapinit->[0] != INSTR_MAPINIT) {
+        if ($mapinit->[0] != INSTR_MAPCONS) {
             $self->error($scope, "not a valid Map inside String in Map() cast (got `$expr->[1]`)");
         }
 
@@ -1212,7 +1223,7 @@ sub function_builtin_Array($self, $scope, $name, $arguments) {
     if ($self->{types}->check(['TYPE', 'String'], $expr->[0])) {
         my $arrayinit = $self->parse_string($expr->[1])->[0];
 
-        if ($arrayinit->[0] != INSTR_ARRAYINIT) {
+        if ($arrayinit->[0] != INSTR_ARRAYCONS) {
             $self->error($scope, "not a valid Array inside String in Array() cast (got `$expr->[1]`)");
         }
 
@@ -1279,10 +1290,21 @@ sub parse_string($self, $string) {
 }
 
 sub interpolate_string($self, $scope, $string) {
-    my $new_string = "";
+    my $new_string = '';
     while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
         my ($text, $interpolate) = ($1, $2);
+
         my $ast = $self->parse_string($interpolate);
+
+        # run validator to desugar AST
+        my $validator = Plang::Validator->new(types => $self->{types});
+        my $errors = $validator->validate($ast, scope => $scope);
+
+        if ($errors) {
+            print STDERR $errors->[1];
+            exit 1;
+        }
+
         my $result = $self->execute($scope, $ast);
         $new_string .= $text . $self->output_value($result);
     }
@@ -1428,6 +1450,8 @@ sub run($self, $ast = undef, %opt) {
         $self->{repl_scope} ||= $self->new_scope;
         $scope = $self->{repl_scope};
         $self->{repl} = 1;
+    } elsif ($opt{scope}) {
+        $scope = $opt{scope};
     } else {
         $scope = $self->new_scope;
         $self->{repl} = 0;
@@ -1477,12 +1501,15 @@ sub execute($self, $scope, $ast) {
     if ($self->{debug}) {
         $Data::Dumper::Indent = 0;
         $self->{debug}->{print}->('AST', "interpret ast: " . Dumper ($ast) . "\n");
+        # XXX $self->{debug}->{print}->('AST', "interpret ast: " . $self->{dumper}->dump($ast) . "\n");
         $Data::Dumper::Indent = 1;
     }
 
     my $final_result;
 
     foreach my $node (@$ast) {
+        $self->{debug}->{print}->('AST', "AST node: " . $self->{dumper}->dump($node) . "\n") if $self->{debug};
+
         my $instruction = $node->[0];
 
         if ($instruction == INSTR_EXPR_GROUP) {
@@ -1510,7 +1537,7 @@ sub evaluate($self, $scope, $data) {
     my $ins = $data->[0];
 
     if ($ins !~ /^\d+$/) {
-        if ($self->{debug}) {
+        if ($self->{debug} && $self->{debug}->{tags}->{INSTR}) {
             print "Unknown instruction ", Dumper($ins), "\n";
             my $trace = Devel::StackTrace->new;
             print $trace->as_string;
@@ -1519,10 +1546,7 @@ sub evaluate($self, $scope, $data) {
     }
 
     if ($self->{debug}) {
-        $Data::Dumper::Indent = 0;
-        $Data::Dumper::Terse = 1;
-        $self->{debug}->{print}->('EVAL', "eval $pretty_instr[$ins]: " . Dumper($data) . "\n");
-        $Data::Dumper::Indent = 1;
+        $self->{debug}->{print}->('EVAL', "eval $pretty_instr[$ins]: " . $self->{dumper}->dump($data) . "\n");
     }
 
     my $result = $self->dispatch_instruction($ins, $scope, $data);

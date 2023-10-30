@@ -1,0 +1,15 @@
+test_eq(map([2,4,8], fn (x) x * 2), [4,8,16], "normal function call syntax")
+test_eq([2,4,8].map(fn (x) x * 2), [4,8,16], "universal function call syntax")
+
+fn add(a, b) a + b
+
+test_eq(add(3, 5), 8)
+test_eq(3.add(5), 8)
+
+fn mul(a, b) a * b
+
+test_eq(add(mul(3, 5), 6), 21)
+test_eq(3.mul(5).add(6), 21)
+
+test_eq(mul(add(3, 5), 6), 48)
+test_eq(3.add(5).mul(6), 48)

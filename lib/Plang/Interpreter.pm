@@ -52,7 +52,7 @@ sub initialize($self, %conf) {
         # [ TOKEN_TYPE,  MATCH REGEX,  OPTIONAL TOKEN BUILDER,  OPTIONAL SUB-LEXER ]
         [TOKEN_COMMENT_EOL,      qr{\G(   (?://|\#).*$        )}x,  \&discard],
         [TOKEN_COMMENT_INLINE,   qr{\G(   /\* .*? \*/         )}x,  \&discard],
-        [TOKEN_COMMENT_MULTI,    qr{\G(   /\* .*?(?!\*/)\s+$  )}x,  \&discard, sub { multiline_comment(@_) }],
+        [TOKEN_COMMENT_MULTI,    qr{\G(   /\* .*?(?!\*/)\s*$  )}x,  \&discard, sub { multiline_comment(@_) }],
         [TOKEN_DQUOTE_STRING_I,  qr{\G(   \$"(?:[^"\\]|\\.)*" )}x],
         [TOKEN_SQUOTE_STRING_I,  qr{\G(   \$'(?:[^'\\]|\\.)*' )}x],
         [TOKEN_DQUOTE_STRING,    qr{\G(   "(?:[^"\\]|\\.)*"   )}x],

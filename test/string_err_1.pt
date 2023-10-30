@@ -1,0 +1,2 @@
+"hello"["abc"]
+# Validator error: String index must be a range or of type Integer (got String) at line 1, col 9

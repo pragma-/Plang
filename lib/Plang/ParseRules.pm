@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
-# Recursive descent rules to parse a Plang program using
-# the Plang::Parser class. Constructs a syntax tree annotated
-# with token line/col positions.
+# Recursive descent rules to parse a Plang program using the Plang::Parser
+# class. Constructs an abstract syntax tree annotated with token line/col
+# positions.
 #
 # Program() is the start-rule.
 
@@ -793,7 +793,7 @@ sub MapConstructor($parser) {
         }
 
         $parser->advance;
-        return [INSTR_MAPINIT, \@map, token_position($token)];
+        return [INSTR_MAPCONS, \@map, token_position($token)];
     }
 
     $parser->backtrack;
@@ -819,7 +819,7 @@ sub ArrayConstructor($parser) {
         }
 
         $parser->advance;
-        return [INSTR_ARRAYINIT, \@array, token_position($token)];
+        return [INSTR_ARRAYCONS, \@array, token_position($token)];
     }
 
     $parser->backtrack;
@@ -891,7 +891,7 @@ use constant {
 };
 
 my @binop_data;
-$binop_data[TOKEN_DOT]         = [INSTR_ACCESS,     'ACCESS',      ASSOC_LEFT];
+$binop_data[TOKEN_DOT]         = [INSTR_DOT_ACCESS, 'ACCESS',      ASSOC_LEFT];
 $binop_data[TOKEN_STAR_STAR]   = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
 $binop_data[TOKEN_CARET]       = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
 $binop_data[TOKEN_PERCENT]     = [INSTR_REM,        'EXPONENT',    ASSOC_LEFT];
@@ -1022,7 +1022,7 @@ sub LiteralHexInteger($parser) {
     return [INSTR_LITERAL, ['TYPE', 'Integer'], hex $token->[1], token_position($token)];
 }
 
-sub PrefixRBrace($parser) {
+sub PrefixLBrace($parser) {
     my $expr = ExpressionGroup($parser);
     return $expr if defined $expr;
 
@@ -1115,7 +1115,7 @@ sub PrefixType($parser) {
 
 my @prefix_dispatcher;
 $prefix_dispatcher[TOKEN_KEYWORD]         = \&Keyword;
-$prefix_dispatcher[TOKEN_L_BRACE]         = \&PrefixRBrace;
+$prefix_dispatcher[TOKEN_L_BRACE]         = \&PrefixLBrace;
 $prefix_dispatcher[TOKEN_L_BRACKET]       = \&ArrayConstructor;
 $prefix_dispatcher[TOKEN_INT]             = \&LiteralInteger;
 $prefix_dispatcher[TOKEN_FLT]             = \&LiteralFloat;
@@ -1135,6 +1135,8 @@ $prefix_dispatcher[TOKEN_NOT]             = \&PrefixNot;
 $prefix_dispatcher[TOKEN_L_PAREN]         = \&PrefixLParen;
 
 sub Prefix($parser, $precedence) {
+    $parser->try("Prefix");
+
     # peek at upcoming token
     my $token = $parser->next_token('peek') // return;
 
@@ -1144,7 +1146,11 @@ sub Prefix($parser, $precedence) {
     # attempt to dispatch token
     if (defined $dispatcher) {
         my $result = $dispatcher->($parser);
-        return $result if defined $result;
+
+        if (defined $result) {
+            $parser->advance;
+            return $result;
+        }
     }
 
     # no dispatch for token, handle edge cases
@@ -1152,6 +1158,7 @@ sub Prefix($parser, $precedence) {
     # throw exception on unexpected keyword
     UnexpectedKeyword($parser);
 
+    $parser->advance;
     return;
 }
 
@@ -1179,6 +1186,7 @@ sub InfixConditionalOperator($parser, $left) {
 }
 
 sub Infix($parser, $left, $precedence) {
+    $parser->try("Infix");
     # peek at upcoming token
     my $token = $parser->next_token('peek') // return;
 
@@ -1188,15 +1196,25 @@ sub Infix($parser, $left, $precedence) {
     # attempt to dispatch token
     if (defined $data) {
         my $result = BinaryOp($parser, $left, $token->[0], $data->[0], $data->[1], $data->[2]);
-        return $result if defined $result;
+
+        if (defined $result) {
+            $parser->advance;
+            return $result;
+        }
     }
 
     # no dispatch for token, handle edge cases
 
     $data = InfixConditionalOperator($parser, $left);
-    return $data if defined $data;
 
-    return Postfix($parser, $left, $precedence);
+    if (defined $data) {
+        $parser->advance;
+        return $data;
+    }
+
+    my $post = Postfix($parser, $left, $precedence);
+    $parser->advance;
+    return $post;
 }
 
 sub PostfixPlusPlus($parser, $left) {
@@ -1246,27 +1264,14 @@ sub PostfixLBracket($parser, $left) {
     return [INSTR_ACCESS, $left, $expression, token_position($token)];
 }
 
-sub PostfixDot($parser, $left) {
-    my $token = $parser->consume(TOKEN_DOT);
-
-    my $expression = Expression($parser);
-
-    if (not $expression) {
-        expected($parser, 'expression after postfix .');
-    }
-
-    return [INSTR_ACCESS, $left, $expression, token_position($token)];
-}
-
-
 my @postfix_dispatcher;
 $postfix_dispatcher[TOKEN_PLUS_PLUS]   = \&PostfixPlusPlus;
 $postfix_dispatcher[TOKEN_MINUS_MINUS] = \&PostfixMinusMinus;
 $postfix_dispatcher[TOKEN_L_PAREN]     = \&PostfixLParen;
 $postfix_dispatcher[TOKEN_L_BRACKET]   = \&PostfixLBracket;
-$postfix_dispatcher[TOKEN_DOT]         = \&PostfixDot;
 
 sub Postfix($parser, $left, $precedence) {
+    $parser->try("Postfix");
     # peek at upcoming token
     my $token = $parser->next_token('peek') // return;
 
@@ -1276,10 +1281,15 @@ sub Postfix($parser, $left, $precedence) {
     # attempt to dispatch token
     if (defined $dispatcher) {
         my $result = $dispatcher->($parser, $left);
-        return $result if defined $result;
+
+        if (defined $result) {
+            $parser->advance;
+            return $result;
+        }
     }
 
     # no postfix
+    $parser->advance;
     return $left;
 }
 

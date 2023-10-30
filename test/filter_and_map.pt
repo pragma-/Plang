@@ -1,9 +1,16 @@
-test_eq(filter(fn(x) x>4, [1,2,3,4,5,6,7,8]), [5,6,7,8])
+test_eq(filter([1,2,3,4,5,6,7,8], fn(x) x>4), [5,6,7,8], "filter")
 
-test_eq(map(fn(x) x*=2, [1,2,3]), [2,4,6])
+test_eq([1,2,3,4,5,6,7,8].filter(fn(x) x>4), [5,6,7,8], "filter UFCS")
+
+test_eq(map([1,2,3], fn(x) x*=2), [2,4,6], "map")
+
+test_eq([1,2,3].map(fn(x) x*=2), [2,4,6], "map UFCS")
 
 fn add(a) fn(b) a+b
-test_eq(map(add(3), [1,2,3]), [4,5,6])
+
+test_eq(map([1,2,3], add(3)), [4,5,6], "map add func")
+
+test_eq([1,2,3].map(add(3)), [4,5,6], "map add func UFCS")
 
 var list1 = [
    { "type": "dog", "name": "sparky" },
@@ -13,6 +20,8 @@ var list1 = [
    { "type": "cat", "name": "princess" },
 ]
 
-test_eq(filter(fn (x) x["type"] == "dog", list1), [{"type": "dog", "name": "sparky"}, {"type": "dog", "name": "fido"}])
-test_eq(filter(fn (x) x["type"] == "cat", list1), [{"type": "cat", "name": "whiskers"}, {"type": "cat", "name": "princess"}])
-test_eq(filter(fn (x) x["type"] == "bird", list1), [{"type": "bird", "name": "chirpy"}])
+test_eq(filter(list1, fn (x) x["type"] == "dog"), [{"type": "dog", "name": "sparky"}, {"type": "dog", "name": "fido"}])
+test_eq(filter(list1, fn (x) x["type"] == "cat"), [{"type": "cat", "name": "whiskers"}, {"type": "cat", "name": "princess"}])
+test_eq(filter(list1, fn (x) x["type"] == "bird"), [{"type": "bird", "name": "chirpy"}])
+
+test_eq(list1.filter(fn (x) x["type"] == "bird"), [{"type": "bird", "name": "chirpy"}])

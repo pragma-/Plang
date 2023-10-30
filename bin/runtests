@@ -8,7 +8,43 @@ use strict;
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 
+use Getopt::Long qw(GetOptionsFromArray);
+
 STDOUT->autoflush(1);
+
+my $usage = <<"USAGE";
+usage: $0 [file...] [-n]
+
+    -n|--name   print file names of each test file
+USAGE
+
+sub getopt_from_array {
+    my ($opt_args, $result, $config, @opts) = @_;
+    # emitting errors as Perl warnings instead of using die, weird.
+    my $opt_error;
+    local $SIG{__WARN__} = sub {
+        $opt_error = shift;
+        chomp $opt_error;
+    };
+
+    Getopt::Long::Configure(@$config);
+    GetOptionsFromArray($opt_args, $result, @opts);
+    return ($opt_args, $opt_error);
+}
+
+my %opts;
+
+my ($opt_args, $opt_error) = getopt_from_array(
+    \@ARGV,
+    \%opts,
+    ['bundling'],
+    'names|n',
+);
+
+if (defined $opt_error) {
+    print "$opt_error -- $usage\n";
+    exit 1;
+}
 
 my $test_file;   # current test filename
 my @passed;      # passed tests
@@ -128,9 +164,9 @@ sub test_stdout_validator {
 
 my @selected_tests;
 
-if (@ARGV) {
+if (@$opt_args) {
     # select specific tests
-    @selected_tests = @ARGV;
+    @selected_tests = @$opt_args;
 } else {
     # select all tests
     @selected_tests = glob "$RealBin/../test/*.pt";
@@ -143,6 +179,10 @@ use Encode;
 foreach my $test (@selected_tests) {
     if (-d $test) {
         die "Failed to open $test; expected file but got directory.";
+    }
+
+    if ($opts{names}) {
+        print "\n$test\n";
     }
 
     open my $fh, '<', $test or die "Failed to open $test: $!";

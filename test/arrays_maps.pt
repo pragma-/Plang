@@ -2,16 +2,19 @@ var player = { "name": "Grok", "health": 100, "iq": 75 }
 test_eq(player["iq"],  75, "map entry")
 test_eq(player.iq,  75, "map entry (dot)")
 test_eq(player."iq", 75, "map entry (dot string literal)")
-test_eq(player[iq], 75, "map entry (bracket identifier)")
 
 var k = "iq"
-test_eq(player.k, 75, "map entry (dot variable)")
 test_eq(player[k], 75, "map entry (bracket variable)")
+
+# this should attempt to fetch player["k"] instead of player["iq"]
+# and so fetches a null value since ["k"] is not set in the map
+test_eq(player.k, null, "attempt to use variable with map dot access")
 
 var map1 = {}
 map1["color"] = "blue"
 test_eq($"The color is {map1['color']}!", 'The color is blue!', "map interpolation")
-# XXX test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation (dot)")
+test_eq($"The color is {map1.'color'}!", 'The color is blue!', "map interpolation (dot)")
+test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation (dot)")
 
 map1.foobar = "baz"
 test_eq($"The foobar is {map1['foobar']}!", "The foobar is baz!", "map key assignment (dot)")
@@ -30,7 +33,7 @@ test_eq(map4.x.y, 42, "assign anonymous Map to another Map key (dot)")
 
 var map5 = {"say_hi": fn "hi", "say_bye": fn "bye"}
 test_eq(map5["say_bye"](), 'bye', "functions as map value")
-test_eq(map5.say_bye(), 'bye', "functions as map value (dot)")
+# test_eq(map5.say_bye(), 'bye', "functions as map value (dot)")
 
 var map6 = {"hi": [1, "bye"]}
 test_eq(map6["hi"][1], 'bye', "array as map element")
@@ -66,9 +69,19 @@ var functions = {
     'south' : fn { move('south') }
 }
 
+/* no longer possible since UFCS was added
+   but I'm keeping these tests around as a reminder that I may want to somehow
+   still allow this notation specifically for map identifiers
+
 functions.exit()   # prints exit called
 functions.help()   # prints help called
 functions.north()  # prints moving north
 functions.south()  # prints moving south
+*/
+
+functions['exit']()   # prints exit called
+functions['help']()   # prints help called
+functions['north']()  # prints moving north
+functions['south']()  # prints moving south
 
 test_stdout("exit called\nhelp called\nmoving north\nmoving south\n", "map of functions")

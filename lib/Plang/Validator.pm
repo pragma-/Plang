@@ -1,9 +1,11 @@
 #!/usr/bin/env perl
 
 # The validator pass happens once at compile-time immediately after parsing
-# a Plang program into a syntax tree. Static type-checking, semantic-analysis,
-# etc, is performed on the syntax tree so the run-time interpreter need not
-# concern itself with these potentially expensive operations.
+# a Plang program into an abstract syntax tree
+#
+# Static type-checking, semantic-analysis, etc, is performed on the syntax
+# tree so the run-time interpreter need not concern itself with these
+# potentially expensive operations.
 #
 # This module also does some syntax desugaring.
 #
@@ -30,8 +32,8 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
     $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
     $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
-    $self->{instr_dispatch}->[INSTR_ARRAYINIT]   = \&array_constructor;
-    $self->{instr_dispatch}->[INSTR_MAPINIT]     = \&map_constructor;
+    $self->{instr_dispatch}->[INSTR_ARRAYCONS]   = \&array_constructor;
+    $self->{instr_dispatch}->[INSTR_MAPCONS]     = \&map_constructor;
     $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
     $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
     $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
@@ -54,7 +56,8 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
     $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
     $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
-    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access_notation;
+    $self->{instr_dispatch}->[INSTR_DOT_ACCESS]  = \&dot_access;
+    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
     $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
     $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
 
@@ -339,7 +342,7 @@ sub cat_assign($self, $scope, $data) {
 
 sub identifier($self, $scope, $data) {
     my ($var) = $self->get_variable($scope, $data->[1]);
-    $self->error($scope, "undeclared variable `$data->[1]`", $data->[2]) if not defined $var;
+    $var // $self->error($scope, "undeclared variable `$data->[1]`", $data->[2]);
     return $var;
 }
 
@@ -798,6 +801,39 @@ sub get_cached_type($self, $scope, $name) {
 sub function_call($self, $scope, $data) {
     my $target    = $data->[1];
     my $arguments = $data->[2];
+
+    if ($target->[0] == INSTR_DOT_ACCESS) {
+        # if target is x.y(z) then we desugar it to y(x, z) (UFCS)
+        # https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax
+
+        my ($instr, $expr, $new_target) = @$target;
+
+        my @new_arguments;
+
+        while (1) {
+            if ($expr->[0] == INSTR_DOT_ACCESS) {
+                my ($ninstr, $nexpr, $ntarget) = @$expr;
+                push @new_arguments, $ntarget;
+                $expr = $nexpr;
+            } else {
+                push @new_arguments, $expr;
+                last;
+            }
+        }
+
+        foreach my $arg (@$arguments) {
+            push @new_arguments, $arg;
+        }
+
+        # rewrite AST
+        $data->[1] = $new_target;
+        $data->[2] = \@new_arguments;
+
+        # update variables
+        $target = $new_target;
+        $arguments = \@new_arguments;
+    }
+
     my $func;
     my $name;
 
@@ -807,7 +843,7 @@ sub function_call($self, $scope, $data) {
 
         if (not defined $func) {
             # undefined function
-            $self->error($scope, "cannot invoke undefined function `" . $self->output_value($target) . "`", $self->position($target));
+            $self->error($scope, "cannot invoke undefined function `$name`", $self->position($target));
         }
 
         if ($self->{types}->is_equal(['TYPE', 'Any'], $func->[0])) {
@@ -832,6 +868,7 @@ sub function_call($self, $scope, $data) {
         $name = "anonymous-1";
     } else {
         $self->{debug}->{print}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
+
         $func = $self->evaluate($scope, $target);
         $name = "anonymous-2";
 
@@ -840,9 +877,6 @@ sub function_call($self, $scope, $data) {
         }
     }
 
-    my $cached_type = $self->get_cached_type($scope, $func);
-    return $cached_type if defined $cached_type;
-
     if (not defined $func->[1]) {
         return $func;
     }
@@ -850,8 +884,16 @@ sub function_call($self, $scope, $data) {
     my $closure     = $func->[1]->[0];
     my $return_type = $func->[1]->[1];
     my $parameters  = $func->[1]->[2];
-    my $expressions  = $func->[1]->[3];
+    my $expressions = $func->[1]->[3];
     my $return_value;
+
+    my $cached_type = $self->get_cached_type($scope, $func);
+
+    if (defined $cached_type) {
+        # process function call arguments to desugar AST nodes as necessary
+        $self->process_function_call_arguments($scope, $name, $parameters, $arguments, $data);
+        return $cached_type;
+    }
 
     if ($scope != $closure) {
         $scope->{closure} = $closure;
@@ -994,42 +1036,50 @@ sub keyword_last($self, $scope, $data) {
     return [['TYPE', 'Null'], undef];
 }
 
-# rvalue array/map access
-sub access_notation($self, $scope, $data) {
-    my $var = $self->evaluate($scope, $data->[1]);
+sub dot_access_map($self, $scope, $data, $var) {
+    # desugar x.y to x['y'] and prevent variable look-up
+    if ($data->[2]->[0] == INSTR_IDENT) {
+        $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
+    }
 
-    # map index
-    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-        my $key;
+    my $key = $self->evaluate($scope, $data->[2]);
 
-        # desugar x.y to x['y'] if ident does not exist
-        if ($data->[2]->[0] == INSTR_IDENT) {
-            ($key) = $self->get_variable($scope, $data->[2]->[1]);
+    if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
+        my $val = $var->[1]->{$key->[1]};
+        $val // return [['TYPE', 'Null'], undef, $self->position($data)];
+        return $val;
+    }
 
-            if (not defined $key) {
-                $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
-                $key = $self->evaluate($scope, $data->[2]);
-            }
-        } else {
-            $key = $self->evaluate($scope, $data->[2]);
-        }
+    $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
+}
 
+sub access_map($self, $scope, $data, $var) {
+    # variable look-up supported
+    my $key = $self->evaluate($scope, $data->[2]);
+
+    if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
         my $val = $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
         return $val;
     }
 
+    $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
+}
+
+sub access_rest($self, $scope, $data, $var) {
     # array index
     if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
         my $index = $self->evaluate($scope, $data->[2]);
 
-        if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
+        if ($self->{types}->check(['TYPE', 'Integer'], $index->[0])) {
             my $val = $var->[1]->[$index->[1]];
             return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
             return $val;
         }
 
         # TODO support RANGE and x:y splices and negative indexing
+
+        $self->error($scope, "Array index must be of type Integer (got " . $self->{types}->to_string($index->[0]) . ")", $self->position($index));
     }
 
     # string index
@@ -1039,19 +1089,58 @@ sub access_notation($self, $scope, $data) {
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];
             my $to = $value->[2];
+
+            if (!$self->{types}->check(['TYPE', 'Integer'], $from->[0])) {
+                $self->error($scope, "String range index must be of type Integer (got " . $self->{types}->to_string($from->[0]) . ")", $self->position($from));
+            }
+
+            if (!$self->{types}->check(['TYPE', 'Integer'], $to->[0])) {
+                $self->error($scope, "String range index must be of type Integer (got " . $self->{types}->to_string($to->[0]) . ")", $self->position($to));
+            }
+
             return [['TYPE', 'String'], substr($var->[1], $from->[1], $to->[1] + 1 - $from->[1])];
         }
 
-        if ($self->{types}->check(['TYPE', 'Number'], $value->[0])) {
+        if ($self->{types}->check(['TYPE', 'Integer'], $value->[0])) {
             my $index = $value->[1];
             return [['TYPE', 'String'], substr($var->[1], $index, 1) // ""];
         }
+
+        $self->error($scope, "String index must be a range or of type Integer (got " . $self->{types}->to_string($value->[0]) . ")", $self->position($value));
     }
 
     if ($self->{types}->check(['TYPE', 'Any'], $var->[0])) {
         return [['TYPE', 'Any'], 0, $self->position($var)];
     }
 
+    return undef;
+}
+
+# rvalue dot array/map access
+sub dot_access($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
+
+    # map index
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+        return $self->dot_access_map($scope, $data, $var);
+    }
+
+    my $result = $self->access_rest($scope, $data, $var);
+    return $result if defined $result;
+    $self->error($scope, "cannot use DOT_ACCESS notation on object of type " . $self->{types}->to_string($var->[0]), $self->position($var));
+}
+
+# rvalue bracket array/map access
+sub access($self, $scope, $data) {
+    my $var = $self->evaluate($scope, $data->[1]);
+
+    # map index
+    if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
+        return $self->access_map($scope, $data, $var);
+    }
+
+    my $result = $self->access_rest($scope, $data, $var);
+    return $result if defined $result;
     $self->error($scope, "cannot use ACCESS notation on object of type " . $self->{types}->to_string($var->[0]), $self->position($var));
 }
 
@@ -1071,13 +1160,15 @@ sub assignment($self, $scope, $data) {
     }
 
     # lvalue array/map access
-    if ($left_value->[0] == INSTR_ACCESS) {
+    if ($left_value->[0] == INSTR_DOT_ACCESS || $left_value->[0] == INSTR_ACCESS) {
         my $var = $self->evaluate($scope, $left_value->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            # desugar x.y to x['y']
-            if ($left_value->[2]->[0] == INSTR_IDENT) {
-                $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2]->[1]];
+            if ($left_value->[0] == INSTR_DOT_ACCESS) {
+                # desugar x.y to x['y']
+                if ($left_value->[2]->[0] == INSTR_IDENT) {
+                    $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2]->[1]];
+                }
             }
 
             my $key = $self->evaluate($scope, $left_value->[2]);

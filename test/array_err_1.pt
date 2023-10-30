@@ -1,0 +1,2 @@
+[1,2,3]["hi"]
+# Validator error: Array index must be of type Integer (got String) at line 1, col 9
