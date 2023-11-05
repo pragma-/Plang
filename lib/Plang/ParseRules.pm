@@ -172,19 +172,19 @@ sub consume_keyword($parser, $keyword) {
 # KeywordNull ::= "null"
 sub KeywordNull($parser) {
     my $token = consume_keyword($parser, 'null');
-    return [['TYPE', 'Null'], undef, token_position($token)];
+    return [INSTR_LITERAL, ['TYPE', 'Null'], undef, token_position($token)];
 }
 
 # KeywordTrue ::= "true"
 sub KeywordTrue($parser) {
     my $token = consume_keyword($parser, 'true');
-    return [['TYPE', 'Boolean'], 1, token_position($token)];
+    return [INSTR_LITERAL, ['TYPE', 'Boolean'], 1, token_position($token)];
 }
 
 # KeywordFalse ::= "false"
 sub KeywordFalse($parser) {
     my $token = consume_keyword($parser, 'false');
-    return [['TYPE', 'Boolean'], 0, token_position($token)];
+    return [INSTR_LITERAL, ['TYPE', 'Boolean'], 0, token_position($token)];
 }
 
 # KeywordReturn ::= "return" [Expression]
@@ -439,19 +439,6 @@ sub KeywordType($parser) {
 
     my $name = $ident_token->[1];
 
-    my $subtype = 'Any';
-
-    if ($parser->consume(TOKEN_COLON)) {
-        my $subtype_token = $parser->consume(TOKEN_TYPE);
-
-        if (not $subtype_token) {
-            expected($parser, "subtype for new type `$name`");
-        }
-
-        # XXX - fix subtyping
-        # $subtype = $subtype_token->[1];
-    }
-
     if (not $parser->consume(TOKEN_ASSIGN)) {
         expected($parser, "\"=\" after new type `$name`");
     }
@@ -470,7 +457,7 @@ sub KeywordType($parser) {
     # add type to parser's internal list of types
     $parser->add_type($name);
 
-    return [INSTR_TYPE, $name, $subtype, $type, token_position($type_token)];
+    return [INSTR_TYPE, $name, $type, token_position($type_token)];
 }
 
 # Initializer ::= "=" Expression

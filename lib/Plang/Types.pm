@@ -54,9 +54,7 @@ sub add_default_types($self) {
 }
 
 sub default_value($self, $type) {
-    #print "get def val for ", Dumper($type), "\n";
     $type = $self->resolve_alias($type);
-    #print "resolved to ", Dumper($type), "\n";
 
     my $val;
 
@@ -163,7 +161,7 @@ sub as_list($self) {
 
 # convert a type structure into a string
 sub to_string($self, $type) {
-    if ($type->[0] eq 'TYPE') {
+    if ($type->[0] eq 'TYPE' || $type->[0] eq 'NEWTYPE') {
         my $type_alias = $self->{aliases}->{$type->[1]};
 
         if ($type_alias) {
@@ -213,10 +211,6 @@ sub to_string($self, $type) {
         my $return_string = $self->to_string($return);
 
         return "$kind $param_string -> $return_string";
-    }
-
-    if ($type->[0] eq 'SPCL') {
-        return $type->[1];
     }
 
     die "[to-string] unknown type\n";
@@ -358,9 +352,9 @@ sub is_equal($self, $type1, $type2) {
 
         for (my $i = 0; $i < @$type1_props; ++$i) {
             # compare prop name
-            return 0 if not $type1_props->[$i]->[0] eq $type2_props->[$i]->[0];
+            return 0 if not $type1_props->[$i][0] eq $type2_props->[$i][0];
             # compare prop type
-            return 0 if not $self->is_equal($type1_props->[$i]->[1], $type2_props->[$i]->[1]);
+            return 0 if not $self->is_equal($type1_props->[$i][1], $type2_props->[$i][1]);
         }
 
         return 1;
@@ -372,7 +366,7 @@ sub is_equal($self, $type1, $type2) {
         return 0 if @{$type1->[1]} != @{$type2->[1]};
 
         for (my $i = 0; $i < @{$type1->[1]}; ++$i) {
-            return 0 if not $self->is_equal($type1->[1]->[$i], $type2->[1]->[$i]);
+            return 0 if not $self->is_equal($type1->[1][$i], $type2->[1][$i]);
         }
 
         return 1;
@@ -461,9 +455,9 @@ sub check($self, $guard, $type) {
 
         for (my $i = 0; $i < @$guard_props; ++$i) {
             # compare prop name
-            return 0 if not $guard_props->[$i]->[0] eq $type_props->[$i]->[0];
+            return 0 if not $guard_props->[$i][0] eq $type_props->[$i][0];
             # compare prop type
-            return 0 if not $self->check($guard_props->[$i]->[1], $type_props->[$i]->[1]);
+            return 0 if not $self->check($guard_props->[$i][1], $type_props->[$i][1]);
         }
 
         return 1;

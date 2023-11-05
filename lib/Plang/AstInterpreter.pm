@@ -199,12 +199,12 @@ sub process_function_call_arguments($self, $scope, $name, $parameters, $argument
         if (not defined $arguments->[$i]) {
             # no argument provided, but there's guaranteed to be a default
             # argument here since validator caught missing arguments, etc
-            $evaluated_arguments->[$i] = $self->evaluate($scope, $parameters->[$i]->[2]);
-            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $evaluated_arguments->[$i] = $self->evaluate($scope, $parameters->[$i][2]);
+            $scope->{locals}->{$parameters->[$i][1]} = $evaluated_arguments->[$i];
         } else {
             # argument provided
             $evaluated_arguments->[$i] = $self->evaluate($scope, $arguments->[$i]);
-            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $scope->{locals}->{$parameters->[$i][1]} = $evaluated_arguments->[$i];
         }
     }
 
@@ -222,7 +222,7 @@ sub function_call($self, $scope, $data) {
         $self->{debug}->{print}->('FUNCS', "Calling function `$target->[1]` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         ($func) = $self->get_variable($scope, $target->[1]);
 
-        if (defined $func and $func->[0]->[0] eq 'TYPEFUNC' and $func->[0]->[1] eq 'Builtin') {
+        if (defined $func and $func->[0][0] eq 'TYPEFUNC' and $func->[0][1] eq 'Builtin') {
             # builtin function
             return $self->call_builtin_function($scope, $data, $target->[1]);
         }
@@ -234,10 +234,10 @@ sub function_call($self, $scope, $data) {
         $func = $self->evaluate($scope, $target);
     }
 
-    my $closure     = $func->[1]->[0];
-    my $ret_type    = $func->[1]->[1];
-    my $parameters  = $func->[1]->[2];
-    my $expressions = $func->[1]->[3];
+    my $closure     = $func->[1][0];
+    my $ret_type    = $func->[1][1];
+    my $parameters  = $func->[1][2];
+    my $expressions = $func->[1][3];
 
     if ($closure != $scope) {
         $scope->{closure} = $closure;
@@ -339,8 +339,8 @@ sub array_constructor($self, $scope, $data) {
 }
 
 sub keyword_exists($self, $scope, $data) {
-    my $var = $self->evaluate($scope, $data->[1]->[1]);
-    my $key = $self->evaluate($scope, $data->[1]->[2]);
+    my $var = $self->evaluate($scope, $data->[1][1]);
+    my $key = $self->evaluate($scope, $data->[1][2]);
 
     if (exists $var->[1]->{$key->[1]}) {
         return [['TYPE', 'Boolean'], 1];
@@ -351,9 +351,9 @@ sub keyword_exists($self, $scope, $data) {
 
 sub keyword_delete($self, $scope, $data) {
     # delete one key in map
-    if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->evaluate($scope, $data->[1]->[1]);
-        my $key = $self->evaluate($scope, $data->[1]->[2]);
+    if ($data->[1][0] == INSTR_ACCESS) {
+        my $var = $self->evaluate($scope, $data->[1][1]);
+        my $key = $self->evaluate($scope, $data->[1][2]);
 
         my $val = delete $var->[1]->{$key->[1]};
         return [['TYPE', 'Null'], undef] if not defined $val;
@@ -361,8 +361,8 @@ sub keyword_delete($self, $scope, $data) {
     }
 
     # delete all keys in map
-    if ($data->[1]->[0] == INSTR_IDENT) {
-        my ($var) = $self->get_variable($scope, $data->[1]->[1]);
+    if ($data->[1][0] == INSTR_IDENT) {
+        my ($var) = $self->get_variable($scope, $data->[1][1]);
         $var->[1] = {};
         return $var;
     }
@@ -490,13 +490,12 @@ sub keyword_while($self, $scope, $data) {
 
 sub keyword_type($self, $scope, $data) {
     my $name    = $data->[1];
-    my $subtype = $data->[2];
-    my $type    = $data->[3];
+    my $type    = $data->[2];
 
-    $self->{types}->add($subtype, $name);
+    $self->{types}->add('Any', $name);
     $self->{types}->add_alias($name, $type);
 
-    return [['SPCL', 'NEWTYPE'], $name, $subtype, $type];
+    return [['NEWTYPE', $name], $type];
 }
 
 sub add_assign($self, $scope, $data) {
@@ -624,7 +623,7 @@ sub assignment($self, $scope, $data) {
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {
             my $index = $self->evaluate($scope, $left_value->[2]);
             my $val = $self->evaluate($scope, $right_value);
-            $var->[1]->[$index->[1]] = $val;
+            $var->[1][$index->[1]] = $val;
             return $val;
         }
 
@@ -668,7 +667,7 @@ sub access($self, $scope, $data) {
     if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
         my $key = $self->evaluate($scope, $data->[2]);
         my $val = $var->[1]->{$key->[1]};
-        return [['TYPE', 'Null'], undef] if not defined $val;
+        $val // return [['TYPE', 'Null'], undef];
         return $val;
     }
 
@@ -677,8 +676,8 @@ sub access($self, $scope, $data) {
         my $index = $self->evaluate($scope, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
-            my $val = $var->[1]->[$index->[1]];
-            return [['TYPE', 'Null'], undef] if not defined $val;
+            my $val = $var->[1][$index->[1]];
+            $val // return [['TYPE', 'Null'], undef];
             return $val;
         }
 
@@ -947,6 +946,8 @@ sub introspect($self, $data) {
         $type = "Function ";
         $type .= '(' . join(', ', @params) . ') ';
         $type .= "-> $ret_type";
+    } elsif ($type->[0] eq 'SPCL') {
+        $type = $self->output_value($data);
     } else {
         $type = $self->{types}->to_string($type);
     }
@@ -956,7 +957,7 @@ sub introspect($self, $data) {
 
 # builtin print
 sub function_builtin_print($self, $scope, $name, $arguments) {
-    my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1]->[1]);
+    my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1][1]);
     print "$text$end";
     return [['TYPE', 'Null'], undef];
 }
@@ -1254,7 +1255,7 @@ sub identical_objects($self, $obj1, $obj2) {
         return $obj1->[1] == $obj2->[1];
     } elsif ($self->{types}->is_subtype(['TYPE', 'Function'], $obj1->[0])) {
         return 0;
-    } elsif ($obj1->[0]->[0] eq 'TYPEMAP') {
+    } elsif ($obj1->[0][0] eq 'TYPEMAP') {
         my %h1 = %{$obj1->[1]};
         my %h2 = %{$obj2->[1]};
 
@@ -1266,7 +1267,7 @@ sub identical_objects($self, $obj1, $obj2) {
         foreach my $key (sort @keys1) {
             return 0 if !$self->identical_objects($h1{$key}, $h2{$key});
         }
-    } elsif ($obj1->[0]->[0] eq 'TYPEARRAY') {
+    } elsif ($obj1->[0][0] eq 'TYPEARRAY') {
         my @a1 = @{$obj1->[1]};
         my @a2 = @{$obj2->[1]};
 
@@ -1286,7 +1287,7 @@ use Plang::Interpreter;
 sub parse_string($self, $string) {
     my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
     my $program = $interpreter->parse_string($string);
-    return $program->[0]->[1];
+    return $program->[0][1];
 }
 
 sub interpolate_string($self, $scope, $string) {
@@ -1365,13 +1366,9 @@ sub output_string_literal($self, $text) {
 sub output_value($self, $value, %opts) {
     my $result = '';
 
-    # specials
-    if ($value->[0][0] eq 'SPCL') {
-        if ($value->[0][1] eq 'NEWTYPE') {
-            $result .= "type $value->[1] = " . $self->{types}->to_string($value->[3]);
-        } else {
-            die "Unknown special $value->[0][1]";
-        }
+    # special cases
+    if ($value->[0][0] eq 'NEWTYPE') {
+        $result .= "type $value->[0][1] = " . $self->{types}->to_string($value->[1]);
     }
 
     # booleans

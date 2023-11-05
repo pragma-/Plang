@@ -13,6 +13,8 @@ use Devel::StackTrace;
 
 use Plang::Constants::Instructions ':all';
 
+use parent 'Plang::AstInterpreter';
+
 sub new($class, %args) {
     my $self = bless {}, $class;
     $self->initialize(%args);
@@ -108,7 +110,7 @@ sub variable_declaration($self, $scope, $data) {
     if ($initializer) {
         $right_value = $self->evaluate($scope, $initializer);
     } else {
-        $right_value = $self->evaluate($scope, [['TYPE', 'Null'], undef]);
+        $right_value = $self->evaluate($scope, [INSTR_LITERAL, ['TYPE', 'Null'], undef]);
     }
 
     return "(var $name : " . $self->type_to_string($type) . " = $right_value)";
@@ -164,11 +166,11 @@ sub function_definition($self, $scope, $data) {
             $value = " = $value";
         }
 
-        push @params, "($ident : " . $self->type_to_string($type) . $value . ")";
+        push @params, "($ident : " . $self->type_to_string($type) . $value . ')';
     }
 
     if (@params) {
-        $text .= "(params " . (join ' ', @params) . ") ";
+        $text .= '(params "'. (join ' ', @params) . ') ';
     }
 
     my @exprs;
@@ -177,7 +179,7 @@ sub function_definition($self, $scope, $data) {
         push @exprs, $self->evaluate($scope, $expr);
     }
 
-    $text .= "(exprs " . (join ' ', @exprs) . ")";
+    $text .= '(exprs ' . (join ' ', @exprs) . ')';
 
     return "(func-def $name $text)";
 }
@@ -195,7 +197,11 @@ sub map_constructor($self, $scope, $data) {
 
     my $text = join ' ', @props;
 
-    return "(map-cons $text)";
+    if (length $text) {
+        return "(map-cons $text)";
+    } else {
+        return '(map-cons)';
+    }
 }
 
 sub array_constructor($self, $scope, $data) {
@@ -207,12 +213,17 @@ sub array_constructor($self, $scope, $data) {
     }
 
     my $text = join ' ', @values;
-    return "(array-cons $text)";
+
+    if (length $text) {
+        return "(array-cons $text)";
+    } else {
+        return '(array-cons)';
+    }
 }
 
 sub keyword_exists($self, $scope, $data) {
-    my $var = $self->evaluate($scope, $data->[1]->[1]);
-    my $key = $self->evaluate($scope, $data->[1]->[2]);
+    my $var = $self->evaluate($scope, $data->[1][1]);
+    my $key = $self->evaluate($scope, $data->[1][2]);
     return "(exists $var $key)";
 }
 
@@ -298,9 +309,8 @@ sub keyword_while($self, $scope, $data) {
 
 sub keyword_type($self, $scope, $data) {
     my $name    = $data->[1];
-    my $subtype = $data->[2];
-    my $type    = $data->[3];
-    return "(new-type $name $subtype $type)";
+    my $type    = $data->[2];
+    return "(new-type $name " . $self->type_to_string($type) . ")";
 }
 
 sub add_assign($self, $scope, $data) {
@@ -467,8 +477,8 @@ sub identifier($self, $scope, $data) {
 
 sub literal($self, $scope, $data) {
     my $type  = $data->[1];
-    my $value = $data->[2];
-    return "(literal $value : " . $self->type_to_string($type) . ")";
+    my $value = [$data->[1], $data->[2]];
+    return "(literal " . $self->output_value($value, literal => 1). " : " . $self->type_to_string($type) . ")";
 }
 
 sub null_op {
@@ -513,7 +523,7 @@ use Plang::Interpreter;
 sub parse_string($self, $string) {
     my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
     my $program = $interpreter->parse_string($string);
-    return $program->[0]->[1];
+    return $program->[0][1];
 }
 
 sub interpolate_string($self, $scope, $string) {
@@ -567,94 +577,12 @@ sub array_to_string($self, $var) {
     return $string;
 }
 
-# TODO: do this more efficiently
-sub output_string_literal($self, $text) {
-    $Data::Dumper::Indent = 0;
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Useqq  = 1;
-
-    $text = Dumper ($text);
-    $text =~ s/\\([\@\$\%])/$1/g;
-
-    return $text;
-}
-
 sub value_to_string($self, $value) {
     return $self->output_value($value);
 }
 
 sub type_to_string($self, $type) {
     return $self->{types}->to_string($type);
-}
-
-sub output_value($self, $value, %opts) {
-    my $result = '';
-
-    # specials
-    if ($value->[0][0] eq 'SPCL') {
-        if ($value->[0][1] eq 'NEWTYPE') {
-            $result .= "type $value->[1] = " . $self->{types}->to_string($value->[3]);
-        } else {
-            die "Unknown special $value->[0][1]";
-        }
-    }
-
-    # booleans
-    elsif ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
-        if ($value->[1] == 0) {
-            $result .= 'false';
-        } else {
-            $result .= 'true';
-        }
-    }
-
-    # functions
-    elsif ($self->{types}->name_is($value->[0], 'TYPEFUNC')) {
-        $result .= $self->{types}->to_string($value->[0]);
-    }
-
-    # maps
-    elsif ($self->{types}->check(['TYPE', 'Map'], $value->[0])) {
-        $result .= $self->map_to_string($value);
-    }
-
-    # arrays
-    elsif ($self->{types}->check(['TYPE', 'Array'], $value->[0])) {
-        $result .= $self->array_to_string($value);
-    }
-
-    # String and Number
-    else {
-        if ($opts{literal}) {
-            # output literals
-            if ($self->{types}->check(['TYPE', 'String'], $value->[0])) {
-                $result .= $self->output_string_literal($value->[1]);
-            } elsif ($self->{types}->check(['TYPE', 'Null'], $value->[0])) {
-                $result .= 'null';
-            } else {
-                $result .= $value->[1];
-            }
-        } else {
-            $result .= $value->[1] if defined $value->[1];
-        }
-    }
-
-    # append type if in REPL mode
-    if ($self->{repl}) {
-        my $show_type = 0;
-
-        if ($opts{literal}) {
-            $show_type = 1;
-        } else {
-            $show_type = 1 if defined $value->[1];
-        }
-
-        if ($show_type) {
-            $result .= ': ' . $self->{types}->to_string($value->[0]);
-        }
-    }
-
-    return $result;
 }
 
 # returns a Plang AST as dumped as human-readable text
@@ -700,13 +628,7 @@ sub evaluate($self, $scope, $data) {
         return $data;
     }
 
-    my $result = $self->dispatch_instruction($ins, $scope, $data);
-
-    $result =~ s/\n/\\n/g;
-    $result =~ s/\t/\\n/g;
-    $result =~ s/\r/\\n/g;
-
-    return $result;
+    return $self->dispatch_instruction($ins, $scope, $data);
 }
 
 1;

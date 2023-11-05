@@ -1,0 +1,13 @@
+# normal function call syntax
+print(map([2,4,8], fn (x) x * 2)); # prints [4,8,16]
+
+# uniform function call syntax
+[2,4,8].map(fn (x) x * 2).print(); # also prints [4,8,16]
+
+# another example
+
+fn add(a, b) a + b;
+fn mul(a, b) a * b;
+
+print(add(mul(3, 5), 6)); # prints 21
+3.mul(5).add(6).print();  # also prints 21

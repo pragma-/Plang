@@ -60,6 +60,7 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
     $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
     $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
+    $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
 
     # validate these unary operators
     $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
@@ -230,10 +231,10 @@ sub is_truthy($self, $scope, $expr) {
 sub type_check_prefix_postfix_op($self, $scope, $data, $op) {
     my $pos = $self->position($data);
 
-    if ($data->[1]->[0] == INSTR_IDENT or $data->[1]->[0] == INSTR_ACCESS && $data->[1]->[1]->[0] == INSTR_IDENT) {
+    if ($data->[1][0] == INSTR_IDENT or $data->[1][0] == INSTR_ACCESS && $data->[1][1][0] == INSTR_IDENT) {
         # desugar x.y to x['y']
-        if (defined $data->[2] && ref($data->[2]) eq 'ARRAY' && $data->[2]->[0] == INSTR_IDENT) {
-            $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
+        if (defined $data->[2] && ref($data->[2]) eq 'ARRAY' && $data->[2][0] == INSTR_IDENT) {
+            $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2][1]];
         }
 
         my $var = $self->evaluate($scope, $data->[1]);
@@ -245,15 +246,15 @@ sub type_check_prefix_postfix_op($self, $scope, $data, $op) {
         $self->error($scope, "cannot apply $op to type " . $self->{types}->to_string($var->[0]), $pos);
     }
 
-    if ($data->[1]->[0] == INSTR_LITERAL) {
-        $self->error($scope, "cannot apply $op to a " . $self->{types}->to_string($data->[1]->[1]) . " literal", $pos);
+    if ($data->[1][0] == INSTR_LITERAL) {
+        $self->error($scope, "cannot apply $op to a " . $self->{types}->to_string($data->[1][1]) . " literal", $pos);
     }
 
-    if (ref ($data->[1]->[0]) ne 'ARRAY') {
-        $self->error($scope, "cannot apply $op to instruction " . $pretty_instr[$data->[1]->[0]], $pos);
+    if (ref ($data->[1][0]) ne 'ARRAY') {
+        $self->error($scope, "cannot apply $op to instruction " . $pretty_instr[$data->[1][0]], $pos);
     }
 
-    $self->error($scope, "cannot apply $op to type " . $self->{types}->to_string($data->[1]->[0]), $pos);
+    $self->error($scope, "cannot apply $op to type " . $self->{types}->to_string($data->[1][0]), $pos);
 }
 
 sub prefix_increment($self, $scope, $data) {
@@ -432,11 +433,11 @@ sub map_constructor($self, $scope, $data) {
     my @props;
 
     foreach my $entry (@$map) {
-        if ($entry->[0]->[0] == INSTR_IDENT) {
-            my ($var) = $self->get_variable($scope, $entry->[0]->[1]);
+        if ($entry->[0][0] == INSTR_IDENT) {
+            my ($var) = $self->get_variable($scope, $entry->[0][1]);
 
             if (not defined $var) {
-                $self->error($scope, "cannot use undeclared variable `$entry->[0]->[1]` to assign Map key", $self->position($entry->[0]));
+                $self->error($scope, "cannot use undeclared variable `$entry->[0][1]` to assign Map key", $self->position($entry->[0]));
             }
 
             if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
@@ -449,14 +450,14 @@ sub map_constructor($self, $scope, $data) {
             $self->error($scope, "cannot use type `" . $self->{types}->to_string($var->[0]) . "` as Map key", $self->position($entry->[0]));
         }
 
-        if ($self->{types}->check(['TYPE', 'String'], $entry->[0]->[0])) {
+        if ($self->{types}->check(['TYPE', 'String'], $entry->[0][0])) {
             my $value = $self->evaluate($scope, $entry->[1]);
-            $hashref->{$entry->[0]->[1]} = $value;
-            push @props, [$entry->[0]->[1], $value->[0]];
+            $hashref->{$entry->[0][1]} = $value;
+            push @props, [$entry->[0][1], $value->[0]];
             next;
         }
 
-        $self->error($scope, "cannot use type `" . $self->{types}->to_string($entry->[0]->[0]) . "` as Map key", $self->position($entry->[0]));
+        $self->error($scope, "cannot use type `" . $self->{types}->to_string($entry->[0][0]) . "` as Map key", $self->position($entry->[0]));
     }
 
     return [['TYPEMAP', \@props], $hashref];
@@ -464,11 +465,11 @@ sub map_constructor($self, $scope, $data) {
 
 sub keyword_exists($self, $scope, $data) {
     # check for key in map
-    if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->evaluate($scope, $data->[1]->[1]);
+    if ($data->[1][0] == INSTR_ACCESS) {
+        my $var = $self->evaluate($scope, $data->[1][1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->evaluate($scope, $data->[1]->[2]);
+            my $key = $self->evaluate($scope, $data->[1][2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 if (exists $var->[1]->{$key->[1]}) {
@@ -490,26 +491,26 @@ sub keyword_exists($self, $scope, $data) {
 
 sub keyword_delete($self, $scope, $data) {
     # delete one key in map
-    if ($data->[1]->[0] == INSTR_ACCESS) {
-        my $var = $self->evaluate($scope, $data->[1]->[1]);
+    if ($data->[1][0] == INSTR_ACCESS) {
+        my $var = $self->evaluate($scope, $data->[1][1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
-            my $key = $self->evaluate($scope, $data->[1]->[2]);
+            my $key = $self->evaluate($scope, $data->[1][2]);
 
             if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
                 my $val = delete $var->[1]->{$key->[1]};
-                return [['TYPE', 'Null'], undef] if not defined $val;
+                $val // return [['TYPE', 'Null'], undef];
                 return $val;
             }
 
-            $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($data->[1]->[2]));
+            $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($data->[1][2]));
         }
 
         $self->error($scope, "delete must be used on Maps (got " . $self->{types}->to_string($var->[0]) . ")", $self->position($var));
     }
 
     # delete all keys in map
-    if ($data->[1]->[0] == INSTR_IDENT) {
+    if ($data->[1][0] == INSTR_IDENT) {
         my $var = $self->evaluate($scope, $data->[1]);
 
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
@@ -613,7 +614,7 @@ sub function_definition($self, $scope, $data) {
         $name = "anonfunc$func";
     }
 
-    if (!$self->{repl} and exists $scope->{locals}->{$name} and $scope->{locals}->{$name}->[0]->[1] ne 'Builtin') {
+    if (!$self->{repl} and exists $scope->{locals}->{$name} and $scope->{locals}->{$name}->[0][1] ne 'Builtin') {
         $self->error($scope, "cannot define function `$name` with same name as existing local", $pos);
     }
 
@@ -727,23 +728,23 @@ sub process_function_call_arguments($self, $scope, $name, $parameters, $argument
         my $arg = $arguments->[$i];
         if ($arg->[0] == INSTR_ASSIGN) {
             # named argument
-            if (not defined $parameters->[$i]->[2]) {
+            if (not defined $parameters->[$i][2]) {
                 # ensure positional arguments are filled first
-                $self->error($scope, "positional parameter `$parameters->[$i]->[1]` must be filled before using named argument", $self->position($arguments->[$i]));
+                $self->error($scope, "positional parameter `$parameters->[$i][1]` must be filled before using named argument", $self->position($arguments->[$i]));
             }
 
-            my $named_arg = $arguments->[$i]->[1];
-            my $value     = $arguments->[$i]->[2];
+            my $named_arg = $arguments->[$i][1];
+            my $value     = $arguments->[$i][2];
 
             if ($named_arg->[0] == INSTR_IDENT) {
                 my $ident = $named_arg->[1];
 
                 my $found = 0;
                 for (my $j = 0; $j < @$parameters; $j++) {
-                    if ($parameters->[$j]->[1] eq $ident) {
+                    if ($parameters->[$j][1] eq $ident) {
                         $processed_arguments->[$j] = $value;
                         $evaluated_arguments->[$j] = $self->evaluate($scope, $value);
-                        $scope->{locals}->{$parameters->[$j]->[1]} = $evaluated_arguments->[$j];
+                        $scope->{locals}->{$parameters->[$j][1]} = $evaluated_arguments->[$j];
                         $found = 1;
                         last;
                     }
@@ -759,7 +760,7 @@ sub process_function_call_arguments($self, $scope, $name, $parameters, $argument
             # normal argument
             $processed_arguments->[$i] = $arg;
             $evaluated_arguments->[$i] = $self->evaluate($scope, $arg);
-            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $scope->{locals}->{$parameters->[$i][1]} = $evaluated_arguments->[$i];
         }
     }
 
@@ -768,15 +769,15 @@ sub process_function_call_arguments($self, $scope, $name, $parameters, $argument
             next;
         }
 
-        if (defined $parameters->[$i]->[2]) {
+        if (defined $parameters->[$i][2]) {
             # found default argument
-            $processed_arguments->[$i] = $parameters->[$i]->[2];
-            $evaluated_arguments->[$i] = $self->evaluate($scope, $parameters->[$i]->[2]);
-            $scope->{locals}->{$parameters->[$i]->[1]} = $evaluated_arguments->[$i];
+            $processed_arguments->[$i] = $parameters->[$i][2];
+            $evaluated_arguments->[$i] = $self->evaluate($scope, $parameters->[$i][2]);
+            $scope->{locals}->{$parameters->[$i][1]} = $evaluated_arguments->[$i];
         } else {
             # no argument or default argument
             if (not defined $evaluated_arguments->[$i]) {
-                $self->error($scope, "missing argument `$parameters->[$i]->[1]` to function `$name`", $self->position($data)),
+                $self->error($scope, "missing argument `$parameters->[$i][1]` to function `$name`", $self->position($data)),
             }
         }
     }
@@ -850,12 +851,12 @@ sub function_call($self, $scope, $data) {
             return $func;
         }
 
-        if ($func->[0]->[0] ne 'TYPEFUNC') {
+        if ($func->[0][0] ne 'TYPEFUNC') {
             # not a function
             $self->error($scope, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")", $self->position($target));
         }
 
-        if ($func->[0]->[1] eq 'Builtin') {
+        if ($func->[0][1] eq 'Builtin') {
             $self->{debug}->{print}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
             $func = $self->get_builtin_function($name);
             return $self->type_check_builtin_function_call($scope, $func, $data, $name);
@@ -881,10 +882,10 @@ sub function_call($self, $scope, $data) {
         return $func;
     }
 
-    my $closure     = $func->[1]->[0];
-    my $return_type = $func->[1]->[1];
-    my $parameters  = $func->[1]->[2];
-    my $expressions = $func->[1]->[3];
+    my $closure     = $func->[1][0];
+    my $return_type = $func->[1][1];
+    my $parameters  = $func->[1][2];
+    my $expressions = $func->[1][3];
     my $return_value;
 
     my $cached_type = $self->get_cached_type($scope, $func);
@@ -906,7 +907,7 @@ sub function_call($self, $scope, $data) {
     # type-check arguments
     if (defined $parameters) {
         for (my $i = 0; $i < @$parameters; $i++) {
-            $self->validate_function_argument_type($func_scope, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
+            $self->validate_function_argument_type($func_scope, $name, $parameters->[$i], $evaled_args->[$i][0], $self->position($evaled_args->[$i]));
         }
     }
 
@@ -931,8 +932,8 @@ sub function_call($self, $scope, $data) {
 
     if ($self->{types}->check($return_type, ['TYPE', 'Any'])) {
         # set inferred return type
-        $func->[1]->[1] = $return_value->[0];
-        $func->[0]->[3] = $return_value->[0];
+        $func->[1][1] = $return_value->[0];
+        $func->[0][3] = $return_value->[0];
     }
 
     $scope->{closure} = undef;
@@ -951,7 +952,7 @@ sub type_check_builtin_function_call($self, $scope, $builtin, $data, $name) {
     my $evaled_args = $self->process_function_call_arguments($scope, $name, $parameters, $arguments, $data);
 
     for (my $i = 0; $i < @$parameters; $i++) {
-        $self->validate_function_argument_type($scope, $name, $parameters->[$i], $evaled_args->[$i]->[0], $self->position($evaled_args->[$i]));
+        $self->validate_function_argument_type($scope, $name, $parameters->[$i], $evaled_args->[$i][0], $self->position($evaled_args->[$i]));
     }
 
     my $return_value;
@@ -1006,6 +1007,20 @@ sub keyword_if($self, $scope, $data) {
     return $result;
 }
 
+sub keyword_type($self, $scope, $data) {
+    my $name    = $data->[1];
+    my $type    = $data->[2];
+
+    $self->{types}->add('Any', $name);
+    $self->{types}->add_alias($name, $type);
+
+    if ($self->get_variable($scope, $name, locals_only => 1)) {
+        $self->error($scope, "cannot define a new type `$name` with same name as existing variable", $self->position($data));
+    }
+
+    return [['NEWTYPE', $name], $type];
+}
+
 sub keyword_while($self, $scope, $data) {
     # validate conditional
     $self->evaluate($scope, $data->[1]);
@@ -1038,8 +1053,8 @@ sub keyword_last($self, $scope, $data) {
 
 sub dot_access_map($self, $scope, $data, $var) {
     # desugar x.y to x['y'] and prevent variable look-up
-    if ($data->[2]->[0] == INSTR_IDENT) {
-        $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2]->[1]];
+    if ($data->[2][0] == INSTR_IDENT) {
+        $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2][1]];
     }
 
     my $key = $self->evaluate($scope, $data->[2]);
@@ -1059,7 +1074,7 @@ sub access_map($self, $scope, $data, $var) {
 
     if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
         my $val = $var->[1]->{$key->[1]};
-        return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
+        $val // return [['TYPE', 'Null'], undef, $self->position($data)];
         return $val;
     }
 
@@ -1072,7 +1087,7 @@ sub access_rest($self, $scope, $data, $var) {
         my $index = $self->evaluate($scope, $data->[2]);
 
         if ($self->{types}->check(['TYPE', 'Integer'], $index->[0])) {
-            my $val = $var->[1]->[$index->[1]];
+            my $val = $var->[1][$index->[1]];
             return [['TYPE', 'Null'], undef, $self->position($data)] if not defined $val;
             return $val;
         }
@@ -1166,8 +1181,8 @@ sub assignment($self, $scope, $data) {
         if ($self->{types}->check(['TYPE', 'Map'], $var->[0])) {
             if ($left_value->[0] == INSTR_DOT_ACCESS) {
                 # desugar x.y to x['y']
-                if ($left_value->[2]->[0] == INSTR_IDENT) {
-                    $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2]->[1]];
+                if ($left_value->[2][0] == INSTR_IDENT) {
+                    $left_value->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $left_value->[2][1]];
                 }
             }
 
@@ -1187,7 +1202,7 @@ sub assignment($self, $scope, $data) {
 
             if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
                 my $val = $self->evaluate($scope, $right_value);
-                $var->[1]->[$index->[1]] = $val;
+                $var->[1][$index->[1]] = $val;
                 return $val;
             }
 
@@ -1272,7 +1287,7 @@ sub array_index_notation($self, $scope, $data) {
 
         # number index
         if ($self->{types}->check(['TYPE', 'Number'], $index->[0])) {
-            my $val = $var->[1]->[$index->[1]];
+            my $val = $var->[1][$index->[1]];
             return [['TYPE', 'Null'], undef] if not defined $val;
             return $val;
         }
@@ -1284,7 +1299,7 @@ sub array_index_notation($self, $scope, $data) {
 
     # string index
     if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-        my $value = $self->evaluate($scope, $data->[2]->[1]);
+        my $value = $self->evaluate($scope, $data->[2][1]);
 
         if ($value->[0] == INSTR_RANGE) {
             my $from = $value->[1];

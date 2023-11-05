@@ -10,6 +10,8 @@ use lib "$RealBin/../lib";
 
 use Getopt::Long qw(GetOptionsFromArray);
 
+use Plang::Constants::Instructions ':all';
+
 STDOUT->autoflush(1);
 
 my $usage = <<"USAGE";
@@ -61,7 +63,7 @@ my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
 $plang->add_builtin_function('print',
     # these are the parameters we want: `expr` and `end`.
     # `expr` has no default value; `end` has default value [String, "\n"]
-    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [['TYPE', 'String'], "\n"]]],
+    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [INSTR_LITERAL, ['TYPE', 'String'], "\n"]]],
     # the type of value print() returns
     ['TYPE', 'Null'],
     # subref to our function that will override the `print` function
@@ -83,7 +85,7 @@ sub print_validator {
 
 # add a `dprint` function so we can print debug messages during tests (since print is overridden)
 $plang->add_builtin_function('dprint',
-    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [['TYPE', 'String'], "\n"]]],
+    [[['TYPE', 'Any'], 'expr', undef], [['TYPE', 'String'], 'end', [INSTR_LITERAL, ['TYPE', 'String'], "\n"]]],
     ['TYPE', 'Null'],
     \&func_dprint,
     \&func_dprint_validator);
@@ -103,7 +105,7 @@ sub func_dprint_validator {
 # takes three arguments: expected:Any, got:Any, test_name:String=""
 # tests if `expected` is equal to `got`
 $plang->add_builtin_function('test_eq',
-    [[['TYPE', 'Any'], 'expected', undef], [['TYPE', 'Any'], 'got', undef], [['TYPE', 'String'], 'test_name', [['TYPE', 'String'], '']]],
+    [[['TYPE', 'Any'], 'expected', undef], [['TYPE', 'Any'], 'got', undef], [['TYPE', 'String'], 'test_name', [INSTR_LITERAL, ['TYPE', 'String'], '']]],
     ['TYPE', 'Boolean'],
     \&test_eq_func,
     \&test_eq_validator);
@@ -133,7 +135,7 @@ sub test_eq_validator {
 # takes two arguments: expected:String, test_name:String=""
 # tests if expected stdout output matches expected output
 $plang->add_builtin_function('test_stdout',
-    [[['TYPE', 'String'], 'expected', undef], [['TYPE', 'String'], 'test_name', [['TYPE', 'String'], '']]],
+    [[['TYPE', 'String'], 'expected', undef], [['TYPE', 'String'], 'test_name', [INSTR_LITERAL, ['TYPE', 'String'], '']]],
     ['TYPE', 'Boolean'],
     \&test_stdout_func,
     \&test_stdout_validator);
