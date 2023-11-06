@@ -120,25 +120,24 @@ sub function_call($self, $scope, $data) {
     my $target    = $data->[1];
     my $arguments = $data->[2];
 
-    my $text = "";
+    my $text = '';
 
     if ($target->[0] == INSTR_IDENT) {
-        $text .= "$target->[1] ";
+        $text .= "$target->[1]";
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $text .= "anonymous-1 ";
+        $text .= 'anonymous-1';
     } else {
-        $text .= "anonymous-2 ";
+        $text .= 'anonymous-2';
     }
 
     if (@$arguments) {
-        $text .= "(args ";
+        $text .= ' ';
         my @args;
         foreach my $arg (@$arguments) {
             my $t = $self->evaluate($scope, $arg);
             push @args, $t;
         }
-        $text .= join ', ', @args;
-        $text .= ")";
+        $text .= join ' ', @args;
     }
 
     return "(call $text)";
@@ -246,41 +245,27 @@ sub keyword_try($self, $scope, $data) {
     my $expr     = $data->[1];
     my $catchers = $data->[2];
 
-    my $result = eval {
-        $self->evaluate($scope, $expr);
-    };
+    my $try = $self->evaluate($scope, $expr);
 
-    if (my $exception = $@) {
-        my $catch;
+    my @catches;
 
-        if (not ref $exception) {
-            chomp $exception;
-            $exception =~ s/ at.*// if $exception =~ /\.pm line \d+/; # strip Perl info
-            $exception = [['TYPE', 'String'], $exception];
-        }
+    foreach my $catcher (@$catchers) {
+        my ($cond, $body) = @$catcher;
 
-        foreach my $catcher (@$catchers) {
-            my ($cond, $body) = @$catcher;
-
-            if (not $cond) {
-                $catch = $body;
-                last;
-            }
-
+        if (not $cond) {
+            $cond = '(default)';
+        } else {
             $cond = $self->evaluate($scope, $cond);
-
-            if ($cond->[1] eq $exception->[1]) {
-                $catch = $body;
-                last;
-            }
         }
 
-        my $try_scope = $self->new_scope($scope);
-        $self->declare_variable($try_scope, ['TYPE', 'String'], 'e', $exception);
-        return $self->evaluate($try_scope, $catch);
+        $body = $self->evaluate($scope, $body);
+
+        push @catches, "($cond $body)";
     }
 
-    return $result;
+    my $catch = join ' ', @catches;
+
+    return "(try $try $catch)";
 }
 
 sub keyword_throw($self, $scope, $data) {
@@ -322,7 +307,7 @@ sub add_assign($self, $scope, $data) {
 sub sub_assign($self, $scope, $data) {
     my $left  = $self->evaluate($scope, $data->[1]);
     my $right = $self->evaluate($scope, $data->[2]);
-    return "(add-assign $left $right)";
+    return "(sub-assign $left $right)";
 }
 
 sub mul_assign($self, $scope, $data) {
@@ -600,7 +585,11 @@ sub dump($self, $ast = undef, %opt) {
     my $scope = {};
 
     # interpret the expressions and return the human-readable text
-    return $self->execute($scope, [$ast]);
+    if ($opt{tree}) {
+        return $self->execute($scope, $ast);
+    } else {
+        return $self->execute($scope, [$ast]);
+    }
 }
 
 sub execute($self, $scope, $ast) {

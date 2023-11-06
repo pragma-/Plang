@@ -1496,10 +1496,7 @@ sub run($self, $ast = undef, %opt) {
 
 sub execute($self, $scope, $ast) {
     if ($self->{debug}) {
-        $Data::Dumper::Indent = 0;
-        $self->{debug}->{print}->('AST', "interpret ast: " . Dumper ($ast) . "\n");
-        # XXX $self->{debug}->{print}->('AST', "interpret ast: " . $self->{dumper}->dump($ast) . "\n");
-        $Data::Dumper::Indent = 1;
+        $self->{debug}->{print}->('AST', "interpret ast: " . $self->{dumper}->dump($ast, tree => 1) . "\n");
     }
 
     my $final_result;
