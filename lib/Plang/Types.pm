@@ -8,6 +8,7 @@ use warnings;
 use strict;
 use feature 'signatures';
 
+use Plang::Constants::Instructions ':all';
 use Data::Dumper;
 
 sub new($class, %args) {
@@ -92,6 +93,9 @@ sub default_value($self, $type) {
     elsif ($type->[0] eq 'TYPEUNION') {
     }
 
+    elsif ($type->[0] eq 'TYPEFUNC') {
+    }
+
     else {
         die "[default-value] unknown type ($type->[0])\n";
     }
@@ -137,6 +141,37 @@ sub resolve_alias($self, $type) {
     }
 
     return $type;
+}
+
+# find first default value in type chain
+sub resolve_default_value($self, $type) {
+    if ($type->[0] eq 'TYPE') {
+        if (defined $type->[2]) {
+            return $type->[2];
+        }
+
+        my $alias = $self->{aliases}->{$type->[1]};
+
+        if ($alias) {
+            return $self->resolve_default_value($alias);
+        }
+    } elsif ($type->[0] eq 'TYPEMAP') {
+        my $map = $type->[1];
+        my @props;
+
+        foreach my $entry (@$map) {
+            if (defined $entry->[2]) {
+                push @props, [[INSTR_LITERAL, ['TYPE', 'String'], $entry->[0]], $entry->[2], $entry->[2][-1]];
+            }
+        }
+
+        # construct a map if any entries have a default value
+        if (@props) {
+            return [INSTR_MAPCONS, \@props, $type->[-1]];
+        }
+    }
+
+    return undef;
 }
 
 # reset type aliases

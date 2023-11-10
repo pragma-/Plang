@@ -427,7 +427,7 @@ sub KeywordVar($parser) {
     return [INSTR_VAR, $type, $name, $initializer, token_position($var_token)];
 }
 
-# KeywordType ::= "type" IDENT "=" Type
+# KeywordType ::= "type" IDENT [":" Type] [Initializer]
 sub KeywordType($parser) {
     my $type_token = consume_keyword($parser, 'type');
 
@@ -439,16 +439,6 @@ sub KeywordType($parser) {
 
     my $name = $ident_token->[1];
 
-    if (not $parser->consume(TOKEN_ASSIGN)) {
-        expected($parser, "\"=\" after new type `$name`");
-    }
-
-    my $type = Type($parser);
-
-    if (not $type) {
-        expected($parser, "type literal for new type `$name`");
-    }
-
     # check for duplicate type definition
     if ($parser->get_type($name)) {
         error($parser, "cannot redefine existing type `$name`");
@@ -457,7 +447,21 @@ sub KeywordType($parser) {
     # add type to parser's internal list of types
     $parser->add_type($name);
 
-    return [INSTR_TYPE, $name, $type, token_position($type_token)];
+    my $type;
+
+    if ($parser->consume(TOKEN_COLON)) {
+        $type = Type($parser);
+
+        if (not $type) {
+            expected($parser, "type after \":\" for new type `$name`");
+        }
+    }
+
+    $type //= ['TYPE', 'Any'];
+
+    my $initializer = Initializer($parser);
+
+    return [INSTR_TYPE, $type, $name, $initializer, token_position($type_token)];
 }
 
 # Initializer ::= "=" Expression
@@ -538,7 +542,7 @@ sub TypeLiteral($parser) {
 
     if (my $token = $parser->consume(TOKEN_TYPE)) {
         my $type = $token->[1];
-        return ['TYPE', $type, token_position($token)];
+        return ['TYPE', $type, undef, token_position($token)];
     }
 
     return;
@@ -569,19 +573,27 @@ sub TypeMap($parser) {
                     $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
                 }
 
-                if (not $parser->consume(TOKEN_COLON)) {
-                    expected($parser, '":" after map key');
+                my $type;
+
+                if ($parser->consume(TOKEN_COLON)) {
+                    $type = Type($parser);
+
+                    if (not $type) {
+                        expected($parser, 'type after ":" for map entry');
+                    }
                 }
 
-                my $type = Type($parser);
+                my $initializer = Initializer($parser);
 
-                if (not $type) {
-                    expected($parser, 'type for map value');
+                if (!defined $type && !defined $initializer) {
+                    expected($parser, '": <type>" or "= <default value>" after map key');
                 }
+
+                $type //= ['TYPE', 'Any'];
 
                 $parser->consume(TOKEN_COMMA);
 
-                push @map, [$mapkey->[1], $type];
+                push @map, [$mapkey->[1], $type, $initializer];
                 next;
             }
 
@@ -751,10 +763,10 @@ sub MapConstructor($parser) {
 
                 if ($parsedkey->[0] == TOKEN_DQUOTE_STRING) {
                     $parsedkey->[1] =~ s/^"|"$//g;
-                    $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
+                    $mapkey = [INSTR_LITERAL, ['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } elsif ($parsedkey->[0] == TOKEN_SQUOTE_STRING) {
                     $parsedkey->[1] =~ s/^'|'$//g;
-                    $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
+                    $mapkey = [INSTR_LITERAL, ['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } else {
                     $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
                 }

@@ -72,8 +72,8 @@ $plang->add_builtin_function('print',
 
 # our overridden `print` function
 sub print_override {
-    my ($plang, $context, $name, $arguments) = @_;
-    my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    my ($plang, $scope, $name, $arguments) = @_;
+    my ($expr, $end) = ($plang->output_value($scope, $arguments->[0]), $arguments->[1]->[1]);
     $output .= "$expr$end"; # append the print output to our $output
     return [['TYPE', 'Null'], undef];
 }
@@ -91,8 +91,8 @@ $plang->add_builtin_function('dprint',
     \&func_dprint_validator);
 
 sub func_dprint {
-    my ($plang, $context, $name, $arguments) = @_;
-    my ($expr, $end) = ($plang->output_value($arguments->[0]), $arguments->[1]->[1]);
+    my ($plang, $scope, $name, $arguments) = @_;
+    my ($expr, $end) = ($plang->output_value($scope, $arguments->[0]), $arguments->[1]->[1]);
     print "$expr$end";
     return [['TYPE', 'Null'], undef];
 }
@@ -111,7 +111,7 @@ $plang->add_builtin_function('test_eq',
     \&test_eq_validator);
 
 sub test_eq_func {
-    my ($plang, $context, $name, $arguments) = @_;
+    my ($plang, $scope, $name, $arguments) = @_;
 
     my ($got, $expected) = ($arguments->[0], $arguments->[1]);
     my $test = $arguments->[2]->[1];
@@ -141,9 +141,9 @@ $plang->add_builtin_function('test_stdout',
     \&test_stdout_validator);
 
 sub test_stdout_func {
-    my ($plang, $context, $name, $arguments) = @_;
+    my ($plang, $scope, $name, $arguments) = @_;
 
-    my $expected = $plang->output_value($arguments->[0]);
+    my $expected = $plang->output_value($scope, $arguments->[0]);
     my $got      = $output;
     my $test     = $arguments->[1]->[1];
 

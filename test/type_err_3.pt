@@ -1,0 +1,3 @@
+type A = "hello"
+var x : A = 42
+# Validator error: cannot initialize `x` with value of type Integer (expected A aka String) at line 2, col 1

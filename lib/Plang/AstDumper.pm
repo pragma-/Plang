@@ -113,7 +113,7 @@ sub variable_declaration($self, $scope, $data) {
         $right_value = $self->evaluate($scope, [INSTR_LITERAL, ['TYPE', 'Null'], undef]);
     }
 
-    return "(var $name : " . $self->type_to_string($type) . " = $right_value)";
+    return "(var $name : " . $self->{types}->to_string($type) . " = $right_value)";
 }
 
 sub function_call($self, $scope, $data) {
@@ -151,7 +151,7 @@ sub function_definition($self, $scope, $data) {
 
     my $text = "";
 
-    $text .= "(return-type " . $self->type_to_string($ret_type) . ") ";
+    $text .= "(return-type " . $self->{types}->to_string($ret_type) . ") ";
 
     my @params;
 
@@ -165,7 +165,7 @@ sub function_definition($self, $scope, $data) {
             $value = " = $value";
         }
 
-        push @params, "($ident : " . $self->type_to_string($type) . $value . ')';
+        push @params, "($ident : " . $self->{types}->to_string($type) . $value . ')';
     }
 
     if (@params) {
@@ -189,9 +189,9 @@ sub map_constructor($self, $scope, $data) {
     my @props;
 
     foreach my $entry (@$map) {
-        my $key   = $entry->[0];
+        my $key   = $self->evaluate($scope, $entry->[0]);
         my $value = $self->evaluate($scope, $entry->[1]);
-        push @props, "($key->[1]: $value)";
+        push @props, "($key: $value)";
     }
 
     my $text = join ' ', @props;
@@ -293,9 +293,16 @@ sub keyword_while($self, $scope, $data) {
 }
 
 sub keyword_type($self, $scope, $data) {
-    my $name    = $data->[1];
-    my $type    = $data->[2];
-    return "(new-type $name " . $self->type_to_string($type) . ")";
+    my $type  = $data->[1];
+    my $name  = $data->[2];
+    my $value = $data->[3];
+
+    if (defined $value) {
+        $value = $self->evaluate($scope, $value);
+        return "(new-type $name " . $self->{types}->to_string($type) . " = $value)";
+    } else {
+        return "(new-type $name " . $self->{types}->to_string($type) . ")";
+    }
 }
 
 sub add_assign($self, $scope, $data) {
@@ -463,7 +470,7 @@ sub identifier($self, $scope, $data) {
 sub literal($self, $scope, $data) {
     my $type  = $data->[1];
     my $value = [$data->[1], $data->[2]];
-    return "(literal " . $self->output_value($value, literal => 1). " : " . $self->type_to_string($type) . ")";
+    return "(literal " . $self->output_value($scope, $value, literal => 1). " : " . $self->{types}->to_string($type) . ")";
 }
 
 sub null_op {
@@ -472,102 +479,6 @@ sub null_op {
 
 sub expression_group($self, $scope, $data) {
     return "(expr-group " . $self->execute($scope, $data->[1]) . ")";
-}
-
-# just like typeof() except include function parameter identifiers and default values
-sub introspect($self, $data) {
-    my $type  = $data->[0];
-    my $value = $data->[1];
-
-    if ($type->[0] eq 'TYPEFUNC') {
-        my $ret_type = $self->{types}->to_string($value->[1]);
-
-        my @params;
-        foreach my $param (@{$value->[2]}) {
-            my $param_type = $self->{types}->to_string($param->[0]);
-            if (defined $param->[2]) {
-                my $default_value = $self->evaluate($self->new_scope, $param->[2]);
-                push @params, "$param->[1]: $param_type = " . $self->output_value($default_value, literal => 1);
-            } else {
-                push @params, "$param->[1]: $param_type";
-            }
-        }
-
-        $type = "Function ";
-        $type .= '(' . join(', ', @params) . ') ';
-        $type .= "-> $ret_type";
-    } else {
-        $type = $self->{types}->to_string($type);
-    }
-
-    return $type;
-}
-
-use Plang::Interpreter;
-
-sub parse_string($self, $string) {
-    my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
-    my $program = $interpreter->parse_string($string);
-    return $program->[0][1];
-}
-
-sub interpolate_string($self, $scope, $string) {
-    my $new_string = "";
-
-    while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
-        my ($text, $interpolate) = ($1, $2);
-        my $ast = $self->parse_string($interpolate);
-        my $result = $self->execute($scope, $ast);
-        $new_string .= $text . $result;
-    }
-
-    $string =~ /\G(.*)/gc;
-    $new_string .= $1;
-    return $new_string;
-}
-
-# converts a map to a string
-# note: trusts $var to be Map type
-sub map_to_string($self, $var) {
-    my $hash = $var->[1];
-    my $string = '{';
-
-    my @entries;
-    foreach my $key (sort keys %$hash) {
-        my $value = $hash->{$key};
-        $key = $self->output_string_literal($key);
-        my $entry = "$key: ";
-        $entry .= $self->output_value($value, literal => 1);
-        push @entries, $entry;
-    }
-
-    $string .= join(', ', @entries);
-    $string .= '}';
-    return $string;
-}
-
-# converts an array to a string
-# note: trusts $var to be Array type
-sub array_to_string($self, $var) {
-    my $array = $var->[1];
-    my $string = '[';
-
-    my @entries;
-    foreach my $entry (@$array) {
-        push @entries, $self->output_value($entry, literal => 1);
-    }
-
-    $string .= join(',', @entries);
-    $string .= ']';
-    return $string;
-}
-
-sub value_to_string($self, $value) {
-    return $self->output_value($value);
-}
-
-sub type_to_string($self, $type) {
-    return $self->{types}->to_string($type);
 }
 
 # returns a Plang AST as dumped as human-readable text

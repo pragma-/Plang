@@ -1,6 +1,6 @@
-type A = Integer
-type B = A
-type C = B
+type A : Integer
+type B : A
+type C : B
 
 var x: [C] = ["42"]
 

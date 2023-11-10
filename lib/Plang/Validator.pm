@@ -363,7 +363,16 @@ sub variable_declaration($self, $scope, $data) {
     if ($initializer) {
         $right_value = $self->evaluate($scope, $initializer);
     } else {
-        $right_value = [['TYPE', 'Null'], undef];
+        my $default_value = $self->{types}->resolve_default_value($type);
+
+        if (defined $default_value) {
+            $right_value = $self->evaluate($scope, $default_value);
+
+            # desugar AST to include type default value as initializer
+            $data->[3] = $default_value;
+        } else {
+            $right_value = [['TYPE', 'Null'], undef];
+        }
     }
 
     if (!$self->{repl}) {
@@ -433,31 +442,16 @@ sub map_constructor($self, $scope, $data) {
     my @props;
 
     foreach my $entry (@$map) {
-        if ($entry->[0][0] == INSTR_IDENT) {
-            my ($var) = $self->get_variable($scope, $entry->[0][1]);
+        my $key = $self->evaluate($scope, $entry->[0]);
 
-            if (not defined $var) {
-                $self->error($scope, "cannot use undeclared variable `$entry->[0][1]` to assign Map key", $self->position($entry->[0]));
-            }
-
-            if ($self->{types}->check(['TYPE', 'String'], $var->[0])) {
-                my $value = $self->evaluate($scope, $entry->[1]);
-                $hashref->{$var->[1]} = $value;
-                push @props, [$var->[1], $value->[0]];
-                next;
-            }
-
-            $self->error($scope, "cannot use type `" . $self->{types}->to_string($var->[0]) . "` as Map key", $self->position($entry->[0]));
-        }
-
-        if ($self->{types}->check(['TYPE', 'String'], $entry->[0][0])) {
+        if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
             my $value = $self->evaluate($scope, $entry->[1]);
-            $hashref->{$entry->[0][1]} = $value;
-            push @props, [$entry->[0][1], $value->[0]];
+            $hashref->{$key->[1]} = $value;
+            push @props, [$key->[1], $value->[0]];
             next;
         }
 
-        $self->error($scope, "cannot use type `" . $self->{types}->to_string($entry->[0][0]) . "` as Map key", $self->position($entry->[0]));
+        $self->error($scope, "cannot use type `" . $self->{types}->to_string($key->[0]) . "` as Map key (expected String)", $self->position($entry->[0]));
     }
 
     return [['TYPEMAP', \@props], $hashref];
@@ -1008,15 +1002,59 @@ sub keyword_if($self, $scope, $data) {
 }
 
 sub keyword_type($self, $scope, $data) {
-    my $name    = $data->[1];
-    my $type    = $data->[2];
-
-    $self->{types}->add('Any', $name);
-    $self->{types}->add_alias($name, $type);
+    my $type  = $data->[1];
+    my $name  = $data->[2];
+    my $value = $data->[3];
 
     if ($self->get_variable($scope, $name, locals_only => 1)) {
         $self->error($scope, "cannot define a new type `$name` with same name as existing variable", $self->position($data));
     }
+
+    # handle TYPEMAP specially
+    if ($type->[0] eq 'TYPEMAP') {
+        my $map = $type->[1];
+
+        foreach my $entry (@$map) {
+            # these variables shadow the outer variables
+            my $name = $entry->[0];
+            my $type = $entry->[1];
+            my $value = $entry->[2];
+
+            if (defined $value) {
+                my $evalue = $self->evaluate($scope, $value);
+
+                if ($self->{types}->check($type, ['TYPE', 'Any'])) {
+                    # desugar AST to inferred type
+                    $entry->[1] = $evalue->[0];
+                } else {
+                    if (not $self->{types}->check($type, $evalue->[0])) {
+                        $self->error($scope, "map entry `$name` defined as " . $self->{types}->to_string($type) . ' cannot use a default value of type ' . $self->{types}->to_string($evalue->[0]), $self->position($data));
+                    }
+                }
+            }
+        }
+    }
+
+    # otherwise check for a default value
+    elsif (defined $value) {
+        my $evalue = $self->evaluate($scope, $value);
+
+        if ($self->{types}->check($type, ['TYPE', 'Any'])) {
+            $type = $evalue->[0];
+
+            # desugar AST to aliased type
+            $data->[1] = ['TYPE', $name];
+        } else {
+            if (not $self->{types}->check($type, $evalue->[0])) {
+                $self->error($scope, "new type `$name` defined as " . $self->{types}->to_string($type) . ' cannot use a default value of type ' . $self->{types}->to_string($evalue->[0]), $self->position($data));
+            }
+        }
+    }
+
+    $type = [$type->[0], $type->[1], $value, $type->[2]];
+
+    $self->{types}->add('Any', $name);
+    $self->{types}->add_alias($name, $type);
 
     return [['NEWTYPE', $name], $type];
 }
@@ -1188,13 +1226,38 @@ sub assignment($self, $scope, $data) {
 
             my $key = $self->evaluate($scope, $left_value->[2]);
 
-            if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
-                my $val = $self->evaluate($scope, $right_value);
-                $var->[1]->{$key->[1]} = $val;
-                return $val;
+            if (not $self->{types}->check(['TYPE', 'String'], $key->[0])) {
+                $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $pos);
             }
 
-            $self->error($scope, "Map key must be of type String (got " . $self->{types}->to_string($key->[0]) . ")", $self->position($key));
+            my $resolved_type = $self->{types}->resolve_alias($var->[0]);
+            my $props = $resolved_type->[1];
+            my $prop_type = undef;
+
+            foreach my $prop (@$props) {
+                if ($prop->[0] eq $key->[1]) {
+                    $prop_type = $prop->[1];
+                    last;
+                }
+            }
+
+            # TODO: support strict maps
+            # if (not defined $prop_type) {
+            #    $self->error($scope, "Map has no such key `$key->[1]`", $pos);
+            # }
+
+            my $val = $self->evaluate($scope, $right_value);
+
+            if (not defined $prop_type) {
+                push @$props, [$key->[1], $val->[0]];
+            }
+
+            elsif (not $self->{types}->check($prop_type, $val->[0])) {
+                $self->error($scope, "cannot assign to Map key `$key->[1]` a value of type " . $self->{types}->to_string($val->[0]) . " (expected " . $self->{types}->to_string($prop_type) . ")", $pos);
+            }
+
+            $var->[1]->{$key->[1]} = $val;
+            return $val;
         }
 
         if ($self->{types}->check(['TYPE', 'Array'], $var->[0])) {

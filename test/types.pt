@@ -47,3 +47,21 @@ fn f6(x)
 
 test_eq(typeof(f6), "Function (Any) -> Boolean")
 test_eq(whatis(f6), "Function (x: Any) -> Boolean")
+
+type Port = 80
+var port : Port
+
+test_eq(typeof(port), "Integer") # TODO: should be "Port aka Integer"
+test_eq(port, 80)
+
+type Thing : Port
+var thing : Thing
+
+test_eq(typeof(thing), "Integer") # TODO: should be "Thing aka Port aka Integer"
+test_eq(thing, 80)
+
+type Foo : Thing = 8080
+var foo : Foo
+
+test_eq(typeof(foo), "Integer") # TODO: should be "Foo aka Thing aka Port aka Integer"
+test_eq(foo, 8080)

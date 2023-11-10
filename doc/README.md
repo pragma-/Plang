@@ -6,82 +6,85 @@ This README describes what is implemented so far.
 <details><summary>Click to show table of contents</summary>
 
 <!-- md-toc-begin -->
-* [Project structure](#project-structure)
-* [Running Plang](#running-plang)
-  * [DEBUG environment variable](#debug-environment-variable)
-  * [REPL](#repl)
-* [Embedding Plang](#embedding-plang)
-* [Running the Unit Tests](#running-the-unit-tests)
-* [Example Plang scripts](#example-plang-scripts)
-* [The Plang Language (so far)](#the-plang-language-so-far)
-    * [Operators](#operators)
-    * [Truthiness](#truthiness)
-  * [Identifiers](#identifiers)
-    * [Keywords](#keywords)
-  * [Variables](#variables)
-  * [Functions](#functions)
-    * [Uniform function call syntax](#uniform-function-call-syntax)
-    * [Optional type annotations](#optional-type-annotations)
-    * [Default arguments](#default-arguments)
-    * [Named arguments](#named-arguments)
-    * [Anonymous functions](#anonymous-functions)
-    * [Closures](#closures)
-    * [Currying](#currying)
-    * [Lazy evaluation](#lazy-evaluation)
-  * [Built-in functions](#built-in-functions)
-    * [Input/Output](#inputoutput)
-      * [print](#print)
-    * [Introspection](#introspection)
-      * [typeof](#typeof)
-      * [whatis](#whatis)
-    * [Data and structures](#data-and-structures)
-      * [length](#length)
-      * [map](#map)
-      * [filter](#filter)
-      * [Type conversion functions](#type-conversion-functions)
-  * [Scoping](#scoping)
-  * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
-    * [if/then/else](#ifthenelse)
-    * [while/next/last](#whilenextlast)
-    * [try/catch/throw](#trycatchthrow)
-  * [Type-checking](#type-checking)
-    * [Optional type annotations](#optional-type-annotations-1)
-    * [Type narrowing during inference](#type-narrowing-during-inference)
-    * [Type conversion](#type-conversion)
-    * [Type unions](#type-unions)
-    * [Defining new types](#defining-new-types)
-    * [Types](#types)
-      * [Any](#any)
-      * [Null](#null)
-      * [Boolean](#boolean)
-      * [Number](#number)
-      * [Integer](#integer)
-      * [Real](#real)
-      * [String](#string)
-      * [Array](#array)
-      * [Map](#map-1)
-      * [Function](#function)
-      * [Builtin](#builtin)
-  * [String operations](#string-operations)
-    * [Relational operations](#relational-operations)
-    * [Interpolation](#interpolation)
-    * [Concatenation](#concatenation)
-    * [Substring search](#substring-search)
-    * [Indexing](#indexing)
-    * [Substring](#substring)
-    * [Regular expressions](#regular-expressions)
-  * [Array operations](#array-operations)
-    * [Creating and accessing arrays](#creating-and-accessing-arrays)
-    * [map](#map-2)
-    * [filter](#filter-1)
-  * [Map operations](#map-operations)
-    * [Creating and accessing maps](#creating-and-accessing-maps)
-    * [keys](#keys)
-    * [values](#values)
-    * [exists](#exists)
-    * [delete](#delete)
-  * [JSON compatibility/serialization](#json-compatibilityserialization)
-  * [Plang EBNF Grammar](#plang-ebnf-grammar)
+* [Plang](#plang)
+  * [Project structure](#project-structure)
+  * [Running Plang](#running-plang)
+    * [DEBUG environment variable](#debug-environment-variable)
+    * [REPL](#repl)
+  * [Embedding Plang](#embedding-plang)
+  * [Running the Unit Tests](#running-the-unit-tests)
+  * [Example Plang scripts](#example-plang-scripts)
+  * [The Plang Language (so far)](#the-plang-language-so-far)
+      * [Operators](#operators)
+      * [Truthiness](#truthiness)
+    * [Identifiers](#identifiers)
+      * [Keywords](#keywords)
+    * [Variables](#variables)
+    * [Functions](#functions)
+      * [Uniform function call syntax](#uniform-function-call-syntax)
+      * [Optional type annotations](#optional-type-annotations)
+      * [Default arguments](#default-arguments)
+      * [Named arguments](#named-arguments)
+      * [Anonymous functions](#anonymous-functions)
+      * [Closures](#closures)
+      * [Currying](#currying)
+      * [Lazy evaluation](#lazy-evaluation)
+    * [Built-in functions](#built-in-functions)
+      * [Input/Output](#inputoutput)
+        * [print](#print)
+      * [Introspection](#introspection)
+        * [typeof](#typeof)
+        * [whatis](#whatis)
+      * [Data and structures](#data-and-structures)
+        * [length](#length)
+        * [map](#map)
+        * [filter](#filter)
+        * [Type conversion functions](#type-conversion-functions)
+    * [Scoping](#scoping)
+    * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
+      * [if/then/else](#ifthenelse)
+      * [while/next/last](#whilenextlast)
+      * [try/catch/throw](#trycatchthrow)
+    * [Type-checking](#type-checking)
+      * [Optional type annotations](#optional-type-annotations-1)
+      * [Type narrowing during inference](#type-narrowing-during-inference)
+      * [Type conversion](#type-conversion)
+      * [Type unions](#type-unions)
+      * [Defining new types](#defining-new-types)
+        * [Default values in new types](#default-values-in-new-types)
+        * [Inferring type from default values](#inferring-type-from-default-values)
+      * [Types](#types)
+        * [Any](#any)
+        * [Null](#null)
+        * [Boolean](#boolean)
+        * [Number](#number)
+        * [Integer](#integer)
+        * [Real](#real)
+        * [String](#string)
+        * [Array](#array)
+        * [Map](#map-1)
+        * [Function](#function)
+        * [Builtin](#builtin)
+    * [String operations](#string-operations)
+      * [Relational operations](#relational-operations)
+      * [Interpolation](#interpolation)
+      * [Concatenation](#concatenation)
+      * [Substring search](#substring-search)
+      * [Indexing](#indexing)
+      * [Substring](#substring)
+      * [Regular expressions](#regular-expressions)
+    * [Array operations](#array-operations)
+      * [Creating and accessing arrays](#creating-and-accessing-arrays)
+      * [map](#map-2)
+      * [filter](#filter-1)
+    * [Map operations](#map-operations)
+      * [Creating and accessing maps](#creating-and-accessing-maps)
+      * [keys](#keys)
+      * [values](#values)
+      * [exists](#exists)
+      * [delete](#delete)
+    * [JSON compatibility/serialization](#json-compatibilityserialization)
+    * [Plang EBNF Grammar](#plang-ebnf-grammar)
 <!-- md-toc-end -->
 
 </details>
@@ -188,12 +191,15 @@ by the [`runtests`](../bin/runtests) script.
 The `runtests` script may be invoked without arguments to run all the tests. Alternatively, you
 can specify which tests to run by passing a list of file paths.
 
+```
     $ ./bin/runtests test/operators.pt test/closures.pt
     Running 2 test files: ..........
     Pass: 10; Fail: 0
+```
 
 A test failure looks like this:
 
+```
     $ ./bin/runtests test/bad_test.pt
     Running 1 test file: XX.....
     Pass: 5; Fail: 2
@@ -205,6 +211,7 @@ A test failure looks like this:
     FAIL bad_test.pt: exponent literals
            Expected: [["TYPE","Real"],1100]
                 Got: [["TYPE","Real"],1200]
+```
 
 ## Example Plang scripts
 [Check out some examples!](../examples/)
@@ -799,12 +806,20 @@ This tells the compiler (and us) that the function is a `Builtin` that takes eit
 `Array`, `Map` or `String` and returns an `Integer`.
 
 #### Defining new types
+    TypeDefinition ::= "type" Identifier [":" Type] [Initializer]
+
 Use the `type` keyword to define new types.
+
+To define a `Port` type that is an Integer:
+
+```
+    type Port : Integer
+```
 
 To define a `Person` type that is a Map with two properties:
 
 ```
-    type Person = {
+    type Person : {
        "name" : String,
        "age"  : Integer
      }
@@ -812,11 +827,43 @@ To define a `Person` type that is a Map with two properties:
 
 Then you can use it any place you'd use a type annotation. For instance, instead of writing
 
-    var x: {"name": String, "age": Integer} = {"name": "Bob", "age": 42}
+    var x: {"name": String, "age": Integer} = {"name": "John Doe", "age": 18}
 
 you can more concisely write
 
-    var x: Person = {"name": "Bob", "age": 42}
+    var x: Person = {"name": "John Doe", "age": 18}
+
+##### Default values in new types
+You can optionally set default values in new types.
+
+```
+    type Port : Integer = 80
+    var x : Port;
+    print(x)  # prints 80
+```
+
+```
+    type Person : {
+       "name" : String = "John Doe",
+       "age"  : Integer = 18
+    }
+```
+
+New variables of type `Person` will be initialized with the default values.
+
+##### Inferring type from default values
+If you use a default value, you can omit the type. Plang will infer the type from the default value.
+
+```
+    type Port = 80
+```
+
+```
+    type Person : {
+       "name" = "John Doe",
+       "age"  = 18
+    }
+```
 
 #### Types
 The currently implemented types and their subtypes are:
@@ -1188,9 +1235,10 @@ Here is the, potentially incomplete, Plang EBNF grammar.
     KeywordDelete      ::= "delete" Expression
     KeywordKeys        ::= "keys" Expression
     KeywordValues      ::= "values" Expression
-    KeywordTry         ::= try Expression {catch ["(" Expression ")"] Expression}+
+    KeywordTry         ::= "try" Expression {"catch" ["(" Expression ")"] Expression}+
     KeywordThrow       ::= "throw" Expression
     KeywordVar         ::= "var" IDENT [":" Type] [Initializer]
+    KeywordType        ::= "type" IDENT [":" Type] [Initializer]
     Initializer        ::= "=" Expression
     Type               ::= TypeLiteral {"|" TypeLiteral}*
     TypeLiteral        ::= TypeMap | TypeArray | TypeFunction | TYPE

@@ -1,0 +1,2 @@
+type A : Integer = "hello"
+# Validator error: new type `A` defined as Integer cannot use a default value of type String at line 1, col 1

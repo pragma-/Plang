@@ -10,8 +10,8 @@ print(map2)
 test_stdout('{"i love spaces": 42}\n');
 
 
-type Player = {'health': Integer, 'name': String}
+type Player : {'health': Integer, 'name': String}
 fn die(p: Player) p.health = 0
 var p: Player = { 'health': 100, 'name': 'bob' }
-die(p)
+p.die()
 test_eq(p, {'health': 0, 'name': 'bob'})

@@ -297,25 +297,11 @@ sub map_constructor($self, $scope, $data) {
     my @props;
 
     foreach my $entry (@$map) {
-        my $key   = $entry->[0];
-        my $value = $entry->[1];
+        my $key   = $self->evaluate($scope, $entry->[0]);
+        my $value = $self->evaluate($scope, $entry->[1]);
 
-        # identifier
-        if ($key->[0] == INSTR_IDENT) {
-            my ($var) = $self->get_variable($scope, $key->[1]);
-            my $value = $self->evaluate($scope, $value);
-            $hashref->{$var->[1]} = $value;
-            push @props, [$var->[1], $value->[0]];
-            next;
-        }
-
-        # string
-        if ($self->{types}->check(['TYPE', 'String'], $key->[0])) {
-            my $value = $self->evaluate($scope, $value);
-            $hashref->{$key->[1]} = $value;
-            push @props, [$key->[1], $value->[0]];
-            next;
-        }
+        $hashref->{$key->[1]} = $value;
+        push @props, [$key->[1], $value->[0]];
     }
 
     return [['TYPEMAP', \@props], $hashref];
@@ -489,8 +475,11 @@ sub keyword_while($self, $scope, $data) {
 }
 
 sub keyword_type($self, $scope, $data) {
-    my $name    = $data->[1];
-    my $type    = $data->[2];
+    my $type  = $data->[1];
+    my $name  = $data->[2];
+    my $value = $data->[3];
+
+    $type = [$type->[0], $type->[1], $value, $type->[2]];
 
     $self->{types}->add('Any', $name);
     $self->{types}->add_alias($name, $type);
@@ -925,7 +914,7 @@ sub call_builtin_function($self, $scope, $data, $name) {
 }
 
 # just like typeof() except include function parameter identifiers and default values
-sub introspect($self, $data) {
+sub introspect($self, $scope, $data) {
     my $type  = $data->[0];
     my $value = $data->[1];
 
@@ -937,7 +926,7 @@ sub introspect($self, $data) {
             my $param_type = $self->{types}->to_string($param->[0]);
             if (defined $param->[2]) {
                 my $default_value = $self->evaluate($self->new_scope, $param->[2]);
-                push @params, "$param->[1]: $param_type = " . $self->output_value($default_value, literal => 1);
+                push @params, "$param->[1]: $param_type = " . $self->output_value($scope, $default_value, literal => 1);
             } else {
                 push @params, "$param->[1]: $param_type";
             }
@@ -947,7 +936,7 @@ sub introspect($self, $data) {
         $type .= '(' . join(', ', @params) . ') ';
         $type .= "-> $ret_type";
     } elsif ($type->[0] eq 'SPCL') {
-        $type = $self->output_value($data);
+        $type = $self->output_value($scope, $data);
     } else {
         $type = $self->{types}->to_string($type);
     }
@@ -957,7 +946,7 @@ sub introspect($self, $data) {
 
 # builtin print
 sub function_builtin_print($self, $scope, $name, $arguments) {
-    my ($text, $end) = ($self->output_value($arguments->[0]), $arguments->[1][1]);
+    my ($text, $end) = ($self->output_value($scope, $arguments->[0]), $arguments->[1][1]);
     print "$text$end";
     return [['TYPE', 'Null'], undef];
 }
@@ -971,7 +960,7 @@ sub function_builtin_typeof($self, $scope, $name, $arguments) {
 # builtin whatis
 sub function_builtin_whatis($self, $scope, $name, $arguments) {
     my ($expr) = ($arguments->[0]);
-    return [['TYPE', 'String'], $self->introspect($expr)];
+    return [['TYPE', 'String'], $self->introspect($scope, $expr)];
 }
 
 # builtin length
@@ -1128,15 +1117,15 @@ sub function_builtin_String($self, $scope, $name, $arguments) {
     }
 
     if ($self->{types}->check(['TYPE', 'Boolean'], $expr->[0])) {
-        return [['TYPE', 'String'], $self->output_value($expr)];
+        return [['TYPE', 'String'], $self->output_value($scope, $expr)];
     }
 
     if ($self->{types}->check(['TYPE', 'Map'], $expr->[0])) {
-        return [['TYPE', 'String'], $self->map_to_string($expr)];
+        return [['TYPE', 'String'], $self->map_to_string($scope, $expr)];
     }
 
     if ($self->{types}->check(['TYPE', 'Array'], $expr->[0])) {
-        return [['TYPE', 'String'], $self->array_to_string($expr)];
+        return [['TYPE', 'String'], $self->array_to_string($scope, $expr)];
     }
 
     $self->error($scope, "cannot convert type " . $self->{types}->to_string($expr->[0]) . " to String");
@@ -1307,7 +1296,7 @@ sub interpolate_string($self, $scope, $string) {
         }
 
         my $result = $self->execute($scope, $ast);
-        $new_string .= $text . $self->output_value($result);
+        $new_string .= $text . $self->output_value($scope, $result);
     }
 
     $string =~ /\G(.*)/gc;
@@ -1317,7 +1306,7 @@ sub interpolate_string($self, $scope, $string) {
 
 # converts a map to a string
 # note: trusts $var to be Map type
-sub map_to_string($self, $var) {
+sub map_to_string($self, $scope, $var) {
     my $hash = $var->[1];
     my $string = '{';
 
@@ -1326,7 +1315,7 @@ sub map_to_string($self, $var) {
         my $value = $hash->{$key};
         $key = $self->output_string_literal($key);
         my $entry = "$key: ";
-        $entry .= $self->output_value($value, literal => 1);
+        $entry .= $self->output_value($scope, $value, literal => 1);
         push @entries, $entry;
     }
 
@@ -1337,13 +1326,13 @@ sub map_to_string($self, $var) {
 
 # converts an array to a string
 # note: trusts $var to be Array type
-sub array_to_string($self, $var) {
+sub array_to_string($self, $scope, $var) {
     my $array = $var->[1];
     my $string = '[';
 
     my @entries;
     foreach my $entry (@$array) {
-        push @entries, $self->output_value($entry, literal => 1);
+        push @entries, $self->output_value($scope, $entry, literal => 1);
     }
 
     $string .= join(',', @entries);
@@ -1363,12 +1352,17 @@ sub output_string_literal($self, $text) {
     return $text;
 }
 
-sub output_value($self, $value, %opts) {
+sub output_value($self, $scope, $value, %opts) {
     my $result = '';
 
     # special cases
     if ($value->[0][0] eq 'NEWTYPE') {
-        $result .= "type $value->[0][1] = " . $self->{types}->to_string($value->[1]);
+        my $default_value;
+        if (defined $value->[1][2]) {
+            $default_value = $self->evaluate($scope, $value->[1][2]);
+            $default_value = $self->output_value($scope, $default_value, literal => 1);
+        }
+        $result .= "type $value->[0][1] : " . $self->{types}->to_string($value->[1], $default_value);
     }
 
     # booleans
@@ -1387,12 +1381,12 @@ sub output_value($self, $value, %opts) {
 
     # maps
     elsif ($self->{types}->check(['TYPE', 'Map'], $value->[0])) {
-        $result .= $self->map_to_string($value);
+        $result .= $self->map_to_string($scope, $value);
     }
 
     # arrays
     elsif ($self->{types}->check(['TYPE', 'Array'], $value->[0])) {
-        $result .= $self->array_to_string($value);
+        $result .= $self->array_to_string($scope, $value);
     }
 
     # String and Number
@@ -1487,7 +1481,7 @@ sub run($self, $ast = undef, %opt) {
     # print the result if defined
     unless ($opt{silent}) {
         if (defined $result->[1]) {
-            print $self->output_value($result, literal => 1), "\n";
+            print $self->output_value($scope, $result, literal => 1), "\n";
         }
     }
 
