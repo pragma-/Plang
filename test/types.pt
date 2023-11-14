@@ -1,67 +1,91 @@
-test_eq(typeof(1==1), 'Boolean')
-test_eq(typeof("hi"), 'String')
-test_eq(typeof(42),   'Integer')
-test_eq(typeof(null), 'Null')
+test_eq(typeof(1==1), 'Boolean', "Boolean")
+test_eq(typeof("hi"), 'String', "String")
+test_eq(typeof(42),   'Integer', "Integer")
+test_eq(typeof(null), 'Null', "Null")
 
-test_eq(typeof([1,2,3,4]), "[Integer]")
+test_eq(typeof([1,2,3,4]), "[Integer]", "array of Integer")
 
-test_eq(typeof([["a","b"],["c","d"]]), "[[String]]")
+test_eq(typeof([["a","b"],["c","d"]]), "[[String]]", "array of array of String")
 
-test_eq(typeof({"a": 42, "b": 3.14, "c": "hi"}), '{"a": Integer, "b": Real, "c": String}')
+test_eq(typeof({"a": 42, "b": 3.14, "c": "hi"}), '{"a": Integer, "b": Real, "c": String}', "Map")
 
-test_eq(typeof(fn null), 'Function () -> Null')
-test_eq(whatis(fn null), 'Function () -> Null')
+test_eq(typeof(fn null), 'Function () -> Null', "typeof Null func")
+test_eq(whatis(fn null), 'Function () -> Null', "whatis Null func")
 
 fn f1(a: Number, b: String) -> Boolean
   true
 
-test_eq(typeof(f1), 'Function (Number, String) -> Boolean')
-test_eq(whatis(f1), 'Function (a: Number, b: String) -> Boolean')
+test_eq(typeof(f1), 'Function (Number, String) -> Boolean', "typeof f1")
+test_eq(whatis(f1), 'Function (a: Number, b: String) -> Boolean', "whatis f1")
 
 fn f2(a: Integer = 10, b: Integer = 20)
   a + b
 
-test_eq(typeof(f2), 'Function (Integer, Integer) -> Integer')
-test_eq(whatis(f2), 'Function (a: Integer = 10, b: Integer = 20) -> Integer')
+test_eq(typeof(f2), 'Function (Integer, Integer) -> Integer', "typeof f2")
+test_eq(whatis(f2), 'Function (a: Integer = 10, b: Integer = 20) -> Integer', "whatis f2")
 
 fn f3(a, b)
   a + b
 
-test_eq(typeof(f3), "Function (Any, Any) -> Number")
-test_eq(whatis(f3), "Function (a: Any, b: Any) -> Number")
+test_eq(typeof(f3), "Function (Number, Number) -> Number", "typeof f3")
+test_eq(whatis(f3), "Function (a: Number, b: Number) -> Number", "whatis f3")
 
 fn f4(a, b)
   a ^^ b
 
-test_eq(typeof(f4), "Function (Any, Any) -> String")
-test_eq(whatis(f4), "Function (a: Any, b: Any) -> String")
+test_eq(typeof(f4), "Function (String, String) -> String", "typeof f4")
+test_eq(whatis(f4), "Function (a: String, b: String) -> String", "whatis f4")
 
 fn f5(a, b)
   a > b
 
-test_eq(typeof(f5), "Function (Any, Any) -> Boolean")
-test_eq(whatis(f5), "Function (a: Any, b: Any) -> Boolean")
+test_eq(typeof(f5), "Function (Any, Any) -> Boolean", "typeof f5")
+test_eq(whatis(f5), "Function (a: Any, b: Any) -> Boolean", "whatis f5")
 
 fn f6(x)
   !x
 
-test_eq(typeof(f6), "Function (Any) -> Boolean")
-test_eq(whatis(f6), "Function (x: Any) -> Boolean")
+test_eq(typeof(f6), "Function (Boolean | Number) -> Boolean", "typeof f6")
+test_eq(whatis(f6), "Function (x: Boolean | Number) -> Boolean", "whatis f6")
+
+fn f7(a)
+  a + 5
+
+test_eq(typeof(f7), 'Function (Integer) -> Integer', "typeof f7")
+test_eq(whatis(f7), 'Function (a: Integer) -> Integer', "whatis f7")
+
+fn f8(a)
+  5 + a
+
+test_eq(typeof(f8), 'Function (Integer) -> Integer', "typeof f8")
+test_eq(whatis(f8), 'Function (a: Integer) -> Integer', "whatis f8")
+
+fn f9(a)
+  a + 3.14
+
+test_eq(typeof(f9), 'Function (Real) -> Real', "typeof f9")
+test_eq(whatis(f9), 'Function (a: Real) -> Real', "whatis f9")
+
+fn f10(a)
+  3.14 + a
+
+test_eq(typeof(f10), 'Function (Real) -> Real', "typeof f10")
+test_eq(whatis(f10), 'Function (a: Real) -> Real', "whatis f10")
 
 type Port = 80
 var port : Port
 
-test_eq(typeof(port), "Integer") # TODO: should be "Port aka Integer"
-test_eq(port, 80)
+test_eq(typeof(port), "Integer", "Port type") # TODO: should be "Port aka Integer"
+test_eq(port, 80, "Port default value")
 
 type Thing : Port
 var thing : Thing
 
-test_eq(typeof(thing), "Integer") # TODO: should be "Thing aka Port aka Integer"
-test_eq(thing, 80)
+test_eq(typeof(thing), "Integer", "Thing type") # TODO: should be "Thing aka Port aka Integer"
+test_eq(thing, 80, "Thing default value")
 
 type Foo : Thing = 8080
 var foo : Foo
 
-test_eq(typeof(foo), "Integer") # TODO: should be "Foo aka Thing aka Port aka Integer"
-test_eq(foo, 8080)
+test_eq(typeof(foo), "Integer", "Foo type") # TODO: should be "Foo aka Thing aka Port aka Integer"
+test_eq(foo, 8080, "Foo default value")

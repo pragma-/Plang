@@ -859,6 +859,12 @@ my %function_builtins = (
         ret    => ['TYPE', 'Array'],
         subref => \&function_builtin_filter,
     },
+    'char' => {
+        params => [[['TYPE', 'Any'], 'expr', undef]],
+        ret    => ['TYPE', 'String'],
+        subref => \&function_builtin_char,
+        vsubref => \&validate_builtin_char,
+    },
     'Integer' => {
         params => [[['TYPE', 'Any'], 'expr', undef]],
         ret    => ['TYPE', 'Integer'],
@@ -1099,6 +1105,26 @@ sub validate_builtin_Real($self, $scope, $name, $arguments) {
     }
 
     return $self->function_builtin_Real($scope, $name, $arguments);
+}
+
+sub function_builtin_char($self, $scope, $name, $arguments) {
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->check(['TYPE', 'Integer'], $expr->[0])) {
+        return [['TYPE', 'String'], chr $expr->[1]];
+    }
+
+    $self->error($scope, "cannot apply char() to type " . $self->{types}->to_string($expr->[0]));
+}
+
+sub validate_builtin_char($self, $scope, $name, $arguments) {
+    my ($expr) = ($arguments->[0]);
+
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $expr->[0])) {
+        return $expr;
+    }
+
+    return $self->function_builtin_char($scope, $name, $arguments);
 }
 
 sub function_builtin_String($self, $scope, $name, $arguments) {

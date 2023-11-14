@@ -107,16 +107,33 @@ sub position($self, $data) {
 }
 
 sub unary_op($self, $instr, $scope, $data) {
-    my $pos = $data->[2];
-
+    my $pos   = $data->[2];
     my $value = $self->evaluate($scope, $data->[1]);
 
-    if ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0]) || $self->{types}->is_arithmetic($value->[0])) {
-        my $result;
+    my $result;
 
-        if ($instr == INSTR_NOT) {
+    if ($instr == INSTR_NOT) {
+        if (    $self->{types}->is_equal(['TYPE', 'Any'], $value->[0])
+             || $self->{types}->check(['TYPE', 'Boolean'], $value->[0])
+             || $self->{types}->is_arithmetic($value->[0])
+           )
+        {
             $result = [['TYPE', 'Boolean'], 0, $pos];
-        } elsif ($instr == INSTR_NEG) {
+
+            if ($data->[1][0] == INSTR_IDENT) {
+                my ($var, $var_scope) = $self->get_variable($scope, $data->[1][1]);
+                my $var_ident = $data->[1][1];
+
+                if ($self->{types}->is_equal($var->[0], ['TYPE', 'Any'])) {
+                    my $type = $self->{types}->unite([['TYPE', 'Number'], ['TYPE', 'Boolean']]);
+                    push $var_scope->{types}->{$var_ident}->@*, $type;
+                }
+            }
+        }
+    }
+
+    elsif ($self->{types}->is_equal(['TYPE', 'Any'], $value->[0]) || $self->{types}->is_arithmetic($value->[0])) {
+        if ($instr == INSTR_NEG) {
             $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_POS) {
             $result = [['TYPE', 'Number'],  0, $pos];
@@ -128,6 +145,17 @@ sub unary_op($self, $instr, $scope, $data) {
             $result->[0] = $value->[0];
         }
 
+        if ($data->[1][0] == INSTR_IDENT) {
+            my ($var, $var_scope) = $self->get_variable($scope, $data->[1][1]);
+            my $var_ident = $data->[1][1];
+
+            if ($self->{types}->is_equal($var->[0], ['TYPE', 'Any'])) {
+                push $var_scope->{types}->{$var_ident}->@*, $result->[0];
+            }
+        }
+    }
+
+    if (defined $result) {
         return $result;
     }
 
@@ -137,25 +165,129 @@ sub unary_op($self, $instr, $scope, $data) {
 sub binary_op($self, $instr, $scope, $data) {
     my $pos = $data->[3];
 
-    my $left  = $self->evaluate($scope, $data->[1]);
-    my $right = $self->evaluate($scope, $data->[2]);
+    my ($left_var,  $left_scope,  $left_ident);
+    my ($right_var, $right_scope, $right_ident);
 
+    my $left  = $data->[1];
+    my $right = $data->[2];
+
+    if ($left->[0] == INSTR_IDENT) {
+        ($left_var, $left_scope) = $self->get_variable($scope, $left->[1]);
+        $left_ident = $left->[1];
+    }
+
+    if ($right->[0] == INSTR_IDENT) {
+        ($right_var, $right_scope) = $self->get_variable($scope, $right->[1]);
+        $right_ident = $right->[1];
+    }
+
+    $left  = $self->evaluate($scope, $left);
+    $right = $self->evaluate($scope, $right);
+
+    my $result;
 
     # String operations
 
-    if (    $self->{types}->check(['TYPE', 'String'], $left->[0])
-         or $self->{types}->check(['TYPE', 'String'], $right->[0])
+    if (       ($self->{types}->check(['TYPE', 'String'], $left->[0])
+            and $self->{types}->check(['TYPE', 'String'], $right->[0]))
          or $self->{types}->is_equal(['TYPE', 'Any'], $left->[0])
-         or $self->{types}->is_equal(['TYPE', 'Any'], $right->[0]))
+         or $self->{types}->is_equal(['TYPE', 'Any'], $right->[0])
+       )
     {
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_EQ;
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_NEQ;
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_LT;
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_GT;
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_LTE;
-        return [['TYPE', 'Boolean'], 0, $pos]  if $instr == INSTR_GTE;
-        return [['TYPE', 'String'],  0, $pos]  if $instr == INSTR_STRCAT;
-        return [['TYPE', 'Integer'], 0, $pos]  if $instr == INSTR_STRIDX;
+        if (     $instr == INSTR_EQ
+              || $instr == INSTR_NEQ
+              || $instr == INSTR_LT
+              || $instr == INSTR_GT
+              || $instr == INSTR_LTE
+              || $instr == INSTR_GTE
+           )
+        {
+            $result = [['TYPE', 'Boolean'], 0, $pos];
+        }
+
+        if (defined $result) {
+            # if both operands are of type Any then no type can be inferred here
+
+            # if left operand has type Any, check right operand for a concrete type
+            if (defined $left_var && $self->{types}->is_equal($left_var->[0], ['TYPE', 'Any'])) {
+                # infer right operand's type (String) for left operand if right operand is not Any
+                if (!$self->{types}->is_equal($right->[0], ['TYPE', 'Any'])) {
+                    push $left_scope->{types}->{$left_ident}->@*, $right->[0];
+                }
+            }
+
+            # if right operand has type Any, check left operand for a concrete type
+            if (defined $right_var && $self->{types}->is_equal($right_var->[0], ['TYPE', 'Any'])) {
+                # infer left operand's type (String) for right operand if left operand is not Any
+                if (!$self->{types}->is_equal($left->[0], ['TYPE', 'Any'])) {
+                    push $right_scope->{types}->{$right_ident}->@*, $left->[0];
+                }
+            }
+
+            return $result;
+        }
+    }
+
+    if ($instr == INSTR_STRCAT || $instr == INSTR_STRIDX) {
+        if (    !$self->{types}->check(['TYPE', 'String'], $left->[0])
+            and !$self->{types}->is_equal(['TYPE', 'Any'], $left->[0]))
+        {
+            $self->error($scope, "cannot apply operator $pretty_instr[$instr] to type " . $self->{types}->to_string($left->[0]) . " (expected String)", $pos);
+        }
+
+        if (    !$self->{types}->check(['TYPE', 'String'], $right->[0])
+            and !$self->{types}->is_equal(['TYPE', 'Any'], $right->[0]))
+        {
+            $self->error($scope, "cannot apply operator $pretty_instr[$instr] with operand of type " . $self->{types}->to_string($right->[0]) . " (expected String)", $pos);
+        }
+
+        if ($instr == INSTR_STRCAT) {
+            $result = [['TYPE', 'String'],  0, $pos];
+        } elsif ($instr == INSTR_STRIDX) {
+            $result = [['TYPE', 'Integer'], 0, $pos];
+        }
+
+        # infer type String for left operand if left operand has type Any
+        if (defined $left_var && $self->{types}->is_equal($left_var->[0], ['TYPE', 'Any'])) {
+            push $left_scope->{types}->{$left_ident}->@*, ['TYPE', 'String'];
+        }
+
+        # infer type String for right operand if right operand has type Any
+        if (defined $right_var && $self->{types}->is_equal($right_var->[0], ['TYPE', 'Any'])) {
+            push $right_scope->{types}->{$right_ident}->@*, ['TYPE', 'String'];
+        }
+
+        return $result;
+    }
+
+    # Equality operations
+
+    if ($self->{types}->check($left->[0], $right->[0]) or $self->{types}->check($right->[0], $left->[0])) {
+        if ($instr == INSTR_EQ) {
+            $result = [['TYPE', 'Boolean'], 0, $pos];
+        } elsif ($instr == INSTR_NEQ) {
+            $result = [['TYPE', 'Boolean'], 0, $pos];
+        }
+
+        if (defined $result) {
+            # if left operand is type Any and right operand has a concrete type
+            # then infer left operand's type as right operand's
+            if (defined $left_var && $self->{types}->is_equal($left_var->[0], ['TYPE', 'Any'])) {
+                if (!$self->{types}->is_equal($right->[0], ['TYPE', 'Any'])) {
+                    push $left_scope->{types}->{$left_ident}->@*, $right->[0];
+                }
+            }
+
+            # if right operand is type Any and left operand has a concrete type
+            # then infer right operand's type as left operand's
+            if (defined $right_var && $self->{types}->is_equal($right_var->[0], ['TYPE', 'Any'])) {
+                if (!$self->{types}->is_equal($left->[0], ['TYPE', 'Any'])) {
+                    push $right_scope->{types}->{$right_ident}->@*, $left->[0];
+                }
+            }
+
+            return $result;
+        }
     }
 
     # Number operations
@@ -169,13 +301,7 @@ sub binary_op($self, $instr, $scope, $data) {
     }
 
     if ($self->{types}->check($left->[0], $right->[0]) or $self->{types}->check($right->[0], $left->[0])) {
-        my $result;
-
-        if ($instr == INSTR_EQ) {
-            $result = [['TYPE', 'Boolean'], 0, $pos];
-        } elsif ($instr == INSTR_NEQ) {
-            $result = [['TYPE', 'Boolean'], 0, $pos];
-        } elsif ($instr == INSTR_ADD) {
+        if ($instr == INSTR_ADD) {
             $result = [['TYPE', 'Number'],  0, $pos];
         } elsif ($instr == INSTR_SUB) {
             $result = [['TYPE', 'Number'],  0, $pos];
@@ -198,7 +324,32 @@ sub binary_op($self, $instr, $scope, $data) {
         }
 
         if (defined $result) {
-            my $promotion = $self->{types}->get_promoted_type($left->[0], $right->[0]);
+            my $left_type  = $left->[0];
+            my $right_type = $right->[0];
+
+            # if left operand has type Any and right operand has a concrete type
+            # then infer left operand's type as right operand's otherwise infer Number
+            if (defined $left_var && $self->{types}->is_equal($left_var->[0], ['TYPE', 'Any'])) {
+                if (!$self->{types}->is_equal($right->[0], ['TYPE', 'Any'])) {
+                    push $left_scope->{types}->{$left_ident}->@*, $right->[0];
+                    $left_type = $right->[0];
+                } else {
+                    push $left_scope->{types}->{$left_ident}->@*, ['TYPE', 'Number'];
+                }
+            }
+
+            # if right operand has type Any and left operand has a concrete type
+            # then infer right operand's type as left operand's otherwise infer Number
+            if (defined $right_var && $self->{types}->is_equal($right_var->[0], ['TYPE', 'Any'])) {
+                if (!$self->{types}->is_equal($left->[0], ['TYPE', 'Any'])) {
+                    push $right_scope->{types}->{$right_ident}->@*, $left->[0];
+                    $right_type = $left->[0];
+                } else {
+                    push $right_scope->{types}->{$right_ident}->@*, ['TYPE', 'Number'];
+                }
+            }
+
+            my $promotion = $self->{types}->get_promoted_type($left_type, $right_type);
 
             if ($self->{types}->is_subtype($promotion, $result->[0])) {
                 $result->[0] = $promotion;
@@ -221,11 +372,17 @@ sub expression_group($self, $scope, $data) {
 sub is_truthy($self, $scope, $expr) {
     my $result = $self->evaluate($scope, $expr);
 
-    if ($self->{types}->is_equal(['TYPE', 'Any'], $result->[0])) {
+    if (     $self->{types}->is_equal(['TYPE', 'Any'], $result->[0])
+          || $self->{types}->check(['TYPE', 'Null'], $result->[0])
+          || $self->{types}->check(['TYPE', 'Number'], $result->[0])
+          || $self->{types}->check(['TYPE', 'String'], $result->[0])
+          || $self->{types}->check(['TYPE', 'Boolean'], $result->[0])
+       )
+    {
         return 1;
     }
 
-    return $self->SUPER::is_truthy($scope, $result);
+    $self->error($scope, "cannot use value of type " . $self->{types}->to_string($result->[0]) . " as conditional", $self->position($expr));
 }
 
 sub type_check_prefix_postfix_op($self, $scope, $data, $op) {
@@ -237,13 +394,23 @@ sub type_check_prefix_postfix_op($self, $scope, $data, $op) {
             $data->[2] = [INSTR_LITERAL, ['TYPE', 'String'], $data->[2][1]];
         }
 
-        my $var = $self->evaluate($scope, $data->[1]);
+        my ($var, $var_scope, $var_ident);
 
-        if ($self->{types}->is_arithmetic($var->[0])) {
-            return $var;
+        if ($data->[1][0] == INSTR_IDENT) {
+            ($var, $var_scope) = $self->get_variable($scope, $data->[1][1]);
+            $var_ident = $data->[1][1];
         }
 
-        $self->error($scope, "cannot apply $op to type " . $self->{types}->to_string($var->[0]), $pos);
+        my $result = $self->evaluate($scope, $data->[1]);
+
+        if ($self->{types}->is_equal($result->[0], ['TYPE', 'Any']) || $self->{types}->is_arithmetic($result->[0])) {
+            if (defined $var && $self->{types}->is_equal($var->[0], ['TYPE', 'Any'])) {
+                push $var_scope->{types}->{$var_ident}->@*, ['TYPE', 'Number'];
+            }
+            return $result;
+        }
+
+        $self->error($scope, "cannot apply $op to type " . $self->{types}->to_string($result->[0]), $pos);
     }
 
     if ($data->[1][0] == INSTR_LITERAL) {
@@ -284,11 +451,20 @@ sub type_check_op_assign($self, $scope, $data, $op) {
         $self->error($scope, "cannot assign to " . $self->{types}->to_string($left->[1]) . " literal", $pos_left);
     }
 
+    my $left_uneval = $left;
+
     $left  = $self->evaluate($scope, $left);
     $right = $self->evaluate($scope, $right);
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $left->[0])) {
-        return $left;
+        if ($left_uneval->[0] == INSTR_IDENT && !$self->{types}->is_equal(['TYPE', 'Any'], $right->[0])) {
+            my ($var, $var_scope) = $self->get_variable($scope, $left_uneval->[1]);
+            if ($self->{types}->is_equal($var->[0], ['TYPE', 'Any'])) {
+                push $var_scope->{types}->{$left_uneval->[1]}->@*, $right->[0];
+            }
+        }
+
+        return $right;
     }
 
     if ($self->{types}->is_equal(['TYPE', 'Any'], $right->[0])) {
@@ -303,7 +479,6 @@ sub type_check_op_assign($self, $scope, $data, $op) {
         if (not $self->{types}->check($right->[0], ['TYPE', 'String'])) {
             $self->error($scope, "cannot apply operator $op to type " . $self->{types}->to_string($right->[0]) . " (expected String)", $pos_right);
         }
-
     } else {
         if (not $self->{types}->is_arithmetic($left->[0])) {
             $self->error($scope, "cannot apply operator $op to non-arithmetic type " . $self->{types}->to_string($left->[0]), $pos_left);
@@ -413,6 +588,8 @@ sub set_variable {
             . $self->{types}->to_string($value->[0])
             . " (expected " . $self->{types}->to_string($guard) . ")", $self->position($value));
     }
+
+    push $scope->{types}->{$name}->@*, $value->[0];
 
     $scope->{locals}->{$name} = $value;
 }
@@ -652,6 +829,7 @@ sub function_definition($self, $scope, $data) {
 
     $func_scope->{current_function} = $name;
 
+    # collect types of parameters and return expressions
     foreach my $expression (@$expressions) {
         $expr_pos = $self->position($expression);
         $result = $self->evaluate($func_scope, $expression);
@@ -662,10 +840,23 @@ sub function_definition($self, $scope, $data) {
         }
     }
 
-    delete $func_scope->{current_function};
-
     # add final statement to return values
     push @return_values, [$result, $expr_pos];
+
+    delete $func_scope->{current_function};
+
+    # update inferred parameter types
+    for (my $i = 0; $i < @$parameters; $i++) {
+        my ($type, $ident, $default_value) = $parameters->[$i]->@*;
+
+        next if !$self->{types}->is_equal($type, ['TYPE', 'Any']);
+
+        my $types = $func_scope->{types}->{$ident};
+
+        $type = $self->{types}->unite($types);
+
+        $parameters->[$i][0] = $type;
+    }
 
     # type check return types
     my @return_types;
@@ -691,7 +882,7 @@ sub function_definition($self, $scope, $data) {
         $self->error($func_scope, "in definition of function `$name`: cannot return value of type " . $self->{types}->to_string($type) . " from function declared to return type " . $self->{types}->to_string($ret_type), $pos);
     }
 
-    # update with inferred return type if original return type is Any
+    # desugar AST with inferred return type if original return type is Any
     if ($self->{types}->is_equal($ret_type, ['TYPE', 'Any'])) {
         $data->[1]      = $type;
         $func_type->[3] = $type;
@@ -850,6 +1041,8 @@ sub function_call($self, $scope, $data) {
             $self->error($scope, "cannot invoke `$name` as a function (got " . $self->{types}->to_string($func->[0]) . ")", $self->position($target));
         }
 
+        push $scope->{types}->{$name}->@*, $func->[0];
+
         if ($func->[0][1] eq 'Builtin') {
             $self->{debug}->{print}->('FUNCS', "Calling builtin function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
             $func = $self->get_builtin_function($name);
@@ -981,6 +1174,8 @@ sub conditional($self, $scope, $data) {
 }
 
 sub keyword_if($self, $scope, $data) {
+    my ($cond_var, $cond_scope);
+
     # validate conditional
     $self->is_truthy($scope, $data->[1]);
 
@@ -1162,7 +1357,7 @@ sub access_rest($self, $scope, $data, $var) {
         $self->error($scope, "String index must be a range or of type Integer (got " . $self->{types}->to_string($value->[0]) . ")", $self->position($value));
     }
 
-    if ($self->{types}->check(['TYPE', 'Any'], $var->[0])) {
+    if ($self->{types}->is_equal(['TYPE', 'Any'], $var->[0])) {
         return [['TYPE', 'Any'], 0, $self->position($var)];
     }
 

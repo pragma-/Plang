@@ -1,7 +1,7 @@
 test_eq("blue" < "red", true)
 test_eq("hello world" ~ "world", 6)
 test_eq("hello world" ~ "bye", -1)
-test_eq("hi " ^^ 0x263a, 'hi ☺')
+test_eq("hi " ^^ 0x263a.char(), 'hi ☺')
 
 test_eq("Hello!"[1..4], 'ello')
 
