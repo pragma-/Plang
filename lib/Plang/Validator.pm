@@ -125,8 +125,7 @@ sub unary_op($self, $instr, $scope, $data) {
                 my $var_ident = $data->[1][1];
 
                 if ($self->{types}->is_equal($var->[0], ['TYPE', 'Any'])) {
-                    my $type = $self->{types}->unite([['TYPE', 'Number'], ['TYPE', 'Boolean']]);
-                    push $var_scope->{types}->{$var_ident}->@*, $type;
+                    push $var_scope->{types}->{$var_ident}->@*, ['TYPE', 'Boolean'];
                 }
             }
         }

@@ -21,25 +21,19 @@ use Plang::Constants::Keywords     ':all';
 use Plang::Constants::Instructions ':all';
 
 sub error($parser, $err_msg, $consume_to = TOKEN_TERM) {
-    chomp $err_msg;
+    my $pos = '';
 
     if (defined (my $token = $parser->current_token)) {
-        my $line = $token->[2];
-        my $col  = $token->[3];
-        $err_msg = "Parse error: $err_msg at line $line, col $col.";
-    } else {
-        my $pos = '';
-
-        if (my $prev_token = $parser->previous_token) {
-            $pos = " at line $prev_token->[2], col $prev_token->[3]";
-        }
-
-        $err_msg = "Parse error: $err_msg$pos";
+        $pos = " at line $token->[2], col $token->[3]";
+    }
+    elsif (defined (my $prev_token = $parser->previous_token)) {
+        $pos = " at line $prev_token->[2], col $prev_token->[3]";
     }
 
+    chomp $err_msg;
+    $err_msg = "Parse error: $err_msg$pos.";
     $parser->consume_to($consume_to);
     $parser->rewrite_backtrack;
-
     $parser->add_error($err_msg);
     die $err_msg;
 }
