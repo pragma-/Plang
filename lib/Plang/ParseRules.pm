@@ -28,7 +28,13 @@ sub error($parser, $err_msg, $consume_to = TOKEN_TERM) {
         my $col  = $token->[3];
         $err_msg = "Parse error: $err_msg at line $line, col $col.";
     } else {
-        $err_msg = "Parse error: $err_msg";
+        my $pos = '';
+
+        if (my $prev_token = $parser->previous_token) {
+            $pos = " at line $prev_token->[2], col $prev_token->[3]";
+        }
+
+        $err_msg = "Parse error: $err_msg$pos";
     }
 
     $parser->consume_to($consume_to);
@@ -745,7 +751,7 @@ sub IdentifierList($parser) {
     $parser->backtrack;
 }
 
-# MapConstructor ::= "{" {(String | IDENT) ":" Expression [","]}* "}"
+# MapConstructor ::= "{" {(String | IDENT) "=" Expression [","]}* "}"
 #         String ::= DQUOTE_STRING | SQUOTE_STRING
 sub MapConstructor($parser) {
     $parser->try('MapConstructor');
@@ -771,14 +777,14 @@ sub MapConstructor($parser) {
                     $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
                 }
 
-                if (not $parser->consume(TOKEN_COLON)) {
-                    expected($parser, '":" after map key');
+                if (not $parser->consume(TOKEN_ASSIGN)) {
+                    goto MAPCONS_FAIL;
                 }
 
                 my $expr = Expression($parser);
 
                 if (not $expr) {
-                    expected($parser, 'expression for map value');
+                    goto MAPCONS_FAIL;
                 }
 
                 $parser->consume(TOKEN_COMMA);
@@ -788,13 +794,14 @@ sub MapConstructor($parser) {
             }
 
             last if $parser->consume(TOKEN_R_BRACE);
-            expected($parser, 'map entry or `}` in map initializer');
+            goto MAPCONS_FAIL;
         }
 
         $parser->advance;
         return [INSTR_MAPCONS, \@map, token_position($token)];
     }
 
+  MAPCONS_FAIL:
     $parser->backtrack;
 }
 
@@ -957,7 +964,7 @@ sub ExpressionGroup($parser) {
         }
 
         last if $parser->consume(TOKEN_R_BRACE);
-        goto EXPRESSION_GROUP_FAIL;
+        expected($parser, 'terminating } for expression');
     }
 
     $parser->advance;
@@ -1022,10 +1029,10 @@ sub LiteralHexInteger($parser) {
 }
 
 sub PrefixLBrace($parser) {
-    my $expr = ExpressionGroup($parser);
+    my $expr = MapConstructor($parser);
     return $expr if defined $expr;
 
-    $expr = MapConstructor($parser);
+    $expr = ExpressionGroup($parser);
     return $expr if defined $expr;
 
     error($parser, "Unhandled { token");

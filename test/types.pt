@@ -7,7 +7,7 @@ test_eq(typeof([1,2,3,4]), "[Integer]", "array of Integer")
 
 test_eq(typeof([["a","b"],["c","d"]]), "[[String]]", "array of array of String")
 
-test_eq(typeof({"a": 42, "b": 3.14, "c": "hi"}), '{"a": Integer, "b": Real, "c": String}', "Map")
+test_eq(typeof({"a" = 42, "b" = 3.14, "c" = "hi"}), '{"a": Integer, "b": Real, "c": String}', "Map")
 
 test_eq(typeof(fn null), 'Function () -> Null', "typeof Null func")
 test_eq(whatis(fn null), 'Function () -> Null', "whatis Null func")
@@ -45,8 +45,8 @@ test_eq(whatis(f5), "Function (a: Any, b: Any) -> Boolean", "whatis f5")
 fn f6(x)
   !x
 
-test_eq(typeof(f6), "Function (Boolean | Number) -> Boolean", "typeof f6")
-test_eq(whatis(f6), "Function (x: Boolean | Number) -> Boolean", "whatis f6")
+test_eq(typeof(f6), "Function (Boolean) -> Boolean", "typeof f6")
+test_eq(whatis(f6), "Function (x: Boolean) -> Boolean", "whatis f6")
 
 fn f7(a)
   a + 5

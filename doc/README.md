@@ -83,7 +83,6 @@ This README describes what is implemented so far.
       * [values](#values)
       * [exists](#exists)
       * [delete](#delete)
-    * [JSON compatibility/serialization](#json-compatibilityserialization)
     * [Plang EBNF Grammar](#plang-ebnf-grammar)
 <!-- md-toc-end -->
 
@@ -536,7 +535,7 @@ Its signature is: `Builtin (expr: Array | Map | String) -> Integer`
     > length([10,20,30,40])
      4
 
-    > length({"a": 1, "b": 2, "c": 3})
+    > length({"a" = 1, "b" = 2, "c" = 3})
      3
 
 ##### map
@@ -566,8 +565,8 @@ In other words, it takes two parameters and returns an `Array`. The first parame
     > filter(fn(x) x < 4, [1,2,3,4,5])
      [1,2,3]
 
-    > filter(fn(x) x['type'] == 'dog', [{'type': 'dog', 'name': 'Woofers'}, {'type': 'cat', 'name': 'Whiskers'}])
-     [{'type': 'dog', 'name': 'Woofers'}]
+    > filter(fn(x) x['type'] == 'dog', [{'type' = 'dog', 'name' = 'Woofers'}, {'type' = 'cat', 'name' = 'Whiskers'}])
+     [{'type' = 'dog', 'name' = 'Woofers'}]
 
 ##### Type conversion functions
 See [Types](#types).
@@ -577,7 +576,7 @@ Plang is lexically scoped. Expression groups introduce a new lexical scope. Iden
 created within a scope are destroyed when the scope ends. Identifiers within an inner scope may override identifers
 of the same name found in outer scopes.
 
-    { # outer scpe
+    { # outer scope
        var a = 5
 
        { # new inner scope
@@ -827,11 +826,11 @@ To define a `Person` type that is a Map with two properties:
 
 Then you can use it any place you'd use a type annotation. For instance, instead of writing
 
-    var x: {"name": String, "age": Integer} = {"name": "John Doe", "age": 18}
+    var x: {"name": String, "age": Integer} = {"name" = "John Doe", "age" = 18}
 
 you can more concisely write
 
-    var x: Person = {"name": "John Doe", "age": 18}
+    var x: Person = {"name" = "John Doe", "age" = 18}
 
 ##### Default values in new types
 You can optionally set default values in new types.
@@ -1013,7 +1012,7 @@ From Type | With Value | Resulting Array Value
 String | A String containing an [Array constructor](#array) | the constructed Array
 
 ##### Map
-    MapConstructor ::= "{" {(IDENT | String) ":" Expression}* "}"
+    MapConstructor ::= "{" {(IDENT | String) "=" Expression}* "}"
 
 A `Map` is a collection of key/value pairs. Map keys must be of type `String`. Map
 values can be any type.
@@ -1114,11 +1113,11 @@ See the documentation for the builtin [filter](#filter) function.
 To create a map use curly braces optionally containing a list of key/value pairs
 formatted as `key: value` where `key` is of type `String`.
 
-    > var x = {"y": 42, "z": true}
+    > var x = {"y" = 42, "z" = true}
 
 Use a type annotation to ensure a key exists and to constrain the type of its value:
 
-    > var x: {"y": Integer, "z": Boolean} = {"y": 42, "z": 3.14}
+    > var x: {"y": Integer, "z": Boolean} = {"y" = 42, "z" = 3.14}
      Validator error: cannot initialize `x` with value of type {"y": Integer, "z": Real} (expected {"y": Integer, "z": Boolean}) at line 1, col 1
 
 To make this easier to read, you can use the `type` keyword to create a type alias:
@@ -1129,54 +1128,54 @@ To make this easier to read, you can use the `type` keyword to create a type ali
        "age"  : Integer
      }
 
-     var x: Person = {"name": "Bob", "age": 42}
+     var x: Person = {"name" = "Bob", "age" = 42}
 ```
 
 There are two syntactical ways to set/access map keys. The first, and core, way
 is to use a value of type `String` enclosed in square brackets.
 
     > var x = {}; x["y"] = 42; x
-     {"y": 42}
+     {"y" = 42}
 
 The second way is to use the `.` operator followed by a bareword value. A
 bareword value is a single `String` word without quotation symbols. As such,
 bareword values cannot contain whitespace.
 
     > var x = {}; x.y = 42; x
-     {"y": 42}
+     {"y" = 42}
 
 Nested maps:
 
     > var m = {}; m["x"] = {}; m["x"]["y"] = 42; m
-     {"x": {"y": 42}}
+     {"x" = {"y" = 42}}
 
-    > var m = {"x": {"y": 42}}; m["x"]["y"]
+    > var m = {"x" = {"y" = 42}}; m["x"]["y"]
      42
 
-    > var m = {}; m["x"] = {"y": 42}; m["x"]["y"]
+    > var m = {}; m["x"] = {"y" = 42}; m["x"]["y"]
      42
 
 Same as above, but using the alternative `.` access syntax:
 
     > var m = {}; m.x = {}; m.x.y = 42; m
-     {"x": {"y": 42}}
+     {"x" = {"y" = 42}}
 
-    > var m = {"x": {"y": 42}}; m.x.y
+    > var m = {"x" = {"y" = 42}}; m.x.y
      42
 
-    > var m = {}; m.x = {"y": 42}; m.x.y
+    > var m = {}; m.x = {"y" = 42}; m.x.y
      42
 
 #### keys
 Use `keys` to get an array of a Map's keys.
 
-    > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; keys m
+    > var m = {'apple' = 'green', 'banana' = 'yellow', 'cherry' = 'red'}; keys m
      ['apple','banana','cherry']
 
 #### values
 Use `values` to get an array of a Map's values.
 
-    > var m = {'apple': 'green', 'banana': 'yellow', 'cherry': 'red'}; values m
+    > var m = {'apple' = 'green', 'banana' = 'yellow', 'cherry' = 'red'}; values m
      ['green','yellow','red']
 
 #### exists
@@ -1184,7 +1183,7 @@ To check for existence of a Map key, use the `exists` keyword. If the key exists
 `true` is yielded, otherwise `false`. Note that setting a Map key to `null` does not
 delete the key. See the [`delete`](#delete) keyword.
 
-    > var m = { "a": 1, "b": 2 }; exists m["a"]
+    > var m = {"a" = 1, "b" = 2}; exists m["a"]
      true
 
 #### delete
@@ -1197,27 +1196,11 @@ When used on a Map key, the `delete` keyword deletes the key and returns its val
 When used on a Map itself, the `delete` keyword deletes all keys in the Map and returns
 the empty Map.
 
-    > var m = { "a": 1, "b": 2 }; delete m["b"]; m
-     { "a": 1 }
+    > var m = {"a" = 1, "b" = 2}; delete m["b"]; m
+     {"a" = 1}
 
-    > var m = { "a": 1, "b": 2 }; delete m; m
+    > var m = {"a" = 1, "b" = 2}; delete m; m
      {}
-
-### JSON compatibility/serialization
-An [Array constructor](#array) is something like `["red", 2, 3.1459, null]`.
-
-A [Map constructor](#map-1) is something like `{"name": "Bob", "age": 32}`.
-
-This syntax is compatible with JSON. This allows easy and convenient serialization of
-Plang data structures for data-exchange and interoperability.
-
-The String() [type conversion function](#type-conversion) can be used to convert or serialize Arrays
-and Maps to Strings for external storage or transmission.
-
-The Array() and Map() type conversion functions can be used to convert a String containing
-an Array constructor or a Map constructor back to an Array or a Map object.
-
-See [examples/arrays_and_maps.plang](../examples/arrays_and_maps.plang) and [examples/json.plang](../examples/json.plang) for more details.
 
 ### Plang EBNF Grammar
 Here is the, potentially incomplete, Plang EBNF grammar.
@@ -1249,7 +1232,7 @@ Here is the, potentially incomplete, Plang EBNF grammar.
     TypeFunctionReturn ::= "->" TypeLiteral
     KeywordFn          ::= "fn" [IDENT] [IdentifierList] ["->" Type] Expression
     IdentifierList     ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
-    MapConstructor     ::= "{" {(String | IDENT) ":" Expression [","]}* "}"
+    MapConstructor     ::= "{" {(String | IDENT) "=" Expression [","]}* "}"
     String             ::= DQUOTE_STRING | SQUOTE_STRING
     ArrayConstructor   ::= "[" {Expression [","]}* "]"
     UnaryOp            ::= Op Expression

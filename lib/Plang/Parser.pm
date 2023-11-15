@@ -183,11 +183,24 @@ sub next_token($self, $opt = '') {
     return $token;
 }
 
-# gets the current token from the backtrack without consuming it
+# gets the current token from the token history without consuming it
 # next_token() must have been invoked at least once
 sub current_token($self) {
     return $self->{read_tokens}->[$self->{current_token}];
 }
+
+# gets the previous token from the token history
+# if only one token exists, returns that token
+sub previous_token($self) {
+    if ($self->{current_token} > 1) {
+        return $self->{read_tokens}->[$self->{current_token} - 1];
+    }
+    elsif ($self->{current_token} == 1) {
+        return $self->{read_tokens}->[0];
+    }
+    return undef;
+}
+
 
 # if no arguments passed, consumes the current token
 # otherwise, consumes and returns token only if token matches argument

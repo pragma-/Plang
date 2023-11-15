@@ -1340,7 +1340,7 @@ sub map_to_string($self, $scope, $var) {
     foreach my $key (sort keys %$hash) {
         my $value = $hash->{$key};
         $key = $self->output_string_literal($key);
-        my $entry = "$key: ";
+        my $entry = "$key = ";
         $entry .= $self->output_value($scope, $value, literal => 1);
         push @entries, $entry;
     }

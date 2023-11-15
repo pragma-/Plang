@@ -3,7 +3,7 @@ var array1 = ['green', 2, 3.1459, null]
 test_eq(typeof(array1), "[Integer | Null | Real | String]")
 
 # a map
-var map1 = { 'name': 'Grok', 'health': 200 }
+var map1 = { 'name' = 'Grok', 'health' = 200 }
 test_eq(typeof(map1), '{"health": Integer, "name": String}')
 
 # convert array to string
@@ -13,7 +13,7 @@ test_eq(typeof(string1), "String")
 
 # convert map to string
 var string2 = String(map1)
-test_eq(string2, '{"health": 200, "name": "Grok"}')
+test_eq(string2, '{"health" = 200, "name" = "Grok"}')
 test_eq(typeof(string2), "String");
 
 # convert string to array
@@ -24,8 +24,8 @@ print(array2)
 test_stdout('[1,2,"blue","green"]\n')
 
 # convert string to map
-var map2 = Map("{'a': 1, 'b': 2}")
+var map2 = Map("{'a' = 1, 'b' = 2}")
 test_eq(typeof(map2), '{"a": Integer, "b": Integer}')
 test_eq(map2['b'], 2)
 print(map2)
-test_stdout('{"a": 1, "b": 2}\n')
+test_stdout('{"a" = 1, "b" = 2}\n')

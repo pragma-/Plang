@@ -1,4 +1,4 @@
-var player = { "name": "Grok", "health": 100, "iq": 75 }
+var player = { "name" = "Grok", "health" = 100, "iq" = 75 }
 test_eq(player["iq"],  75, "map entry")
 test_eq(player.iq,  75, "map entry (dot)")
 test_eq(player."iq", 75, "map entry (dot string literal)")
@@ -19,23 +19,23 @@ test_eq($"The color is {map1.color}!", 'The color is blue!', "map interpolation 
 map1.foobar = "baz"
 test_eq($"The foobar is {map1['foobar']}!", "The foobar is baz!", "map key assignment (dot)")
 
-var map2 = {"x": 42}; ++map2["x"]; map2["x"] += 5
+var map2 = {"x" = 42}; ++map2["x"]; map2["x"] += 5
 test_eq(map2["x"] + 1, 49, "map arithmetic")
 test_eq(map2.x + 1, 49, "map arithmetic (dot)")
 
-var map3 = {'x': {'y': 42}}
+var map3 = {'x' = {'y' = 42}}
 test_eq(map3['x']['y'], 42, "nested map")
 test_eq(map3.x.y, 42, "nested map (dot)")
 
-var map4 = {}; map4["x"] = {"y": 42}
+var map4 = {}; map4["x"] = {"y" = 42}
 test_eq(map4["x"]["y"], 42, "assign anonymous Map to another Map key")
 test_eq(map4.x.y, 42, "assign anonymous Map to another Map key (dot)")
 
-var map5 = {"say_hi": fn "hi", "say_bye": fn "bye"}
+var map5 = {"say_hi" = fn "hi", "say_bye" = fn "bye"}
 test_eq(map5["say_bye"](), 'bye', "functions as map value")
 # test_eq(map5.say_bye(), 'bye', "functions as map value (dot)")
 
-var map6 = {"hi": [1, "bye"]}
+var map6 = {"hi" = [1, "bye"]}
 test_eq(map6["hi"][1], 'bye', "array as map element")
 test_eq(map6.hi[1], 'bye', "array as map element (dot)")
 
@@ -51,7 +51,7 @@ test_eq(array3[1](), 'bye', "functions as array element")
 var array4 = [1, 2, 3, 4]
 test_eq(array4[-1], 4, "index backwards")
 
-var array5 = ["hi", "bye", {"foo": 42}]
+var array5 = ["hi", "bye", {"foo" = 42}]
 test_eq(array5[2]["foo"], 42, "map as array element")
 test_eq(array5[2].foo, 42, "map as array element (dot)")
 
@@ -63,10 +63,10 @@ fn move(direction) {
 }
 
 var functions = {
-    'exit'  : exit_function
-    'help'  : fn { print("help called") }
-    'north' : fn { move('north') }
-    'south' : fn { move('south') }
+    'exit'  = exit_function
+    'help'  = fn { print("help called") }
+    'north' = fn { move('north') }
+    'south' = fn { move('south') }
 }
 
 /* no longer possible since UFCS was added
