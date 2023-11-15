@@ -10,14 +10,14 @@ print(array)         # prints ["red","green",1,2]
 
 # Basic Map
 var map1 = {
-    'name'   : "Grok",
-    'health' : 200,
-    'iq'     : 75
+    'name'   = "Grok",
+    'health' = 200,
+    'iq'     = 75
 }
 
-print(typeof(map1))  # prints {'name': String, 'health': Integer, 'iq': Integer}
+print(typeof(map1))  # prints {"name": String, "health": Integer, "iq": Integer}
 print(map1['name'])  # prints Grok
-print(map1)          # prints {"name": "Grok", "health": 200, "iq": 75}
+print(map1)          # prints {"name" = "Grok", "health" = 200, "iq" = 75}
 
 # Array of anonymous Arrays
 var arrays = [[1,2], [3,4], [5,6]]
@@ -28,9 +28,9 @@ print(typeof(arrays)) # prints [[Integer]]
 
 # Map of anonymous Arrays:
 var map_arrays = {
-    'colors': [ "red", "green", "blue" ],
-    'shapes': [ "triangle", "square", "circle" ],
-     'sizes': [ "small", "average", "big" ],
+    'colors' = [ "red", "green", "blue" ],
+    'shapes' = [ "triangle", "square", "circle" ],
+     'sizes' = [ "small", "average", "big" ],
 }
 
 print(map_arrays['colors'][1])  # prints green
@@ -43,19 +43,19 @@ print(map_arrays) # this should print the map as expected
 # Array of anonymous Maps
 var array_maps = [
     {
-        'name'   : "Grok the Caveman",
-        'health' : 200,
-        'iq'     : 75
+        'name'   = "Grok the Caveman",
+        'health' = 200,
+        'iq'     = 75
     },
     {
-        'name'   : "Merlin the Wizard",
-        'health' : 100,
-        'iq'     : 200
+        'name'   = "Merlin the Wizard",
+        'health' = 100,
+        'iq'     = 200
     },
     {
-        'name'   : "Bob the Human",
-        'health' : 75,
-        'iq'     : 100,
+        'name'   = "Bob the Human",
+        'health' = 75,
+        'iq'     = 100,
     }
 ]
 
@@ -63,17 +63,17 @@ print(array_maps[1]['name'])  # prints Merlin the Wizard
 
 # Map of anonymous Maps
 var maps = {
-    'caveman': {
-        'health': 200,
-        'iq'    : 75,
+    'caveman' = {
+        'health' = 200,
+        'iq'     = 75,
     },
-    'wizard': {
-        'health' : 100,
-        'iq'     : 200,
+    'wizard' = {
+        'health' = 100,
+        'iq'     = 200,
     },
-    'human': {
-        'health' : 75,
-        'iq'     : 100,
+    'human' = {
+        'health' = 75,
+        'iq'     = 100,
     }
 }
 
@@ -84,7 +84,7 @@ print(maps['wizard']['iq'])  # prints 200
 print(maps.wizard.iq) # also prints 200
 
 # To add another anonymous Map to the Map:
-maps['dragon'] = { 'health': 500, 'iq': 150 }
+maps['dragon'] = { 'health' = 500, 'iq' = 150 }
 
 print(maps)  # should print caveman, wizard, human and dragon as expected
 
@@ -97,13 +97,13 @@ fn move(direction) {
 }
 
 var functions = {
-    'exit'  : exit_function
-    'help'  : fn { print("help called") }
-    'north' : fn { move('north') }
-    'south' : fn { move('south') }
+    'exit'  = exit_function
+    'help'  = fn { print("help called") }
+    'north' = fn { move('north') }
+    'south' = fn { move('south') }
 }
 
-functions.exit()   # prints exit called
-functions.help()   # prints help called
-functions.north()  # prints moving north
-functions.south()  # prints moving south
+functions['exit']()   # prints exit called
+functions['help']()   # prints help called
+functions['north']()  # prints moving north
+functions['south']()  # prints moving south
