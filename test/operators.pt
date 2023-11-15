@@ -1,4 +1,6 @@
-test_eq(1 + 4 * 3 + 2 * 4, 21, "arithmetic")
+test_eq(1 + 4 * 3 + 2 * 4, 21, "arithmetic 1")
+test_eq((1 + 4) * (3 + 2) * 4, 100, "arithmetic 2")
+test_eq((1 + 4) * (((5 + 5) * 4) / 10) / 2, 10, "arithmetic 3")
 
 test_eq(1e2 + 1e3, 1100.0, "exponent literals")
 

@@ -1052,12 +1052,12 @@ sub function_call($self, $scope, $data) {
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $self->{debug}->{print}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
-        $name = "anonymous-1";
+        $name = '#anonymous';
     } else {
         $self->{debug}->{print}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
 
         $func = $self->evaluate($scope, $target);
-        $name = "anonymous-2";
+        $name = '#expr';
 
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
             $self->error($scope, "cannot invoke value of type " . $self->{types}->to_string($func->[0]) . " as a function", $self->position($target));

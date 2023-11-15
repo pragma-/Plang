@@ -891,33 +891,33 @@ use constant {
 };
 
 my @binop_data;
-$binop_data[TOKEN_DOT]         = [INSTR_DOT_ACCESS, 'ACCESS',      ASSOC_LEFT];
-$binop_data[TOKEN_STAR_STAR]   = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
-$binop_data[TOKEN_CARET]       = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
-$binop_data[TOKEN_PERCENT]     = [INSTR_REM,        'EXPONENT',    ASSOC_LEFT];
-$binop_data[TOKEN_STAR]        = [INSTR_MUL,        'PRODUCT',     ASSOC_LEFT];
-$binop_data[TOKEN_SLASH]       = [INSTR_DIV,        'PRODUCT',     ASSOC_LEFT];
-$binop_data[TOKEN_PLUS]        = [INSTR_ADD,        'SUM',         ASSOC_LEFT];
-$binop_data[TOKEN_MINUS]       = [INSTR_SUB,        'SUM',         ASSOC_LEFT];
-$binop_data[TOKEN_TILDE]       = [INSTR_STRIDX,     'STRING',      ASSOC_LEFT];
-$binop_data[TOKEN_CARET_CARET] = [INSTR_STRCAT,     'STRING',      ASSOC_LEFT];
-$binop_data[TOKEN_GREATER_EQ]  = [INSTR_GTE,        'RELATIONAL',  ASSOC_LEFT];
-$binop_data[TOKEN_LESS_EQ]     = [INSTR_LTE,        'RELATIONAL',  ASSOC_LEFT];
-$binop_data[TOKEN_GREATER]     = [INSTR_GT,         'RELATIONAL',  ASSOC_LEFT];
-$binop_data[TOKEN_LESS]        = [INSTR_LT,         'RELATIONAL',  ASSOC_LEFT];
-$binop_data[TOKEN_NOT_EQ]      = [INSTR_NEQ,        'EQUALITY',    ASSOC_LEFT];
-$binop_data[TOKEN_AMP_AMP]     = [INSTR_AND,        'LOGICAL_AND', ASSOC_LEFT];
-$binop_data[TOKEN_PIPE_PIPE]   = [INSTR_OR,         'LOGICAL_OR',  ASSOC_LEFT];
-$binop_data[TOKEN_EQ]          = [INSTR_EQ,         'EQUALITY',    ASSOC_LEFT];
-$binop_data[TOKEN_ASSIGN]      = [INSTR_ASSIGN,     'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_PLUS_EQ]     = [INSTR_ADD_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_MINUS_EQ]    = [INSTR_SUB_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_STAR_EQ]     = [INSTR_MUL_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_SLASH_EQ]    = [INSTR_DIV_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_DOT]            = [INSTR_DOT_ACCESS, 'ACCESS',      ASSOC_LEFT];
+$binop_data[TOKEN_STAR_STAR]      = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
+$binop_data[TOKEN_CARET]          = [INSTR_POW,        'EXPONENT',    ASSOC_RIGHT];
+$binop_data[TOKEN_PERCENT]        = [INSTR_REM,        'EXPONENT',    ASSOC_LEFT];
+$binop_data[TOKEN_STAR]           = [INSTR_MUL,        'PRODUCT',     ASSOC_LEFT];
+$binop_data[TOKEN_SLASH]          = [INSTR_DIV,        'PRODUCT',     ASSOC_LEFT];
+$binop_data[TOKEN_PLUS]           = [INSTR_ADD,        'SUM',         ASSOC_LEFT];
+$binop_data[TOKEN_MINUS]          = [INSTR_SUB,        'SUM',         ASSOC_LEFT];
+$binop_data[TOKEN_TILDE]          = [INSTR_STRIDX,     'STRING',      ASSOC_LEFT];
+$binop_data[TOKEN_CARET_CARET]    = [INSTR_STRCAT,     'STRING',      ASSOC_LEFT];
+$binop_data[TOKEN_GREATER_EQ]     = [INSTR_GTE,        'RELATIONAL',  ASSOC_LEFT];
+$binop_data[TOKEN_LESS_EQ]        = [INSTR_LTE,        'RELATIONAL',  ASSOC_LEFT];
+$binop_data[TOKEN_GREATER]        = [INSTR_GT,         'RELATIONAL',  ASSOC_LEFT];
+$binop_data[TOKEN_LESS]           = [INSTR_LT,         'RELATIONAL',  ASSOC_LEFT];
+$binop_data[TOKEN_NOT_EQ]         = [INSTR_NEQ,        'EQUALITY',    ASSOC_LEFT];
+$binop_data[TOKEN_AMP_AMP]        = [INSTR_AND,        'LOGICAL_AND', ASSOC_LEFT];
+$binop_data[TOKEN_PIPE_PIPE]      = [INSTR_OR,         'LOGICAL_OR',  ASSOC_LEFT];
+$binop_data[TOKEN_EQ]             = [INSTR_EQ,         'EQUALITY',    ASSOC_LEFT];
+$binop_data[TOKEN_ASSIGN]         = [INSTR_ASSIGN,     'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_PLUS_EQ]        = [INSTR_ADD_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_MINUS_EQ]       = [INSTR_SUB_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_STAR_EQ]        = [INSTR_MUL_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
+$binop_data[TOKEN_SLASH_EQ]       = [INSTR_DIV_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
 $binop_data[TOKEN_CARET_CARET_EQ] = [INSTR_CAT_ASSIGN, 'ASSIGNMENT',  ASSOC_RIGHT];
-$binop_data[TOKEN_DOT_DOT]     = [INSTR_RANGE,      'COMMA',       ASSOC_RIGHT];
-$binop_data[TOKEN_AND]         = [INSTR_AND,        'LOW_AND',     ASSOC_LEFT];
-$binop_data[TOKEN_OR]          = [INSTR_OR,         'LOW_OR',      ASSOC_LEFT];
+$binop_data[TOKEN_DOT_DOT]        = [INSTR_RANGE,      'COMMA',       ASSOC_RIGHT];
+$binop_data[TOKEN_AND]            = [INSTR_AND,        'LOW_AND',     ASSOC_LEFT];
+$binop_data[TOKEN_OR]             = [INSTR_OR,         'LOW_OR',      ASSOC_LEFT];
 
 sub get_precedence($tokentype) {
     return $infix_token_precedence{$tokentype} // 0;
@@ -1101,10 +1101,10 @@ sub PrefixNot($parser) {
 }
 
 sub PrefixLParen($parser) {
-    $parser->consume(TOKEN_L_PAREN);
+    my $token = $parser->consume(TOKEN_L_PAREN);
     my $expr = Expression($parser);
     expected($parser, '")"') if not $parser->consume(TOKEN_R_PAREN);
-    return $expr;
+    return [INSTR_EXPR_GROUP, [$expr], token_position($token)];
 }
 
 sub PrefixType($parser) {

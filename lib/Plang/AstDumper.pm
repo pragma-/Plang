@@ -125,9 +125,10 @@ sub function_call($self, $scope, $data) {
     if ($target->[0] == INSTR_IDENT) {
         $text .= "$target->[1]";
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $text .= 'anonymous-1';
+        $text .= '#anonymous';
     } else {
-        $text .= 'anonymous-2';
+        my $val = $self->evaluate($scope, $target);
+        $text .= "(#expr $val)";
     }
 
     if (@$arguments) {
