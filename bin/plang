@@ -18,11 +18,23 @@ use Getopt::Long qw(GetOptionsFromArray);
 use Plang::Interpreter;
 
 my $usage = <<"USAGE";
-usage: $0 [-f <file>] [-m <path>]
+usage: $0 [-f <file>] [-m <path>] [code]
 
-    -f|--file     execute contents of <file> instead of command-line
-                  arguments or stdin
-    -m|--modpath  add <path> to list of module paths
+If the `-f <file>` switch is provided, code will be executed from that file.
+Otherwise, if any command-line arguments remain after all switches are
+processed, they will be used as the code. If there were no arguments, the
+stdin stream will be read.
+
+Switches:
+
+-f|--file <file>
+
+Execute contents of <file> instead of command-line arguments or stdin.
+
+-m|--modpath <path>
+
+Add <path> to list of module paths. Multiple -m can be provided to append
+subsequent paths to the list.
 USAGE
 
 sub getopt_from_array($opt_args, $result, $config, @opts) {
