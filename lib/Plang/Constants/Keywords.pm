@@ -31,6 +31,9 @@ my %constants = (
     KEYWORD_CATCH => $n++,
     KEYWORD_THROW => $n++,
     KEYWORD_TYPE => $n++,
+    KEYWORD_MODULE => $n++,
+    KEYWORD_IMPORT => $n++,
+    KEYWORD_AS => $n++,
 );
 
 our @pretty_keyword = map { s/^KEYWORD_//; lc $_ } sort { $constants{$a} <=> $constants{$b} } keys %constants;

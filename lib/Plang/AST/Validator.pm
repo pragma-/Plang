@@ -12,76 +12,76 @@
 # The error() function in this module produces compile-time errors with
 # line/col information.
 
-package Plang::Validator;
-
-use parent 'Plang::AstInterpreter';
+package Plang::AST::Validator;
+use parent 'Plang::Interpreter::AST';
 
 use warnings;
 use strict;
 use feature 'signatures';
 
-use Data::Dumper;
-
 use Plang::Constants::Instructions ':all';
+
+use Data::Dumper;
+use Devel::StackTrace;
 
 sub initialize($self, %conf) {
     $self->SUPER::initialize(%conf);
 
     # validate these main instructions
-    $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
-    $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
-    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
-    $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
-    $self->{instr_dispatch}->[INSTR_ARRAYCONS]   = \&array_constructor;
-    $self->{instr_dispatch}->[INSTR_MAPCONS]     = \&map_constructor;
-    $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
-    $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
-    $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
-    $self->{instr_dispatch}->[INSTR_VALUES]      = \&keyword_values;
-    $self->{instr_dispatch}->[INSTR_COND]        = \&conditional;
-    $self->{instr_dispatch}->[INSTR_WHILE]       = \&keyword_while;
-    $self->{instr_dispatch}->[INSTR_NEXT]        = \&keyword_next;
-    $self->{instr_dispatch}->[INSTR_LAST]        = \&keyword_last;
-    $self->{instr_dispatch}->[INSTR_IF]          = \&keyword_if;
-    $self->{instr_dispatch}->[INSTR_ASSIGN]      = \&assignment;
-    $self->{instr_dispatch}->[INSTR_ADD_ASSIGN]  = \&add_assign;
-    $self->{instr_dispatch}->[INSTR_SUB_ASSIGN]  = \&sub_assign;
-    $self->{instr_dispatch}->[INSTR_MUL_ASSIGN]  = \&mul_assign;
-    $self->{instr_dispatch}->[INSTR_DIV_ASSIGN]  = \&div_assign;
-    $self->{instr_dispatch}->[INSTR_CAT_ASSIGN]  = \&cat_assign;
-    $self->{instr_dispatch}->[INSTR_FUNCDEF]     = \&function_definition;
-    $self->{instr_dispatch}->[INSTR_CALL]        = \&function_call;
-    $self->{instr_dispatch}->[INSTR_RET]         = \&keyword_return;
-    $self->{instr_dispatch}->[INSTR_PREFIX_ADD]  = \&prefix_increment;
-    $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
-    $self->{instr_dispatch}->[INSTR_DOT_ACCESS]  = \&dot_access;
-    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
-    $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
-    $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
-    $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
+    $self->override_instruction(INSTR_EXPR_GROUP, \&expression_group);
+    $self->override_instruction(INSTR_IDENT, \&identifier);
+    $self->override_instruction(INSTR_LITERAL, \&literal);
+    $self->override_instruction(INSTR_VAR, \&variable_declaration);
+    $self->override_instruction(INSTR_ARRAYCONS, \&array_constructor);
+    $self->override_instruction(INSTR_MAPCONS, \&map_constructor);
+    $self->override_instruction(INSTR_EXISTS, \&keyword_exists);
+    $self->override_instruction(INSTR_DELETE, \&keyword_delete);
+    $self->override_instruction(INSTR_KEYS, \&keyword_keys);
+    $self->override_instruction(INSTR_VALUES, \&keyword_values);
+    $self->override_instruction(INSTR_COND, \&conditional);
+    $self->override_instruction(INSTR_WHILE, \&keyword_while);
+    $self->override_instruction(INSTR_NEXT, \&keyword_next);
+    $self->override_instruction(INSTR_LAST, \&keyword_last);
+    $self->override_instruction(INSTR_IF, \&keyword_if);
+    $self->override_instruction(INSTR_ASSIGN, \&assignment);
+    $self->override_instruction(INSTR_ADD_ASSIGN, \&add_assign);
+    $self->override_instruction(INSTR_SUB_ASSIGN, \&sub_assign);
+    $self->override_instruction(INSTR_MUL_ASSIGN, \&mul_assign);
+    $self->override_instruction(INSTR_DIV_ASSIGN, \&div_assign);
+    $self->override_instruction(INSTR_CAT_ASSIGN, \&cat_assign);
+    $self->override_instruction(INSTR_FUNCDEF, \&function_definition);
+    $self->override_instruction(INSTR_CALL, \&function_call);
+    $self->override_instruction(INSTR_RET, \&keyword_return);
+    $self->override_instruction(INSTR_PREFIX_ADD, \&prefix_increment);
+    $self->override_instruction(INSTR_PREFIX_SUB, \&prefix_decrement);
+    $self->override_instruction(INSTR_POSTFIX_ADD, \&postfix_increment);
+    $self->override_instruction(INSTR_POSTFIX_SUB, \&postfix_decrement);
+    $self->override_instruction(INSTR_DOT_ACCESS, \&dot_access);
+    $self->override_instruction(INSTR_ACCESS, \&access);
+    $self->override_instruction(INSTR_TRY, \&keyword_try);
+    $self->override_instruction(INSTR_THROW, \&keyword_throw);
+    $self->override_instruction(INSTR_TYPE, \&keyword_type);
 
     # validate these unary operators
-    $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_NEG] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_POS] = \&unary_op;
+    $self->override_instruction(INSTR_NOT, \&unary_op);
+    $self->override_instruction(INSTR_NEG, \&unary_op);
+    $self->override_instruction(INSTR_POS, \&unary_op);
 
     # validate these binary operators
-    $self->{instr_dispatch}->[INSTR_POW]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_REM]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_MUL]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_DIV]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_ADD]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_SUB]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRCAT] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRIDX] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+    $self->override_instruction(INSTR_POW, \&binary_op);
+    $self->override_instruction(INSTR_REM, \&binary_op);
+    $self->override_instruction(INSTR_MUL, \&binary_op);
+    $self->override_instruction(INSTR_DIV, \&binary_op);
+    $self->override_instruction(INSTR_ADD, \&binary_op);
+    $self->override_instruction(INSTR_SUB, \&binary_op);
+    $self->override_instruction(INSTR_STRCAT, \&binary_op);
+    $self->override_instruction(INSTR_STRIDX, \&binary_op);
+    $self->override_instruction(INSTR_GTE, \&binary_op);
+    $self->override_instruction(INSTR_LTE, \&binary_op);
+    $self->override_instruction(INSTR_GT, \&binary_op);
+    $self->override_instruction(INSTR_LT, \&binary_op);
+    $self->override_instruction(INSTR_EQ, \&binary_op);
+    $self->override_instruction(INSTR_NEQ, \&binary_op);
 }
 
 sub error($self, $scope, $err_msg, $position = undef) {
@@ -102,11 +102,8 @@ sub error($self, $scope, $err_msg, $position = undef) {
     die "Validator error: $err_msg\n";
 }
 
-sub position($self, $data) {
-    return $data->[@$data - 1]; # position information is always the last element
-}
-
-sub unary_op($self, $instr, $scope, $data) {
+sub unary_op($self, $scope, $data) {
+    my $instr = $data->[0];
     my $pos   = $data->[2];
     my $value = $self->evaluate($scope, $data->[1]);
 
@@ -161,8 +158,9 @@ sub unary_op($self, $instr, $scope, $data) {
     $self->error($scope, "cannot apply unary operator $pretty_instr[$instr] to type " . $self->{types}->to_string($value->[0]) . "\n", $pos);
 }
 
-sub binary_op($self, $instr, $scope, $data) {
-    my $pos = $data->[3];
+sub binary_op($self, $scope, $data) {
+    my $instr = $data->[0];
+    my $pos   = $data->[3];
 
     my ($left_var,  $left_scope,  $left_ident);
     my ($right_var, $right_scope, $right_ident);
@@ -550,7 +548,7 @@ sub variable_declaration($self, $scope, $data) {
     }
 
     if (!$self->{repl}) {
-        my ($var) = $self->get_variable($scope, $name, locals_only => 1);
+        my ($var) = $self->get_variable($scope, [$name], locals_only => 1);
         if ($var && $var->[0] ne 'Builtin') {
             $self->error($scope, "cannot redeclare existing local `$name`", $self->position($data));
         }
@@ -780,8 +778,8 @@ sub function_definition($self, $scope, $data) {
     my $func_data   = [$scope, $ret_type, $parameters, $expressions];
     my $func        = [$func_type, $func_data, $pos];
 
-    if ($name eq '#anonymous') {
-        $name = "anonfunc$func";
+    if ($name =~ /^#anon/) {
+        $name = "#anon$func";
     }
 
     if (!$self->{repl} and exists $scope->{locals}->{$name} and $scope->{locals}->{$name}->[0][1] ne 'Builtin') {
@@ -1052,12 +1050,12 @@ sub function_call($self, $scope, $data) {
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $self->{debug}->{print}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
-        $name = '#anonymous';
+        $name = '#anon-' . $target;
     } else {
         $self->{debug}->{print}->('FUNCS', "Calling anonymous function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
 
         $func = $self->evaluate($scope, $target);
-        $name = '#expr';
+        $name = '#expr-' . $target;
 
         if (not $self->{types}->name_is($func->[0], 'TYPEFUNC')) {
             $self->error($scope, "cannot invoke value of type " . $self->{types}->to_string($func->[0]) . " as a function", $self->position($target));

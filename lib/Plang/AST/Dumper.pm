@@ -2,7 +2,8 @@
 
 # Dumps a Plang abstract syntax tree as human-readable text.
 
-package Plang::AstDumper;
+package Plang::AST::Dumper;
+use parent 'Plang::AST::Walker';
 
 use warnings;
 use strict;
@@ -13,8 +14,6 @@ use Devel::StackTrace;
 
 use Plang::Constants::Instructions ':all';
 
-use parent 'Plang::AstInterpreter';
-
 sub new($class, %args) {
     my $self = bless {}, $class;
     $self->initialize(%args);
@@ -22,83 +21,75 @@ sub new($class, %args) {
 }
 
 sub initialize($self, %conf) {
-    $self->{ast}      = $conf{ast};
-    $self->{embedded} = $conf{embedded} // 0;
-
-    $self->{types} = $conf{types} // die 'Missing types';
-
-    $self->{instr_dispatch} = [];
+    $self->SUPER::initialize(%conf);
 
     # main instructions
-    $self->{instr_dispatch}->[INSTR_NOP]         = \&null_op;
-    $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
-    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
-    $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
-    $self->{instr_dispatch}->[INSTR_MAPCONS]     = \&map_constructor;
-    $self->{instr_dispatch}->[INSTR_ARRAYCONS]   = \&array_constructor;
-    $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
-    $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
-    $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
-    $self->{instr_dispatch}->[INSTR_VALUES]      = \&keyword_values;
-    $self->{instr_dispatch}->[INSTR_COND]        = \&conditional;
-    $self->{instr_dispatch}->[INSTR_WHILE]       = \&keyword_while;
-    $self->{instr_dispatch}->[INSTR_NEXT]        = \&keyword_next;
-    $self->{instr_dispatch}->[INSTR_LAST]        = \&keyword_last;
-    $self->{instr_dispatch}->[INSTR_IF]          = \&keyword_if;
-    $self->{instr_dispatch}->[INSTR_AND]         = \&logical_and;
-    $self->{instr_dispatch}->[INSTR_OR]          = \&logical_or;
-    $self->{instr_dispatch}->[INSTR_ASSIGN]      = \&assignment;
-    $self->{instr_dispatch}->[INSTR_ADD_ASSIGN]  = \&add_assign;
-    $self->{instr_dispatch}->[INSTR_SUB_ASSIGN]  = \&sub_assign;
-    $self->{instr_dispatch}->[INSTR_MUL_ASSIGN]  = \&mul_assign;
-    $self->{instr_dispatch}->[INSTR_DIV_ASSIGN]  = \&div_assign;
-    $self->{instr_dispatch}->[INSTR_CAT_ASSIGN]  = \&cat_assign;
-    $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
-    $self->{instr_dispatch}->[INSTR_FUNCDEF]     = \&function_definition;
-    $self->{instr_dispatch}->[INSTR_CALL]        = \&function_call;
-    $self->{instr_dispatch}->[INSTR_RET]         = \&keyword_return;
-    $self->{instr_dispatch}->[INSTR_PREFIX_ADD]  = \&prefix_increment;
-    $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
-    $self->{instr_dispatch}->[INSTR_RANGE]       = \&range_operator;
-    $self->{instr_dispatch}->[INSTR_DOT_ACCESS]  = \&access;
-    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
-    $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
-    $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
-    $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
-    $self->{instr_dispatch}->[INSTR_STRING_I]    = \&string_interpolation;
+    $self->override_instruction(INSTR_NOP, \&null_op);
+    $self->override_instruction(INSTR_EXPR_GROUP, \&expression_group);
+    $self->override_instruction(INSTR_LITERAL, \&literal);
+    $self->override_instruction(INSTR_VAR, \&variable_declaration);
+    $self->override_instruction(INSTR_MAPCONS, \&map_constructor);
+    $self->override_instruction(INSTR_ARRAYCONS, \&array_constructor);
+    $self->override_instruction(INSTR_EXISTS, \&keyword_exists);
+    $self->override_instruction(INSTR_DELETE, \&keyword_delete);
+    $self->override_instruction(INSTR_KEYS, \&keyword_keys);
+    $self->override_instruction(INSTR_VALUES, \&keyword_values);
+    $self->override_instruction(INSTR_COND, \&conditional);
+    $self->override_instruction(INSTR_WHILE, \&keyword_while);
+    $self->override_instruction(INSTR_NEXT, \&keyword_next);
+    $self->override_instruction(INSTR_LAST, \&keyword_last);
+    $self->override_instruction(INSTR_IF, \&keyword_if);
+    $self->override_instruction(INSTR_AND, \&logical_and);
+    $self->override_instruction(INSTR_OR, \&logical_or);
+    $self->override_instruction(INSTR_ASSIGN, \&assignment);
+    $self->override_instruction(INSTR_ADD_ASSIGN, \&add_assign);
+    $self->override_instruction(INSTR_SUB_ASSIGN, \&sub_assign);
+    $self->override_instruction(INSTR_MUL_ASSIGN, \&mul_assign);
+    $self->override_instruction(INSTR_DIV_ASSIGN, \&div_assign);
+    $self->override_instruction(INSTR_CAT_ASSIGN, \&cat_assign);
+    $self->override_instruction(INSTR_IDENT, \&identifier);
+    $self->override_instruction(INSTR_QIDENT, \&qualified_identifier);
+    $self->override_instruction(INSTR_FUNCDEF, \&function_definition);
+    $self->override_instruction(INSTR_CALL, \&function_call);
+    $self->override_instruction(INSTR_RET, \&keyword_return);
+    $self->override_instruction(INSTR_PREFIX_ADD, \&prefix_increment);
+    $self->override_instruction(INSTR_PREFIX_SUB, \&prefix_decrement);
+    $self->override_instruction(INSTR_POSTFIX_ADD, \&postfix_increment);
+    $self->override_instruction(INSTR_POSTFIX_SUB, \&postfix_decrement);
+    $self->override_instruction(INSTR_RANGE, \&range_operator);
+    $self->override_instruction(INSTR_DOT_ACCESS, \&access);
+    $self->override_instruction(INSTR_ACCESS, \&access);
+    $self->override_instruction(INSTR_TRY, \&keyword_try);
+    $self->override_instruction(INSTR_THROW, \&keyword_throw);
+    $self->override_instruction(INSTR_TYPE, \&keyword_type);
+    $self->override_instruction(INSTR_IMPORT, \&keyword_import);
+    $self->override_instruction(INSTR_MODULE, \&keyword_module);
+    $self->override_instruction(INSTR_STRING_I, \&string_interpolation);
 
     # unary operators
-    $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_NEG] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_POS] = \&unary_op;
+    $self->override_instruction(INSTR_NOT, \&unary_op);
+    $self->override_instruction(INSTR_NEG, \&unary_op);
+    $self->override_instruction(INSTR_POS, \&unary_op);
 
     # binary operators
-    $self->{instr_dispatch}->[INSTR_POW]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_REM]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_MUL]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_DIV]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_ADD]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_SUB]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRCAT] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRIDX] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+    $self->override_instruction(INSTR_POW, \&binary_op);
+    $self->override_instruction(INSTR_REM, \&binary_op);
+    $self->override_instruction(INSTR_MUL, \&binary_op);
+    $self->override_instruction(INSTR_DIV, \&binary_op);
+    $self->override_instruction(INSTR_ADD, \&binary_op);
+    $self->override_instruction(INSTR_SUB, \&binary_op);
+    $self->override_instruction(INSTR_STRCAT, \&binary_op);
+    $self->override_instruction(INSTR_STRIDX, \&binary_op);
+    $self->override_instruction(INSTR_GTE, \&binary_op);
+    $self->override_instruction(INSTR_LTE, \&binary_op);
+    $self->override_instruction(INSTR_GT, \&binary_op);
+    $self->override_instruction(INSTR_LT, \&binary_op);
+    $self->override_instruction(INSTR_EQ, \&binary_op);
+    $self->override_instruction(INSTR_NEQ, \&binary_op);
 }
 
 sub dispatch_instruction($self, $instr, $scope, $data) {
-    # main instructions
-    if ($instr < INSTR_NOT) {
-        return $self->{instr_dispatch}->[$instr]->($self, $scope, $data);
-    }
-
-    # unary and binary operators
-    return $self->{instr_dispatch}->[$instr]->($self, $instr, $scope, $data);
+    return $self->{instr_dispatch}->[$instr]->($self, $scope, $data);
 }
 
 sub variable_declaration($self, $scope, $data) {
@@ -125,10 +116,10 @@ sub function_call($self, $scope, $data) {
     if ($target->[0] == INSTR_IDENT) {
         $text .= "$target->[1]";
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
-        $text .= '#anonymous';
+        $text .= '#anon-' . $target;
     } else {
         my $val = $self->evaluate($scope, $target);
-        $text .= "(#expr $val)";
+        $text .= "(#expr-" . $target . " $val)";
     }
 
     if (@$arguments) {
@@ -306,6 +297,16 @@ sub keyword_type($self, $scope, $data) {
     }
 }
 
+sub keyword_module($self, $scope, $data) {
+    my $ident = $self->evaluate($scope, $data->[1]);
+    return "(module $ident)";
+}
+
+sub keyword_import($self, $scope, $data) {
+    my $ident = $self->evaluate($scope, $data->[1]);
+    return "(import $ident)";
+}
+
 sub add_assign($self, $scope, $data) {
     my $left  = $self->evaluate($scope, $data->[1]);
     my $right = $self->evaluate($scope, $data->[2]);
@@ -357,7 +358,7 @@ sub postfix_decrement($self, $scope, $data) {
 }
 
 sub string_interpolation($self, $scope, $data) {
-    return "(interpolate-string " . $self->interpolate_string($scope, $data->[1]) . ")";
+    return "(interpolate-string \"$data->[1]\")";
 }
 
 # ?: ternary conditional operator
@@ -409,7 +410,8 @@ sub access($self, $scope, $data) {
     return "(access $var $val)";
 }
 
-sub unary_op($self, $instr, $scope, $data) {
+sub unary_op($self, $scope, $data) {
+    my $instr = $data->[0];
     my $value = $self->evaluate($scope, $data->[1]);
 
     my $result;
@@ -425,7 +427,8 @@ sub unary_op($self, $instr, $scope, $data) {
     return $result;
 }
 
-sub binary_op($self, $instr, $scope, $data) {
+sub binary_op($self, $scope, $data) {
+    my $instr = $data->[0];
     my $left  = $self->evaluate($scope, $data->[1]);
     my $right = $self->evaluate($scope, $data->[2]);
 
@@ -465,7 +468,19 @@ sub binary_op($self, $instr, $scope, $data) {
 }
 
 sub identifier($self, $scope, $data) {
-    return "(ident $data->[1])";
+    my $name;
+
+    if (ref $data->[1] eq 'ARRAY') {
+        $name = 'BEFORE-DESUGAR ' . (join '::', $data->[1]->@*);
+    } else {
+        $name = $data->[1];
+    }
+
+    return "(ident $name)";
+}
+
+sub qualified_identifier($self, $scope, $data) {
+    return "(qualified-ident $data->[1][0] $data->[1][1])";
 }
 
 sub literal($self, $scope, $data) {
@@ -480,28 +495,6 @@ sub null_op {
 
 sub expression_group($self, $scope, $data) {
     return "(expr-group " . $self->execute($scope, $data->[1]) . ")";
-}
-
-# returns a Plang AST as dumped as human-readable text
-sub dump($self, $ast = undef, %opt) {
-    # ast can be supplied via new() or via this run() subroutine
-    $ast ||= $self->{ast};
-
-    # make sure we were given a program
-    if (not $ast) {
-        print STDERR "No program to dump.\n";
-        return;
-    }
-
-    # set up the (unused) global environment
-    my $scope = {};
-
-    # interpret the expressions and return the human-readable text
-    if ($opt{tree}) {
-        return $self->execute($scope, $ast);
-    } else {
-        return $self->execute($scope, [$ast]);
-    }
 }
 
 sub execute($self, $scope, $ast) {
@@ -530,6 +523,14 @@ sub evaluate($self, $scope, $data) {
     }
 
     return $self->dispatch_instruction($ins, $scope, $data);
+}
+
+sub dump($self, $ast = undef, %opt) {
+    if ($opt{tree}) {
+        return $self->walk($ast, %opt);
+    } else {
+        return $self->walk([$ast], %opt);
+    }
 }
 
 1;

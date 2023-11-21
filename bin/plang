@@ -4,25 +4,58 @@
 #
 # see the `plang_builtin` script for a demonstration of adding a builtin function
 
+use v5.16;
 use warnings;
 use strict;
+use feature 'signatures';
 
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 
+use Getopt::Long qw(GetOptionsFromArray);
+
 # use Plang
 use Plang::Interpreter;
+
+my $usage = <<"USAGE";
+usage: $0 [-f <file>] [-m <path>]
+
+    -f|--file     execute contents of <file> instead of command-line
+                  arguments or stdin
+    -m|--modpath  add <path> to list of module paths
+USAGE
+
+sub getopt_from_array($opt_args, $result, $config, @opts) {
+    # emitting errors as Perl warnings instead of using die, weird.
+    my $opt_error;
+    local $SIG{__WARN__} = sub {
+        $opt_error = shift;
+        chomp $opt_error;
+    };
+
+    Getopt::Long::Configure(@$config);
+    GetOptionsFromArray($opt_args, $result, @opts);
+    return ($opt_args, $opt_error);
+}
 
 # The plang() subroutine can used to interpret a string or the STDIN stream,
 # depending on whether a string argument was passed or not.
 
-sub plang {
-    my ($text) = @_;
+sub plang($text, %opts) {
+    # add default modules/ path relative to location of this script
+    push $opts{modpath}->@*, "$RealBin/../modules/";
 
     # create Plang object
-    my $plang = Plang::Interpreter->new(debug => $ENV{DEBUG});
+    my $plang = Plang::Interpreter->new(
+        debug   => $ENV{DEBUG},
+        modpath => $opts{modpath},
+    );
 
-    if (defined $text and length $text) {
+    if ($opts{file}) {
+        # if -f or --file was specified, interpret contents of a file
+        my $content = $plang->load_file($opts{file}, rootpath => 1);
+        return $plang->interpret_string($content);
+    } elsif (defined $text and length $text) {
         # if a string argument was provided, interpret the string
         return $plang->interpret_string($text);
     } else {
@@ -31,5 +64,24 @@ sub plang {
     }
 }
 
-# interpret plang script and exit using returned value
-exit int (plang("@ARGV") // 0);
+sub main() {
+    my %opts;
+
+    my ($opt_args, $opt_error) = getopt_from_array(
+        \@ARGV,
+        \%opts,
+        ['bundling'],
+        'file|f=s',
+        'modpath|m=s@'
+    );
+
+    if (defined $opt_error) {
+        print "$opt_error -- $usage\n";
+        exit 1;
+    }
+
+    # interpret plang script and exit using returned value
+    exit int (plang("@$opt_args", %opts) // 0);
+}
+
+main;

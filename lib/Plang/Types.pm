@@ -8,6 +8,7 @@ use warnings;
 use strict;
 use feature 'signatures';
 
+use Plang::AST::Dumper;
 use Plang::Constants::Instructions ':all';
 use Data::Dumper;
 
@@ -19,6 +20,8 @@ sub new($class, %args) {
 
 sub initialize($self, %conf) {
     $self->{debug} = $conf{debug};
+
+    $self->{dumper} = Plang::AST::Dumper->new(types => $self);
 
     $self->{types}   = {};
     $self->{aliases} = {};
@@ -195,7 +198,7 @@ sub as_list($self) {
 }
 
 # convert a type structure into a string
-sub to_string($self, $type) {
+sub to_string($self, $type, $default_value = undef) {
     if ($type->[0] eq 'TYPE' || $type->[0] eq 'NEWTYPE') {
         my $type_alias = $self->{aliases}->{$type->[1]};
 
@@ -214,9 +217,14 @@ sub to_string($self, $type) {
         my @types;
 
         foreach my $entry (sort { $a->[0] cmp $b->[0] } @{$type->[1]}) {
-            my ($key, $type) = @$entry;
+            my ($key, $type, $default_value) = @$entry;
 
-            push @types, "\"$key\": " . $self->to_string($type);
+            if (defined $default_value) {
+                $default_value = $self->{dumper}->dump($default_value);
+                push @types, "\"$key\": " . $self->to_string($type) . " = $default_value";
+            } else {
+                push @types, "\"$key\": " . $self->to_string($type);
+            }
         }
 
         return '{' . join(', ', @types) . '}';
@@ -441,9 +449,6 @@ sub is_equal($self, $type1, $type2) {
 # type-checking
 sub check($self, $guard, $type) {
     if ($self->{debug}) {
-        $Data::Dumper::Terse = 1;
-        $Data::Dumper::Indent = 0;
-
         $self->{debug}->{print}->('TYPES', "type check " . Dumper($guard) . " vs " . Dumper($type) . "\n");
 
         if ($self->{debug}->{tags}->{TYPES}) {

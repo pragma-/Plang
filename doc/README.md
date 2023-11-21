@@ -97,15 +97,20 @@ Path | Description
 [`bin/runtests`](../bin/runtests) | Verifies that Plang is working correctly by running the tests in the [`test`](../test) directory.
 [`doc/`](../doc/) | Plang documentation.
 [`examples/`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
-[`lib/Plang/AstInterpreter.pm`](../lib/Plang/AstInterpreter.pm) | At this early stage, Plang is a simple AST interpreter.
 [`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
 [`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
 [`lib/Plang/Parser.pm`](../lib/Plang/Parser.pm) | Generic abstract backtracking parser class that accepts a list of parse rules.
 [`lib/Plang/ParseRules.pm`](../lib/Plang/ParseRules.pm) | Recursive-descent rules to parse a stream of tokens into an AST.
-[`lib/Plang/Validator.pm`](../lib/Plang/Validator.pm) | Compile-time type-checking and semantic validation. Does some syntax desugaring.
 [`lib/Plang/Types.pm`](../lib/Plang/Types.pm) | Plang's simple yet evolving and growing type system.
+[`lib/Plang/AST/Dumper.pm`](../lib/Plang/AST/Dumper.pm) | Pretty-prints Plang's AST as Lisp-like text.
+[`lib/Plang/AST/Validator.pm`](../lib/Plang/AST/Validator.pm) | Compile-time type-checking and semantic validation. Does some syntax desugaring.
+[`lib/Plang/AST/Walker.pm`](../lib/Plang/AST/Walker.pm) | Base class to walk a Plang AST. Overload its methods to perform actions on nodes.
+[`lib/Plang/Compiler/ByteCode.pm`](../lib/Plang/Compiler/ByteCode.pm) | Placeholder for future plans to compile Plang AST to bytecode instructions.
+[`lib/Plang/Compiler/C.pm`](../lib/Plang/Compiler/C.pm) | Placeholder for future plans to compile Plang AST to C source code.
 [`lib/Plang/Constants/`](../lib/Plang/Constants/) | Integer constants identifying various tokens, keywords and instructions.
-[`test/`](../test) | Plang test programs.
+[`lib/Plang/Interpreter/AST.pm`](../lib/Plang/Interpreter/AST.pm) | At this early stage, Plang is a simple AST interpreter.
+[`lib/Plang/Interpreter/ByteCode.pm`](../lib/Plang/Interpreter/ByteCode.pm) | Placeholder for future plans to interpret bytecode instructions.
+[`test/`](../test) | Plang test programs to verify functionality and detect bugs.
 
 ## Running Plang
 You may use the [`plang`](../bin/plang) executable to interpret Plang scripts.

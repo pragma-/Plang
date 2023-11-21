@@ -39,7 +39,7 @@ sub error($parser, $err_msg, $consume_to = TOKEN_TERM) {
 }
 
 sub expected($parser, $expected) {
-    $parser->{indent}-- if $parser->{debug};
+    $parser->{indent}-- if $parser->{debug} && $parser->{indent} > 1;
 
     if (defined (my $token = $parser->current_token)) {
         my $name = pretty_token($token->[0]) . ' (' . pretty_value($token->[1]) . ')';
@@ -103,7 +103,7 @@ sub Program($parser) {
     }
 
     $parser->advance;
-    return @expressions ? ['PRGM', \@expressions] : undef;
+    return @expressions ? \@expressions : undef;
 }
 
 my @keyword_dispatcher;
@@ -126,6 +126,8 @@ $keyword_dispatcher[KEYWORD_TRY]    = \&KeywordTry;
 $keyword_dispatcher[KEYWORD_CATCH]  = \&CatchWithoutTry;
 $keyword_dispatcher[KEYWORD_THROW]  = \&KeywordThrow;
 $keyword_dispatcher[KEYWORD_TYPE]   = \&KeywordType;
+$keyword_dispatcher[KEYWORD_MODULE] = \&KeywordModule;
+$keyword_dispatcher[KEYWORD_IMPORT] = \&KeywordImport;
 
 sub Keyword($parser) {
     $parser->try('Keyword');
@@ -464,6 +466,42 @@ sub KeywordType($parser) {
     return [INSTR_TYPE, $type, $name, $initializer, token_position($type_token)];
 }
 
+# KeywordModule ::= "module" Identifier
+sub KeywordModule($parser) {
+    my $module_token = consume_keyword($parser, 'module');
+
+    my $identifier = Identifier($parser);
+
+    if (not $identifier) {
+        expected($parser, 'identifier for module');
+    }
+
+    return [INSTR_MODULE, $identifier];
+}
+
+# KeywordModule ::= "import" Identifier ["as" IDENT]
+sub KeywordImport($parser) {
+    my $import_token = consume_keyword($parser, 'import');
+
+    my $identifier = Identifier($parser);
+
+    if (not $identifier) {
+        expected($parser, 'identifier for import');
+    }
+
+    my $alias;
+
+    if (consume_keyword($parser, 'as')) {
+        $alias = $parser->consume(TOKEN_IDENT);
+
+        if (not $alias) {
+            expected($parser, 'identifier for import alias');
+        }
+    }
+
+    return [INSTR_IMPORT, $identifier, [INSTR_IDENT, [$alias->[1]], token_position($alias)]];
+}
+
 # Initializer ::= "=" Expression
 sub Initializer($parser) {
     $parser->try('Initializer');
@@ -570,7 +608,7 @@ sub TypeMap($parser) {
                     $parsedkey->[1] =~ s/^'|'$//g;
                     $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } else {
-                    $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
+                    $mapkey = [INSTR_IDENT, [$parsedkey->[1]], token_position($parsedkey)];
                 }
 
                 my $type;
@@ -690,7 +728,7 @@ sub KeywordFn($parser) {
     my $fn_token = consume_keyword($parser, 'fn');
 
     my $ident_token = $parser->consume(TOKEN_IDENT);
-    my $name  = $ident_token ? $ident_token->[1] : '#anonymous';
+    my $name  = $ident_token ? $ident_token->[1] : "#anon-$fn_token";
 
     my $identlist = IdentifierList($parser) // [];
 
@@ -768,7 +806,7 @@ sub MapConstructor($parser) {
                     $parsedkey->[1] =~ s/^'|'$//g;
                     $mapkey = [INSTR_LITERAL, ['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } else {
-                    $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
+                    $mapkey = [INSTR_IDENT, [$parsedkey->[1]], token_position($parsedkey)];
                 }
 
                 if (not $parser->consume(TOKEN_ASSIGN)) {
@@ -993,10 +1031,29 @@ sub Expression($parser, $precedence = 0) {
     $parser->backtrack;
 }
 
-# Identifier ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}*
+# Identifier ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}* {"::" IDENT}*
 sub Identifier($parser) {
     my $token = $parser->consume(TOKEN_IDENT);
-    return [INSTR_IDENT, $token->[1], token_position($token)];
+
+    if (not $token) {
+        expected($parser, 'identifier');
+    }
+
+    my @path;
+
+    push @path, $token->[1];
+
+    while ($parser->consume(TOKEN_COLON_COLON)) {
+        my $identifier = $parser->consume(TOKEN_IDENT);
+
+        if (not defined $identifier) {
+            expected($parser, 'identifier after `::`');
+        }
+
+        push @path, $identifier->[1];
+    }
+
+    return [INSTR_IDENT, \@path, token_position($token)];
 }
 
 # LiteralInteger ::= {"0" .. "9"}+
@@ -1110,7 +1167,7 @@ sub PrefixLParen($parser) {
 sub PrefixType($parser) {
     my $token = $parser->consume(TOKEN_TYPE);
     # convert to identifier to invoke builtin function for type conversion
-    return [INSTR_IDENT, $token->[1], token_position($token)];
+    return [INSTR_IDENT, [$token->[1]], token_position($token)];
 }
 
 my @prefix_dispatcher;

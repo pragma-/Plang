@@ -9,28 +9,20 @@
 # The error() function in this module produces run-time errors (without
 # line/col information).
 
-package Plang::AstInterpreter;
+package Plang::Interpreter::AST;
+use parent 'Plang::AST::Walker';
 
 use warnings;
 use strict;
 use feature 'signatures';
 
-use Data::Dumper;
-use Devel::StackTrace;
-use Plang::AstDumper;
-
 use Plang::Constants::Instructions ':all';
 
-sub new($class, %args) {
-    my $self = bless {}, $class;
-    $self->initialize(%args);
-    return $self;
-}
+use Data::Dumper;
+use Devel::StackTrace;
 
 sub initialize($self, %conf) {
-    $self->{ast}      = $conf{ast};
-    $self->{embedded} = $conf{embedded} // 0;
-    $self->{debug}    = $conf{debug};
+    $self->SUPER::initialize(%conf);
 
     $self->{max_recursion}  = $conf{max_recursion}  // 10000;
     $self->{recursions}     = 0;
@@ -40,72 +32,66 @@ sub initialize($self, %conf) {
 
     $self->{repl_scope}     = undef; # persistent repl scope
 
-    $self->{types} = $conf{types} // die 'Missing types';
-
-    $self->{dumper} = Plang::AstDumper->new(types => $self->{types}, debug => $self->{debug});
-
-    $self->{instr_dispatch} = [];
-
     # main instructions
-    $self->{instr_dispatch}->[INSTR_NOP]         = \&null_op;
-    $self->{instr_dispatch}->[INSTR_EXPR_GROUP]  = \&expression_group;
-    $self->{instr_dispatch}->[INSTR_LITERAL]     = \&literal;
-    $self->{instr_dispatch}->[INSTR_VAR]         = \&variable_declaration;
-    $self->{instr_dispatch}->[INSTR_MAPCONS]     = \&map_constructor;
-    $self->{instr_dispatch}->[INSTR_ARRAYCONS]   = \&array_constructor;
-    $self->{instr_dispatch}->[INSTR_EXISTS]      = \&keyword_exists;
-    $self->{instr_dispatch}->[INSTR_DELETE]      = \&keyword_delete;
-    $self->{instr_dispatch}->[INSTR_KEYS]        = \&keyword_keys;
-    $self->{instr_dispatch}->[INSTR_VALUES]      = \&keyword_values;
-    $self->{instr_dispatch}->[INSTR_COND]        = \&conditional;
-    $self->{instr_dispatch}->[INSTR_WHILE]       = \&keyword_while;
-    $self->{instr_dispatch}->[INSTR_NEXT]        = \&keyword_next;
-    $self->{instr_dispatch}->[INSTR_LAST]        = \&keyword_last;
-    $self->{instr_dispatch}->[INSTR_IF]          = \&keyword_if;
-    $self->{instr_dispatch}->[INSTR_AND]         = \&logical_and;
-    $self->{instr_dispatch}->[INSTR_OR]          = \&logical_or;
-    $self->{instr_dispatch}->[INSTR_ASSIGN]      = \&assignment;
-    $self->{instr_dispatch}->[INSTR_ADD_ASSIGN]  = \&add_assign;
-    $self->{instr_dispatch}->[INSTR_SUB_ASSIGN]  = \&sub_assign;
-    $self->{instr_dispatch}->[INSTR_MUL_ASSIGN]  = \&mul_assign;
-    $self->{instr_dispatch}->[INSTR_DIV_ASSIGN]  = \&div_assign;
-    $self->{instr_dispatch}->[INSTR_CAT_ASSIGN]  = \&cat_assign;
-    $self->{instr_dispatch}->[INSTR_IDENT]       = \&identifier;
-    $self->{instr_dispatch}->[INSTR_FUNCDEF]     = \&function_definition;
-    $self->{instr_dispatch}->[INSTR_CALL]        = \&function_call;
-    $self->{instr_dispatch}->[INSTR_RET]         = \&keyword_return;
-    $self->{instr_dispatch}->[INSTR_PREFIX_ADD]  = \&prefix_increment;
-    $self->{instr_dispatch}->[INSTR_PREFIX_SUB]  = \&prefix_decrement;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_ADD] = \&postfix_increment;
-    $self->{instr_dispatch}->[INSTR_POSTFIX_SUB] = \&postfix_decrement;
-    $self->{instr_dispatch}->[INSTR_RANGE]       = \&range_operator;
-    $self->{instr_dispatch}->[INSTR_DOT_ACCESS]  = \&access;
-    $self->{instr_dispatch}->[INSTR_ACCESS]      = \&access;
-    $self->{instr_dispatch}->[INSTR_TRY]         = \&keyword_try;
-    $self->{instr_dispatch}->[INSTR_THROW]       = \&keyword_throw;
-    $self->{instr_dispatch}->[INSTR_TYPE]        = \&keyword_type;
-    $self->{instr_dispatch}->[INSTR_STRING_I]    = \&string_interpolation;
+    $self->override_instruction(INSTR_NOP, \&null_op);
+    $self->override_instruction(INSTR_EXPR_GROUP, \&expression_group);
+    $self->override_instruction(INSTR_LITERAL, \&literal);
+    $self->override_instruction(INSTR_VAR, \&variable_declaration);
+    $self->override_instruction(INSTR_MAPCONS, \&map_constructor);
+    $self->override_instruction(INSTR_ARRAYCONS, \&array_constructor);
+    $self->override_instruction(INSTR_EXISTS, \&keyword_exists);
+    $self->override_instruction(INSTR_DELETE, \&keyword_delete);
+    $self->override_instruction(INSTR_KEYS, \&keyword_keys);
+    $self->override_instruction(INSTR_VALUES, \&keyword_values);
+    $self->override_instruction(INSTR_COND, \&conditional);
+    $self->override_instruction(INSTR_WHILE, \&keyword_while);
+    $self->override_instruction(INSTR_NEXT, \&keyword_next);
+    $self->override_instruction(INSTR_LAST, \&keyword_last);
+    $self->override_instruction(INSTR_IF, \&keyword_if);
+    $self->override_instruction(INSTR_AND, \&logical_and);
+    $self->override_instruction(INSTR_OR, \&logical_or);
+    $self->override_instruction(INSTR_ASSIGN, \&assignment);
+    $self->override_instruction(INSTR_ADD_ASSIGN, \&add_assign);
+    $self->override_instruction(INSTR_SUB_ASSIGN, \&sub_assign);
+    $self->override_instruction(INSTR_MUL_ASSIGN, \&mul_assign);
+    $self->override_instruction(INSTR_DIV_ASSIGN, \&div_assign);
+    $self->override_instruction(INSTR_CAT_ASSIGN, \&cat_assign);
+    $self->override_instruction(INSTR_IDENT, \&identifier);
+    $self->override_instruction(INSTR_FUNCDEF, \&function_definition);
+    $self->override_instruction(INSTR_CALL, \&function_call);
+    $self->override_instruction(INSTR_RET, \&keyword_return);
+    $self->override_instruction(INSTR_PREFIX_ADD, \&prefix_increment);
+    $self->override_instruction(INSTR_PREFIX_SUB, \&prefix_decrement);
+    $self->override_instruction(INSTR_POSTFIX_ADD, \&postfix_increment);
+    $self->override_instruction(INSTR_POSTFIX_SUB, \&postfix_decrement);
+    $self->override_instruction(INSTR_RANGE, \&range_operator);
+    $self->override_instruction(INSTR_DOT_ACCESS, \&access);
+    $self->override_instruction(INSTR_ACCESS, \&access);
+    $self->override_instruction(INSTR_TRY, \&keyword_try);
+    $self->override_instruction(INSTR_THROW, \&keyword_throw);
+    $self->override_instruction(INSTR_TYPE, \&keyword_type);
+    $self->override_instruction(INSTR_STRING_I, \&string_interpolation);
 
     # unary operators
-    $self->{instr_dispatch}->[INSTR_NOT] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_NEG] = \&unary_op;
-    $self->{instr_dispatch}->[INSTR_POS] = \&unary_op;
+    $self->override_instruction(INSTR_NOT, \&unary_op);
+    $self->override_instruction(INSTR_NEG, \&unary_op);
+    $self->override_instruction(INSTR_POS, \&unary_op);
 
     # binary operators
-    $self->{instr_dispatch}->[INSTR_POW]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_REM]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_MUL]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_DIV]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_ADD]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_SUB]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRCAT] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_STRIDX] = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LTE]    = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_GT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
-    $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
+    $self->override_instruction(INSTR_POW, \&binary_op);
+    $self->override_instruction(INSTR_REM, \&binary_op);
+    $self->override_instruction(INSTR_MUL, \&binary_op);
+    $self->override_instruction(INSTR_DIV, \&binary_op);
+    $self->override_instruction(INSTR_ADD, \&binary_op);
+    $self->override_instruction(INSTR_SUB, \&binary_op);
+    $self->override_instruction(INSTR_STRCAT, \&binary_op);
+    $self->override_instruction(INSTR_STRIDX, \&binary_op);
+    $self->override_instruction(INSTR_GTE, \&binary_op);
+    $self->override_instruction(INSTR_LTE, \&binary_op);
+    $self->override_instruction(INSTR_GT, \&binary_op);
+    $self->override_instruction(INSTR_LT, \&binary_op);
+    $self->override_instruction(INSTR_EQ, \&binary_op);
+    $self->override_instruction(INSTR_NEQ, \&binary_op);
 }
 
 sub reset($self) {
@@ -113,67 +99,10 @@ sub reset($self) {
     $self->{iterations} = 0;
 }
 
-sub dispatch_instruction($self, $instr, $scope, $data) {
-    if ($self->{debug}) {
-        $self->{debug}->{print}->('INSTR', "Dispatching instruction $pretty_instr[$instr]\n");
-    }
-
-    # main instructions
-    if ($instr < INSTR_NOT) {
-        return $self->{instr_dispatch}->[$instr]->($self, $scope, $data);
-    }
-
-    # unary and binary operators
-    return $self->{instr_dispatch}->[$instr]->($self, $instr, $scope, $data);
-}
-
 sub error($self, $scope, $err_msg) {
     chomp $err_msg;
     $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
     die "Runtime error: $err_msg\n";
-}
-
-sub new_scope($self, $parent = undef) {
-    return {
-        locals => {},
-        parent => $parent,
-    };
-}
-
-sub declare_variable($self, $scope, $type, $name, $value) {
-    $scope->{guards}->{$name} = $type;
-    $scope->{locals}->{$name} = $value;
-    $self->{debug}->{print}->('VARS', "declare_variable $name with value " . Dumper($value) ."\n") if $self->{debug};
-}
-
-sub set_variable($self, $scope, $name, $value) {
-    $scope->{locals}->{$name} = $value;
-    $self->{debug}->{print}->('VARS', "set_variable $name to value " . Dumper($value) . "\n") if $self->{debug};
-}
-
-sub get_variable($self, $scope, $name, %opt) {
-    $self->{debug}->{print}->('VARS', "get_variable: $name has value " . Dumper($scope->{locals}->{$name}) . "\n") if $self->{debug} and $name ne 'fib';
-
-    # look for variables in current scope
-    if (exists $scope->{locals}->{$name}) {
-        my $var = $scope->{locals}->{$name};
-        return ($var, $scope);
-    }
-
-    # check for closure
-    if (defined $scope->{closure}) {
-        my ($var, $var_scope) = $self->get_variable($scope->{closure}, $name);
-        return ($var, $var_scope) if defined $var;
-    }
-
-    # look for variables in enclosing scopes
-    if (!$opt{locals_only} and defined $scope->{parent}) {
-        my ($var, $var_scope) = $self->get_variable($scope->{parent}, $name);
-        return ($var, $var_scope) if defined $var;
-    }
-
-    # otherwise it's an undefined variable
-    return (undef);
 }
 
 sub variable_declaration($self, $scope, $data) {
@@ -212,8 +141,6 @@ sub process_function_call_arguments($self, $scope, $name, $parameters, $argument
 }
 
 sub function_call($self, $scope, $data) {
-    $Data::Dumper::Indent = 0;
-
     my $target    = $data->[1];
     my $arguments = $data->[2];
     my $func;
@@ -690,7 +617,8 @@ sub access($self, $scope, $data) {
     }
 }
 
-sub unary_op($self, $instr, $scope, $data) {
+sub unary_op($self, $scope, $data) {
+    my $instr = $data->[0];
     my $value = $self->evaluate($scope, $data->[1]);
 
     my $result;
@@ -710,7 +638,8 @@ sub unary_op($self, $instr, $scope, $data) {
     return $result;
 }
 
-sub binary_op($self, $instr, $scope, $data) {
+sub binary_op($self, $scope, $data) {
+    my $instr = $data->[0];
     my $left  = $self->evaluate($scope, $data->[1]);
     my $right = $self->evaluate($scope, $data->[2]);
 
@@ -1297,158 +1226,6 @@ sub identical_objects($self, $obj1, $obj2) {
     return 1;
 }
 
-use Plang::Interpreter;
-
-sub parse_string($self, $string) {
-    my $interpreter = Plang::Interpreter->new; # TODO reuse interpreter
-    my $program = $interpreter->parse_string($string);
-    return $program->[0][1];
-}
-
-sub interpolate_string($self, $scope, $string) {
-    my $new_string = '';
-    while ($string =~ /\G(.*?)(\{(?:[^\}\\]|\\.)*\})/gc) {
-        my ($text, $interpolate) = ($1, $2);
-
-        my $ast = $self->parse_string($interpolate);
-
-        # run validator to desugar AST
-        my $validator = Plang::Validator->new(types => $self->{types});
-        my $errors = $validator->validate($ast, scope => $scope);
-
-        if ($errors) {
-            print STDERR $errors->[1];
-            exit 1;
-        }
-
-        my $result = $self->execute($scope, $ast);
-        $new_string .= $text . $self->output_value($scope, $result);
-    }
-
-    $string =~ /\G(.*)/gc;
-    $new_string .= $1;
-    return $new_string;
-}
-
-# converts a map to a string
-# note: trusts $var to be Map type
-sub map_to_string($self, $scope, $var) {
-    my $hash = $var->[1];
-    my $string = '{';
-
-    my @entries;
-    foreach my $key (sort keys %$hash) {
-        my $value = $hash->{$key};
-        $key = $self->output_string_literal($key);
-        my $entry = "$key = ";
-        $entry .= $self->output_value($scope, $value, literal => 1);
-        push @entries, $entry;
-    }
-
-    $string .= join(', ', @entries);
-    $string .= '}';
-    return $string;
-}
-
-# converts an array to a string
-# note: trusts $var to be Array type
-sub array_to_string($self, $scope, $var) {
-    my $array = $var->[1];
-    my $string = '[';
-
-    my @entries;
-    foreach my $entry (@$array) {
-        push @entries, $self->output_value($scope, $entry, literal => 1);
-    }
-
-    $string .= join(',', @entries);
-    $string .= ']';
-    return $string;
-}
-
-# TODO: do this more efficiently
-sub output_string_literal($self, $text) {
-    $Data::Dumper::Indent = 0;
-    $Data::Dumper::Terse  = 1;
-    $Data::Dumper::Useqq  = 1;
-
-    $text = Dumper ($text);
-    $text =~ s/\\([\@\$\%])/$1/g;
-
-    return $text;
-}
-
-sub output_value($self, $scope, $value, %opts) {
-    my $result = '';
-
-    # special cases
-    if ($value->[0][0] eq 'NEWTYPE') {
-        my $default_value;
-        if (defined $value->[1][2]) {
-            $default_value = $self->evaluate($scope, $value->[1][2]);
-            $default_value = $self->output_value($scope, $default_value, literal => 1);
-        }
-        $result .= "type $value->[0][1] : " . $self->{types}->to_string($value->[1], $default_value);
-    }
-
-    # booleans
-    elsif ($self->{types}->check(['TYPE', 'Boolean'], $value->[0])) {
-        if ($value->[1] == 0) {
-            $result .= 'false';
-        } else {
-            $result .= 'true';
-        }
-    }
-
-    # functions
-    elsif ($self->{types}->name_is($value->[0], 'TYPEFUNC')) {
-        $result .= $self->{types}->to_string($value->[0]);
-    }
-
-    # maps
-    elsif ($self->{types}->check(['TYPE', 'Map'], $value->[0])) {
-        $result .= $self->map_to_string($scope, $value);
-    }
-
-    # arrays
-    elsif ($self->{types}->check(['TYPE', 'Array'], $value->[0])) {
-        $result .= $self->array_to_string($scope, $value);
-    }
-
-    # String and Number
-    else {
-        if ($opts{literal}) {
-            # output literals
-            if ($self->{types}->check(['TYPE', 'String'], $value->[0])) {
-                $result .= $self->output_string_literal($value->[1]);
-            } elsif ($self->{types}->check(['TYPE', 'Null'], $value->[0])) {
-                $result .= 'null';
-            } else {
-                $result .= $value->[1];
-            }
-        } else {
-            $result .= $value->[1] if defined $value->[1];
-        }
-    }
-
-    # append type if in REPL mode
-    if ($self->{repl}) {
-        my $show_type = 0;
-
-        if ($opts{literal}) {
-            $show_type = 1;
-        } else {
-            $show_type = 1 if defined $value->[1];
-        }
-
-        if ($show_type) {
-            $result .= ': ' . $self->{types}->to_string($value->[0]);
-        }
-    }
-
-    return $result;
-}
-
 # runs a new Plang program with a fresh environment
 sub run($self, $ast = undef, %opt) {
     # ast can be supplied via new() or via this run() subroutine
@@ -1491,12 +1268,8 @@ sub run($self, $ast = undef, %opt) {
         $self->set_variable($scope, $builtin, [$type, $data]);
     }
 
-    # grab our program's expressions
-    my $program    = $ast->[0];
-    my $expressions = $program->[1];
-
     # interpret the expressions
-    my $result = $self->execute($scope, $expressions);
+    my $result = $self->execute($scope, $ast);
 
     # return result to parent program if we're embedded
     return $result if $self->{embedded};
@@ -1516,7 +1289,7 @@ sub run($self, $ast = undef, %opt) {
 
 sub execute($self, $scope, $ast) {
     if ($self->{debug}) {
-        $self->{debug}->{print}->('AST', "interpret ast: " . $self->{dumper}->dump($ast, tree => 1) . "\n");
+        $self->{debug}->{print}->('ASTV', "interpret ast: " . $self->{dumper}->dump($ast, tree => 1) . "\n");
     }
 
     my $final_result;
@@ -1543,36 +1316,6 @@ sub execute($self, $scope, $ast) {
     }
 
     return $final_result // [['TYPE', 'Null'], undef];
-}
-
-sub evaluate($self, $scope, $data) {
-    return if not $data;
-
-    my $ins = $data->[0];
-
-    if ($ins !~ /^\d+$/) {
-        if ($self->{debug} && $self->{debug}->{tags}->{INSTR}) {
-            print "Unknown instruction ", Dumper($ins), "\n";
-            my $trace = Devel::StackTrace->new;
-            print $trace->as_string;
-        }
-        return $data;
-    }
-
-    if ($self->{debug}) {
-        $self->{debug}->{print}->('EVAL', "eval $pretty_instr[$ins]: " . $self->{dumper}->dump($data) . "\n");
-    }
-
-    my $result = $self->dispatch_instruction($ins, $scope, $data);
-
-    if ($self->{debug}) {
-        $Data::Dumper::Indent = 0;
-        $Data::Dumper::Terse = 1;
-        $self->{debug}->{print}->('EVAL', "done $pretty_instr[$ins]: " . Dumper($result) . "\n");
-        $Data::Dumper::Indent = 1;
-    }
-
-    return $result;
 }
 
 1;

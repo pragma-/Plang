@@ -35,6 +35,7 @@ my %constants = (
     INSTR_DIV_ASSIGN => $n++,
     INSTR_CAT_ASSIGN => $n++,
     INSTR_IDENT => $n++,
+    INSTR_QIDENT => $n++,
     INSTR_FUNCDEF => $n++,
     INSTR_CALL => $n++,
     INSTR_RET => $n++,
@@ -49,11 +50,15 @@ my %constants = (
     INSTR_TRY => $n++,
     INSTR_THROW => $n++,
     INSTR_TYPE => $n++,
+    INSTR_MODULE => $n++,
+    INSTR_IMPORT => $n++,
 
-    # binary operators begin here
+    # unary operators
     INSTR_NOT => $n++,
     INSTR_NEG => $n++,
     INSTR_POS => $n++,
+
+    # binary operators
     INSTR_POW => $n++,
     INSTR_REM => $n++,
     INSTR_MUL => $n++,

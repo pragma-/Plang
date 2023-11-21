@@ -318,7 +318,7 @@ sub parse($self, $token_iter = undef) {
         }
     }
 
-    return \@results;
+    return @results == 1 ? $results[0] : \@results;
 }
 
 1;

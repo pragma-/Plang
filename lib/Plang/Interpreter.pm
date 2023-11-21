@@ -15,11 +15,16 @@ use Plang::Lexer;
 use Plang::Parser;
 use Plang::ParseRules qw/Program/;
 use Plang::Types;
-use Plang::Validator;
-use Plang::AstInterpreter;
+use Plang::Modules;
+
+use Plang::AST::Validator;
+use Plang::Interpreter::AST;
 
 use Plang::Constants::Tokens   ':all';
 use Plang::Constants::Keywords ':all';
+
+use Cwd qw(getcwd realpath);
+use File::Basename qw(dirname);
 
 sub new($class, %args) {
     my $self  = bless {}, $class;
@@ -30,6 +35,9 @@ sub new($class, %args) {
 sub initialize($self, %conf) {
     $self->{embedded} = $conf{embedded};
     $self->{debug}    = $conf{debug};
+    $self->{modpath}  = $conf{modpath},
+    $self->{path}     = getcwd();
+    $self->{rootpath} = $self->{path};
 
     if ($self->{debug}) {
         my %tags = map { $_ => 1 } split /,/, $self->{debug};
@@ -80,7 +88,7 @@ sub initialize($self, %conf) {
         [TOKEN_LESS,             qr{\G(   <                   )}x],
         [TOKEN_BANG,             qr{\G(   !                   )}x],
         [TOKEN_QUESTION,         qr{\G(   \?                  )}x],
-# !used [TOKEN_COLON_COLON,      qr{\G(   ::                  )}x],
+        [TOKEN_COLON_COLON,      qr{\G(   ::                  )}x],
         [TOKEN_COLON,            qr{\G(   :                   )}x],
 # !used [TOKEN_TILDE_TILDE,      qr{\G(   ~~                  )}x],
         [TOKEN_TILDE,            qr{\G(   ~                   )}x],
@@ -117,19 +125,38 @@ sub initialize($self, %conf) {
         [TOKEN_OTHER,            qr{\G(   .                   )}x],
     );
 
-    $self->{parser} = Plang::Parser->new(debug => $self->{debug});
-
-    $self->{parser}->add_rule(\&Program);
-
-    $self->{parser}->define_keywords(@pretty_keyword);
-
     $self->{types} = Plang::Types->new(debug => $self->{debug});
+
+    $self->{parser} = Plang::Parser->new(debug => $self->{debug});
 
     $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
 
-    $self->{validator} = Plang::Validator->new(debug => $self->{debug}, types => $self->{types});
+    $self->{parser}->define_keywords(@pretty_keyword);
 
-    $self->{interpreter} = Plang::AstInterpreter->new(embedded => $conf{embedded}, debug => $self->{debug}, types => $self->{types});
+    $self->{parser}->add_rule(\&Program);
+
+    $self->{namespace} = {};
+
+    $self->{modules} = Plang::Modules->new(
+        debug      => $self->{debug},
+        parser     => $self->{parser},
+        types      => $self->{types},
+        modpath    => $self->{modpath},
+        namespace  => $self->{namespace},
+    );
+
+    $self->{validator} = Plang::AST::Validator->new(
+        debug      => $self->{debug},
+        types      => $self->{types},
+        namespace  => $self->{namespace},
+    );
+
+    $self->{interpreter} = Plang::Interpreter::AST->new(
+        embedded   => $conf{embedded},
+        debug      => $self->{debug},
+        types      => $self->{types},
+        namespace  => $self->{namespace},
+    );
 }
 
 # discard token
@@ -159,11 +186,37 @@ sub add_builtin_function($self, @args) {
     $self->{interpreter}->add_builtin_function(@args);
 }
 
+sub load_file($self, $filename, %opts) {
+    my $realpath = realpath($filename);
+    my $path     = dirname($realpath);
+
+    open(my $fh, "< :encoding(UTF-8)", $filename)
+        || die "Can't open $filename: $!\n";
+
+    my $content = do { local $/; <$fh> };
+
+    close($fh) || die "Can't close $filename: $!\n";
+
+    $self->{path} = $path;
+
+    if ($opts{rootpath}) {
+        $self->{rootpath} = $path;
+        unshift $self->{modpath}->@*, "$path/modules/";
+    }
+
+    return $content;
+}
+
 sub parse($self, $input_iter) {
     $self->reset_parser;
+
     # iterates over tokens returned by lexer
     my $token_iter = $self->{lexer}->tokens($input_iter);
     $self->{ast}   = $self->{parser}->parse($token_iter);
+
+    my $errors = $self->handle_parse_errors;
+    die $errors if defined $errors;
+
     return $self->{ast};
 }
 
@@ -181,7 +234,6 @@ sub parse_string($self, $string) {
 }
 
 sub handle_parse_errors($self) {
-    # were there any parse errors?
     if (my $count = @{$self->{parser}->{errors}}) {
         if (not $self->{embedded}) {
             # not embedded: print them and exit
@@ -195,7 +247,6 @@ sub handle_parse_errors($self) {
             return $errors;
         }
     }
-
     return;
 }
 
@@ -208,26 +259,42 @@ sub reset_types($self) {
     $self->{parser}->define_types(map { $_ => 1 } $self->{types}->as_list);
 }
 
+sub reset_modules($self) {
+    $self->{modules}->reset_modules;
+}
+
+sub import_modules($self, $ast, %opt) {
+    return $self->{modules}->import_modules($ast, %opt);
+}
+
 sub validate($self, $ast, %opt) {
     return $self->{validator}->validate($ast, %opt);
 }
 
+sub handle_errors($self, $errors) {
+    if (not $self->{embedded}) {
+        # not embedded: print errors and exit
+        print STDERR $errors->[1];
+        exit 1;
+    } else {
+        # embedded: return as-is
+        return $errors;
+    }
+}
+
 sub interpret($self, %opt) {
-    my $errors = $self->handle_parse_errors;
-    die $errors if defined $errors;
+    print "-- Modules --\n" if $self->{debug};
+    my $errors = $self->import_modules($self->{ast}, %opt, rootpath => $self->{rootpath});
+
+    if ($errors) {
+        return $self->handle_errors($errors);
+    }
 
     print "-- Validator --\n" if $self->{debug};
     $errors = $self->validate($self->{ast}, %opt);
 
     if ($errors) {
-        if (not $self->{embedded}) {
-            # not embedded: print errors and exit
-            print STDERR $errors->[1];
-            exit 1;
-        } else {
-            # embedded: return as-is
-            return $errors;
-        }
+        return $self->handle_errors($errors);
     }
 
     print "-- Interpreter --\n" if $self->{debug};
