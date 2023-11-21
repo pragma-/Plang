@@ -1,1 +1,1 @@
-# Some day this will emit bytecode.
+# Someday this will emit bytecode.

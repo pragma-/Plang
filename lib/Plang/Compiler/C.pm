@@ -1,1 +1,1 @@
-# Some day this will emit C code.
+# Someday this will emit C code.

@@ -1,1 +1,1 @@
-# Some day this will interpreter bytecode emitted by Compiler::ByteCode.
+# Someday this will interpret bytecode emitted by Compiler::ByteCode.
