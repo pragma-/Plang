@@ -15,7 +15,7 @@ test_eq(mul(add(3, 5), 6), 48)
 test_eq(3.add(5).mul(6), 48)
 
 fn f(x) print("function")
-type S: {'f' = fn () print("map entry")}
+type S = {'f' = fn () print("map entry")}
 var s: S
 s.f();
 (s.f)();

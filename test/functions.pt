@@ -24,8 +24,11 @@ test_eq(curriedAdd(3)(4), 7, "curried function")
 var f3 = fn (x) fn (y) x + y
 test_eq(f3(3)(4), 7, "anonymous curried function")
 
-fn force(f) f()
+fn flip(f) fn(a: Number, b: Number) f(b, a)
+fn sub(x, y) x - y
+test_eq(flip(sub)(1, 5), 4, "flipping arguments")
 
+fn force(f) f()
 var lazy1 = fn 1 + 1
 test_eq(force(lazy1), 2, "lazy evaluation")
 

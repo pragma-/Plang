@@ -538,7 +538,7 @@ sub variable_declaration($self, $scope, $data) {
         my $default_value = $self->{types}->resolve_default_value($type);
 
         if (defined $default_value) {
-            $right_value = $self->evaluate($scope, $default_value);
+            $right_value = $default_value;
 
             # desugar AST to include type default value as initializer
             $data->[3] = $default_value;
@@ -777,10 +777,6 @@ sub function_definition($self, $scope, $data) {
     my $func_type   = ['TYPEFUNC', 'Function', $param_types, $ret_type];
     my $func_data   = [$scope, $ret_type, $parameters, $expressions];
     my $func        = [$func_type, $func_data, $pos];
-
-    if ($name =~ /^#anon/) {
-        $name = "#anon$func";
-    }
 
     if (!$self->{repl} and exists $scope->{locals}->{$name} and $scope->{locals}->{$name}->[0][1] ne 'Builtin') {
         $self->error($scope, "cannot define function `$name` with same name as existing local", $pos);
@@ -1199,48 +1195,24 @@ sub keyword_type($self, $scope, $data) {
     my $value = $data->[3];
 
     if ($self->get_variable($scope, $name, locals_only => 1)) {
-        $self->error($scope, "cannot define a new type `$name` with same name as existing variable", $self->position($data));
+        $self->error($scope, "cannot define a new type `$name` with same name as existing local", $self->position($data));
     }
 
-    # handle TYPEMAP specially
-    if ($type->[0] eq 'TYPEMAP') {
-        my $map = $type->[1];
-
-        foreach my $entry (@$map) {
-            # these variables shadow the outer variables
-            my $name = $entry->[0];
-            my $type = $entry->[1];
-            my $value = $entry->[2];
-
-            if (defined $value) {
-                my $evalue = $self->evaluate($scope, $value);
-
-                if ($self->{types}->check($type, ['TYPE', 'Any'])) {
-                    # desugar AST to inferred type
-                    $entry->[1] = $evalue->[0];
-                } else {
-                    if (not $self->{types}->check($type, $evalue->[0])) {
-                        $self->error($scope, "map entry `$name` defined as " . $self->{types}->to_string($type) . ' cannot use a default value of type ' . $self->{types}->to_string($evalue->[0]), $self->position($data));
-                    }
-                }
-            }
-        }
-    }
-
-    # otherwise check for a default value
-    elsif (defined $value) {
+    # check for a default value
+    if (defined $value) {
         my $evalue = $self->evaluate($scope, $value);
 
         if ($self->{types}->check($type, ['TYPE', 'Any'])) {
-            $type = $evalue->[0];
-
-            # desugar AST to aliased type
-            $data->[1] = ['TYPE', $name];
+            # infer type from value
+            $type->[0] = $evalue->[0][0];
+            $type->[1] = $evalue->[0][1];
         } else {
             if (not $self->{types}->check($type, $evalue->[0])) {
                 $self->error($scope, "new type `$name` defined as " . $self->{types}->to_string($type) . ' cannot use a default value of type ' . $self->{types}->to_string($evalue->[0]), $self->position($data));
             }
         }
+
+        $value = $evalue;
     }
 
     $type = [$type->[0], $type->[1], $value, $type->[2]];

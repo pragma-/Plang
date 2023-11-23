@@ -89,3 +89,11 @@ var foo : Foo
 
 test_eq(typeof(foo), "Integer", "Foo type") # TODO: should be "Foo aka Thing aka Port aka Integer"
 test_eq(foo, 8080, "Foo default value")
+
+type S = fn add(a, b) a+b
+var a: S
+a(4, 5).print()
+var b: S
+b(3,4).print()
+
+test_stdout("9\n7\n")

@@ -114,7 +114,11 @@ sub function_call($self, $scope, $data) {
     my $text = '';
 
     if ($target->[0] == INSTR_IDENT) {
-        $text .= "$target->[1]";
+        if (ref $target->[1] eq 'ARRAY') {
+            $text .= "BEFORE-DESUGAR " . (join '::', $target->[1]->@*);
+        } else {
+            $text .= "$target->[1]";
+        }
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $text .= '#anon-' . $target;
     } else {
@@ -141,9 +145,9 @@ sub function_definition($self, $scope, $data) {
     my $parameters  = $data->[3];
     my $expressions = $data->[4];
 
-    my $text = "";
+    my $text = '';
 
-    $text .= "(return-type " . $self->{types}->to_string($ret_type) . ") ";
+    $text .= '(return-type ' . $self->{types}->to_string($ret_type) . ') ';
 
     my @params;
 
@@ -161,7 +165,7 @@ sub function_definition($self, $scope, $data) {
     }
 
     if (@params) {
-        $text .= '(params "'. (join ' ', @params) . ') ';
+        $text .= '(params '. (join ' ', @params) . ') ';
     }
 
     my @exprs;

@@ -670,21 +670,24 @@ sub TypeArray($parser) {
 
 # TypeFunction ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
 sub TypeFunction($parser) {
+    $parser->try('TypeFunction');
+
     my $token = $parser->next_token('peek') // return;
 
     my $kind = $token->[1];
 
-    if (defined $kind and ($kind eq 'Function' or  $kind eq 'Builtin')) {
+    if ($token->[0] == TOKEN_TYPE && ($kind eq 'Function' ||  $kind eq 'Builtin')) {
         $parser->consume;
 
         my $params = TypeFunctionParams($parser) // [];
 
         my $return_type = TypeFunctionReturn($parser) // ['TYPE', 'Any'];
 
+        $parser->advance;
         return ['TYPEFUNC', $kind, $params, $return_type, token_position($token)];
     }
 
-    return;
+    $parser->backtrack;
 }
 
 # TypeFunctionParams ::= "(" {Type [","]}* ")"
@@ -699,7 +702,10 @@ sub TypeFunctionParams($parser) {
 
             $parser->consume(TOKEN_COMMA);
             last if $parser->consume(TOKEN_R_PAREN);
-            expected($parser, 'type name or ")"');
+
+            if (not $type) {
+                expected($parser, 'type name or ")"');
+            }
         }
 
         return $types;

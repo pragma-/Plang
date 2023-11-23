@@ -223,7 +223,7 @@ sub consume($self, $wanted = undef) {
         return $token;
     }
 
-    $self->{debug}->{print}->('PARSER', "Got " . $pretty_token[$token->[0]] . " instead\n", $self->{indent}) if $debug;
+    $self->{debug}->{print}->('PARSER', "Got " . $pretty_token[$token->[0]] . " (" . $self->{clean}->($token->[1]) . ") instead\n", $self->{indent}) if $debug;
     return;
 }
 

@@ -10,7 +10,9 @@ use feature 'signatures';
 
 use Plang::AST::Dumper;
 use Plang::Constants::Instructions ':all';
+
 use Data::Dumper;
+use Devel::StackTrace;
 
 sub new($class, %args) {
     my $self = bless {}, $class;
@@ -133,13 +135,22 @@ sub get_alias($self, $name) {
 
 # resolve a type to an alias
 sub resolve_alias($self, $type) {
-    my $alias = $self->{aliases}->{$type->[1]};
+    if ($type->[0] eq 'TYPE' || $type->[0] eq 'NEWTYPE') {
+        if (defined $type->[2]) {
+            return $type->[2][0];
+        }
 
-    if ($alias) {
-        if ($alias->[0] eq 'TYPE') {
-            return $self->resolve_alias($alias);
-        } else {
-            return $alias;
+        my $alias = $self->{aliases}->{$type->[1]};
+
+        if ($alias) {
+            if ($alias->[0] eq 'TYPE') {
+                return $self->resolve_alias($alias);
+            } else {
+                if (defined $alias->[2]) {
+                    return $alias->[2][0];
+                }
+                return $alias;
+            }
         }
     }
 
@@ -156,21 +167,11 @@ sub resolve_default_value($self, $type) {
         my $alias = $self->{aliases}->{$type->[1]};
 
         if ($alias) {
-            return $self->resolve_default_value($alias);
-        }
-    } elsif ($type->[0] eq 'TYPEMAP') {
-        my $map = $type->[1];
-        my @props;
-
-        foreach my $entry (@$map) {
-            if (defined $entry->[2]) {
-                push @props, [[INSTR_LITERAL, ['TYPE', 'String'], $entry->[0]], $entry->[2], $entry->[2][-1]];
+            if ($alias->[0] eq 'TYPE') {
+                return $self->resolve_default_value($alias);
+            } elsif (defined $alias->[2]) {
+                return $alias->[2];
             }
-        }
-
-        # construct a map if any entries have a default value
-        if (@props) {
-            return [INSTR_MAPCONS, \@props, $type->[-1]];
         }
     }
 
@@ -203,6 +204,10 @@ sub to_string($self, $type, $default_value = undef) {
         my $type_alias = $self->{aliases}->{$type->[1]};
 
         if ($type_alias) {
+            if (defined $type_alias->[2]) {
+                $type_alias = $type_alias->[2][0];
+            }
+
             return "$type->[1] aka " . $self->to_string($type_alias);
         } else {
             return $type->[1];
@@ -255,6 +260,9 @@ sub to_string($self, $type, $default_value = undef) {
 
         return "$kind $param_string -> $return_string";
     }
+
+    my $trace = Devel::StackTrace->new(indent => 1, ignore_class => ['Plang::Interpreter', 'main']);
+    print "  at ", $trace->as_string(), "\n";
 
     die "[to-string] unknown type\n";
 }
@@ -451,8 +459,7 @@ sub check($self, $guard, $type) {
     if ($self->{debug}) {
         $self->{debug}->{print}->('TYPES', "type check " . Dumper($guard) . " vs " . Dumper($type) . "\n");
 
-        if ($self->{debug}->{tags}->{TYPES}) {
-            use Devel::StackTrace;
+        if ($self->{debug}->{tags}->{TYPESV}) {
             my $trace = Devel::StackTrace->new(indent => 1, ignore_class => ['Plang::Interpreter', 'main']);
             print "  at ", $trace->as_string(), "\n";
         }

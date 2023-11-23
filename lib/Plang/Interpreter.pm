@@ -16,7 +16,7 @@ use Plang::Parser;
 use Plang::ParseRules qw/Program/;
 use Plang::Types;
 use Plang::Modules;
-
+use Plang::AST::Dumper;
 use Plang::AST::Validator;
 use Plang::Interpreter::AST;
 
@@ -137,8 +137,14 @@ sub initialize($self, %conf) {
 
     $self->{namespace} = {};
 
+    $self->{dumper} = Plang::AST::Dumper->new(
+        debug      => $self->{debug},
+        types      => $self->{types},
+    );
+
     $self->{modules} = Plang::Modules->new(
         debug      => $self->{debug},
+        dumper     => $self->{dumper},
         parser     => $self->{parser},
         types      => $self->{types},
         modpath    => $self->{modpath},
@@ -147,6 +153,7 @@ sub initialize($self, %conf) {
 
     $self->{validator} = Plang::AST::Validator->new(
         debug      => $self->{debug},
+        dumper     => $self->{dumper},
         types      => $self->{types},
         namespace  => $self->{namespace},
     );
@@ -154,6 +161,7 @@ sub initialize($self, %conf) {
     $self->{interpreter} = Plang::Interpreter::AST->new(
         embedded   => $conf{embedded},
         debug      => $self->{debug},
+        dumper     => $self->{dumper},
         types      => $self->{types},
         namespace  => $self->{namespace},
     );

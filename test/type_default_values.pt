@@ -1,0 +1,16 @@
+type A = 42
+var a: A
+test_eq(a, 42)
+test_eq(typeof(a), "Integer")
+
+type B = {'x' = "foo", 'y' = 42}
+var b: B
+test_eq(b.x, "foo")
+test_eq(b.y, 42)
+test_eq(typeof(b), '{"x": String, "y": Integer}')
+
+type C: {'foo': Real, 'bar': String} = {'foo' = 3.14159, 'bar' = "pi"}
+var c: C
+test_eq(c.foo, 3.14159)
+test_eq(c.bar, "pi")
+test_eq(typeof(c), '{"bar": String, "foo": Real}')

@@ -1,0 +1,5 @@
+
+type B = {'x' = "foo", 'y' = 42}
+var b: B
+b.x = false
+# Validator error: cannot assign to Map key `x` a value of type Boolean (expected String) at line 4, col 5

@@ -1,0 +1,4 @@
+
+type B = {'x' = "foo", 'y' = 42}
+var b: B = {'x' = 5, 'y' = 6}
+# Validator error: cannot initialize `b` with value of type {"x": Integer, "y": Integer} (expected B aka {"x": String, "y": Integer}) at line 3, col 1

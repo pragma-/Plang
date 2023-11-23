@@ -9,13 +9,11 @@ use warnings;
 use strict;
 use feature 'signatures';
 
+use Plang::AST::Validator;
+use Plang::Constants::Instructions ':all';
+
 use Data::Dumper;
 use Devel::StackTrace;
-
-use Plang::AST::Validator;
-use Plang::AST::Dumper;
-
-use Plang::Constants::Instructions ':all';
 
 BEGIN {
     $Data::Dumper::Indent = 0;
@@ -25,17 +23,15 @@ BEGIN {
 sub new($class, %args) {
     my $self = bless {}, $class;
     $self->initialize(%args);
-    $self->init_ast_dumper();
     return $self;
 }
 
 sub initialize($self, %conf) {
-    $self->{ast}      = $conf{ast};
-    $self->{debug}    = $conf{debug};
-    $self->{embedded} = $conf{embedded} // 0;
-
-    $self->{types} = $conf{types} // die 'Missing types';
-
+    $self->{ast}       = $conf{ast};
+    $self->{debug}     = $conf{debug};
+    $self->{dumper}    = $conf{dumper};
+    $self->{embedded}  = $conf{embedded} // 0;
+    $self->{types}     = $conf{types};
     $self->{namespace} = $conf{namespace};
 
     $self->{instr_dispatch} = [];
@@ -103,13 +99,6 @@ sub initialize($self, %conf) {
     $self->{instr_dispatch}->[INSTR_LT]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_EQ]     = \&binary_op;
     $self->{instr_dispatch}->[INSTR_NEQ]    = \&binary_op;
-}
-
-sub init_ast_dumper($self) {
-    $self->{dumper} = Plang::AST::Dumper->new(
-        types => $self->{types},
-        debug => $self->{debug},
-    );
 }
 
 sub override_instruction($self, $instr, $sub) {
@@ -489,6 +478,11 @@ sub get_variable($self, $scope, $name, %opt) {
     if (!$opt{locals_only} and defined $scope->{parent}) {
         my ($var, $var_scope) = $self->get_variable($scope->{parent}, $name);
         return ($var, $var_scope) if defined $var;
+    }
+
+    # check builtins
+    if (exists $self->{namespace}->{builtins}->{$name}) {
+        return $self->{namespace}->{builtins}->{$name};
     }
 
     # otherwise it's an undefined variable

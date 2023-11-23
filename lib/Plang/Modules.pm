@@ -35,7 +35,7 @@ sub keyword_import($self, $scope, $data) {
     my $alias  = $data->[2][1][0]; # alias identifier always has one entry
     my $pos    = $data->[1][2];
 
-    eval { $self->import_module($target) };
+    eval { $self->import_module($target, $alias) };
 
     if (my $exception = $@) {
         chomp $exception;
@@ -57,7 +57,7 @@ sub identifier($self, $scope, $data) {
     }
 }
 
-sub import_module($self, $target) {
+sub import_module($self, $target, $alias) {
     my $interp = Plang::Interpreter->new(
         path     => $self->{path},
         embedded => $self->{embedded},
@@ -91,6 +91,7 @@ sub import_module($self, $target) {
     my $importer = Plang::ModuleImporter->new(
         ast        => $ast,
         target     => (join '::', @$target),
+        alias      => $alias,
         types      => $self->{types},
         namespace  => $self->{namespace}
     );

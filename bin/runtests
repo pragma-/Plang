@@ -221,7 +221,11 @@ foreach my $test (@selected_tests) {
             push @failed, [$test_file, 'EXCEPTION', $exception, 'No exception'];
             print 'X';
         }
+    } elsif (defined $expected_error) {
+        push @failed, [$test_file, 'EXPECTED EXCEPTION', 'No exception', $expected_error];
+        print 'X';
     }
+
 }
 
 print "\nPass: ", scalar @passed, "; Fail: ", scalar @failed, "\n";

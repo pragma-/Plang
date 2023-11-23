@@ -1,0 +1,2 @@
+var x: Function (Integer, Integer) -> Integer = fn (x: Real, y: Real) x - y
+# Validator error: cannot initialize `x` with value of type Function (Real, Real) -> Real (expected Function (Integer, Integer) -> Integer) at line 1, col 1

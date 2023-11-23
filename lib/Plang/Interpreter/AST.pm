@@ -16,10 +16,10 @@ use warnings;
 use strict;
 use feature 'signatures';
 
-use Plang::Constants::Instructions ':all';
-
 use Data::Dumper;
 use Devel::StackTrace;
+
+use Plang::Constants::Instructions ':all';
 
 sub initialize($self, %conf) {
     $self->SUPER::initialize(%conf);
@@ -1265,7 +1265,7 @@ sub run($self, $ast = undef, %opt) {
         my $type = ['TYPEFUNC', 'Builtin', $param_types, $ret_type];
         my $data = [$scope, $ret_type, $param_whatis, undef];
 
-        $self->set_variable($scope, $builtin, [$type, $data]);
+        $self->{namespace}->{builtins}->{$builtin} = [$type, $data];
     }
 
     # interpret the expressions
