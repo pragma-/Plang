@@ -1,0 +1,2 @@
+import BadModule1
+# Import error: expected module BadModule1 but found BadName at line 1, col 8

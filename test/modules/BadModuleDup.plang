@@ -1,0 +1,5 @@
+module BadModuleDup
+
+module BadModuleDup
+
+var x = 42

@@ -209,10 +209,6 @@ sub function_definition($self, $scope, $data) {
 
     my $func = [['TYPEFUNC', 'Function', $param_types, $ret_type], [$scope, $ret_type, $parameters, $expressions]];
 
-    if ($name eq '#anonymous') {
-        $name = "anonfunc$func";
-    }
-
     $scope->{locals}->{$name} = $func;
     return $func;
 }

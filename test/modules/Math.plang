@@ -1,0 +1,5 @@
+module Math
+
+var pi = 3.14159
+
+var two_pi = pi * 2.0

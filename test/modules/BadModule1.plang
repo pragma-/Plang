@@ -1,0 +1,3 @@
+module BadName
+
+var x = 42

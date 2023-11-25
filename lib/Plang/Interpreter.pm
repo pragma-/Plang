@@ -142,6 +142,13 @@ sub initialize($self, %conf) {
         types      => $self->{types},
     );
 
+    $self->{validator} = Plang::AST::Validator->new(
+        debug      => $self->{debug},
+        dumper     => $self->{dumper},
+        types      => $self->{types},
+        namespace  => $self->{namespace},
+    );
+
     $self->{modules} = Plang::Modules->new(
         debug      => $self->{debug},
         dumper     => $self->{dumper},
@@ -149,13 +156,7 @@ sub initialize($self, %conf) {
         types      => $self->{types},
         modpath    => $self->{modpath},
         namespace  => $self->{namespace},
-    );
-
-    $self->{validator} = Plang::AST::Validator->new(
-        debug      => $self->{debug},
-        dumper     => $self->{dumper},
-        types      => $self->{types},
-        namespace  => $self->{namespace},
+        validator  => $self->{validator},
     );
 
     $self->{interpreter} = Plang::Interpreter::AST->new(
@@ -199,11 +200,11 @@ sub load_file($self, $filename, %opts) {
     my $path     = dirname($realpath);
 
     open(my $fh, "< :encoding(UTF-8)", $filename)
-        || die "Can't open $filename: $!\n";
+        || die "can't open $filename: $!\n";
 
     my $content = do { local $/; <$fh> };
 
-    close($fh) || die "Can't close $filename: $!\n";
+    close($fh) || die "can't close $filename: $!\n";
 
     $self->{path} = $path;
 
@@ -323,13 +324,19 @@ sub interpret($self, %opt) {
 }
 
 sub interpret_stream($self, $stream, %opt) {
-    $self->reset_types unless $opt{repl};
+    unless ($opt{repl}) {
+        $self->reset_modules;
+        $self->reset_types;
+    }
     $self->parse_stream($stream);
     return $self->interpret(%opt);
 }
 
 sub interpret_string($self, $string, %opt) {
-    $self->reset_types unless $opt{repl};
+    unless ($opt{repl}) {
+        $self->reset_modules;
+        $self->reset_types;
+    }
     $self->parse_string($string);
     return $self->interpret(%opt);
 }

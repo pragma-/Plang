@@ -1,0 +1,5 @@
+module BadModule2
+
+module Oops
+
+var x = 42

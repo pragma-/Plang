@@ -1,0 +1,2 @@
+import BadModuleDup
+# Import error: duplicate use of `module` for BadModuleDup at line 3, col 8

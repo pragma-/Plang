@@ -1,8 +1,6 @@
 #!/usr/bin/env perl
 
 # Parses and importss Plang modules.
-# Desugars identifiers into INSTR_IDENT or INSTER_QIDENT depending on
-# whether the identifier is namespace-qualified (i.e. Foo::Bar) or not.
 
 package Plang::Modules;
 use parent 'Plang::AST::Walker';
@@ -24,40 +22,52 @@ use File::Basename qw(dirname);
 sub initialize($self, %conf) {
     $self->SUPER::initialize(%conf);
 
-    $self->{modpath} = $conf{modpath};
+    $self->{modpath}   = $conf{modpath};
+    $self->{validator} = $conf{validator};
 
     $self->override_instruction(INSTR_IMPORT, \&keyword_import);
-    $self->override_instruction(INSTR_IDENT,  \&identifier);
+}
+
+sub error($self, $scope, $err_msg, $position = undef) {
+    chomp $err_msg;
+
+    if (defined $position) {
+        my $line = $position->{line};
+        my $col  = $position->{col};
+
+        if (defined $line) {
+            $err_msg .= " at line $line, col $col";
+        } else {
+            $err_msg .= " at EOF";
+        }
+    }
+
+    $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
+    die "Module import error: $err_msg\n";
 }
 
 sub keyword_import($self, $scope, $data) {
-    my $target = $data->[1][1];
-    my $alias  = $data->[2][1][0]; # alias identifier always has one entry
+    my $target = $data->[1];
+    my $alias  = $data->[2][1];
     my $pos    = $data->[1][2];
 
-    eval { $self->import_module($target, $alias) };
+    if ($target->[0] == INSTR_IDENT) {
+        $target = [$target->[1]];
+    }
+    elsif ($target->[0] == INSTR_QIDENT) {
+        $target = $target->[1];
+    } else {
+        $self->error($scope, "unknown instruction $target->[0] for import target", $pos);
+    }
+
+    eval { $self->import_module($target, $alias, $scope, $pos) };
 
     if (my $exception = $@) {
-        chomp $exception;
-        print STDERR "$exception at line $pos->{line}, col $pos->{col}\n";
-        exit 1;
+        die $exception;
     }
 }
 
-sub identifier($self, $scope, $data) {
-    my $ident = $data->[1];
-
-    if (@$ident == 1) {
-        $data->[1] = $ident->[0];
-    } else {
-        $data->[0] = INSTR_QIDENT;
-        my @module = $data->[1]->@*;
-        my $name   = pop @module;
-        $data->[1] = [(join '::', @module), $name];
-    }
-}
-
-sub import_module($self, $target, $alias) {
+sub import_module($self, $target, $alias, $scope, $pos) {
     my $interp = Plang::Interpreter->new(
         path     => $self->{path},
         embedded => $self->{embedded},
@@ -80,13 +90,15 @@ sub import_module($self, $target, $alias) {
 
     if (not defined $content) {
         if (my $exception = $@) {
-            die $exception;
+            $self->error($scope, $exception, $pos);
         } else {
-            die "Failed to find module " . (join '::', @$target) . "\n";
+            $self->error($scope, "failed to find module " . (join '::', @$target) . "\n", $pos);
         }
     }
 
     my $ast = $interp->parse_string($content);
+
+    $self->{validator}->validate($ast);
 
     my $importer = Plang::ModuleImporter->new(
         ast        => $ast,
@@ -99,7 +111,8 @@ sub import_module($self, $target, $alias) {
     $importer->walk();
 }
 
-sub reset_modules() {
+sub reset_modules($self) {
+    $self->{namespace}->{modules} = {};
 }
 
 sub import_modules($self, $ast, %opts) {

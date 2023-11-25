@@ -1,0 +1,3 @@
+import Math
+var x = Math::bi
+# Validator error: undeclared qualified identifier `Math::bi` at line 2, col 9

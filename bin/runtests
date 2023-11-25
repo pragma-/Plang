@@ -56,7 +56,12 @@ my $output;      # stdout output from Plang program
 
 # create our $plang object in embedded mode
 use Plang::Interpreter;
-my $plang = Plang::Interpreter->new(embedded => 1, debug => $ENV{DEBUG});
+
+my $plang = Plang::Interpreter->new(
+    embedded => 1,
+    debug    => $ENV{DEBUG},
+    modpath  => ["$RealBin/../modules/", "$RealBin/../test/modules/"],
+);
 
 # override the Plang builtin `print` function so we can collect
 # the output for testing, instead of printing it

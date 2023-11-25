@@ -1,0 +1,13 @@
+import Math
+
+test_eq(Math::pi, 3.14159)
+
+test_eq(Math::two_pi, Math::pi * 2.0)
+
+
+
+import Bad::Math as B
+
+test_eq(B::pi, 4.15)
+
+test_eq(B::two_pi, B::pi * 3.0)

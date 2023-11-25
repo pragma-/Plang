@@ -1,0 +1,2 @@
+import BadModule2
+# Import error: cannot redefine module BadModule2 as Oops at line 3, col 8

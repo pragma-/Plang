@@ -361,9 +361,9 @@ sub qualified_identifier($self, $scope, $data) {
     my $module     = $data->[1][0];
     my $identifier = $data->[1][1];
 
-    if (exists $self->{namespace}->{$module}
-            and exists $self->{namespace}->{$module}->{$identifier}) {
-        return $self->{namespace}->{$module}->{$identifier};
+    if (exists $self->{namespace}->{modules}->{$module}
+            and exists $self->{namespace}->{modules}->{$module}->{$identifier}) {
+        return $self->{namespace}->{modules}->{$module}->{$identifier};
     }
     return undef;
 }

@@ -499,7 +499,7 @@ sub KeywordImport($parser) {
         }
     }
 
-    return [INSTR_IMPORT, $identifier, [INSTR_IDENT, [$alias->[1]], token_position($alias)]];
+    return [INSTR_IMPORT, $identifier, [INSTR_IDENT, $alias->[1], token_position($alias)]];
 }
 
 # Initializer ::= "=" Expression
@@ -608,7 +608,7 @@ sub TypeMap($parser) {
                     $parsedkey->[1] =~ s/^'|'$//g;
                     $mapkey = [['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } else {
-                    $mapkey = [INSTR_IDENT, [$parsedkey->[1]], token_position($parsedkey)];
+                    $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
                 }
 
                 my $type;
@@ -812,7 +812,7 @@ sub MapConstructor($parser) {
                     $parsedkey->[1] =~ s/^'|'$//g;
                     $mapkey = [INSTR_LITERAL, ['TYPE', 'String'], $parsedkey->[1], token_position($parsedkey)];
                 } else {
-                    $mapkey = [INSTR_IDENT, [$parsedkey->[1]], token_position($parsedkey)];
+                    $mapkey = [INSTR_IDENT, $parsedkey->[1], token_position($parsedkey)];
                 }
 
                 if (not $parser->consume(TOKEN_ASSIGN)) {
@@ -1059,7 +1059,11 @@ sub Identifier($parser) {
         push @path, $identifier->[1];
     }
 
-    return [INSTR_IDENT, \@path, token_position($token)];
+    if (@path == 1) {
+        return [INSTR_IDENT, $path[0], token_position($token)];
+    } else {
+        return [INSTR_QIDENT, \@path, token_position($token)];
+    }
 }
 
 # LiteralInteger ::= {"0" .. "9"}+
@@ -1173,7 +1177,7 @@ sub PrefixLParen($parser) {
 sub PrefixType($parser) {
     my $token = $parser->consume(TOKEN_TYPE);
     # convert to identifier to invoke builtin function for type conversion
-    return [INSTR_IDENT, [$token->[1]], token_position($token)];
+    return [INSTR_IDENT, $token->[1], token_position($token)];
 }
 
 my @prefix_dispatcher;

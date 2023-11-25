@@ -5,7 +5,7 @@
 # identifiers into qualified identifiers (i.e. `foo` into `module::foo`).
 
 package Plang::ModuleImporter;
-use parent 'Plang::AST::Walker';
+use parent 'Plang::Interpreter::AST';
 
 use warnings;
 use strict;
@@ -26,8 +26,8 @@ sub initialize($self, %conf) {
     $self->SUPER::initialize(%conf);
 
     $self->{target} = $conf{target};
+    $self->{alias}  = $conf{alias};
 
-    # main instructions
     $self->override_instruction(INSTR_MODULE,  \&keyword_module);
     $self->override_instruction(INSTR_IMPORT,  \&keyword_import);
     $self->override_instruction(INSTR_IDENT,   \&identifier);
@@ -52,17 +52,42 @@ sub error($self, $scope, $err_msg, $position = undef) {
     }
 
     $self->{debug}->{print}->('ERRORS', "Got error: $err_msg\n") if $self->{debug};
-    die "Module import error: $err_msg\n";
+    die "Import error: $err_msg\n";
 }
 
 sub keyword_module($self, $scope, $data) {
-    my $name = join '::', $data->[1][1]->@*;
+    my $target = $data->[1];
 
-    if (defined $self->{module}) {
-        $self->error($scope, "Cannot redefine module $self->{module} name as $name", $self->position($data));
+    if ($target->[0] == INSTR_IDENT) {
+        $target = $target->[1];
+    }
+    elsif ($target->[0] == INSTR_QIDENT) {
+        $target = join '::', $target->[1]->@*;
+    } else {
+        die "Unknown instruction $target->[0] for module target";
     }
 
-    $self->{module} = $name;
+    if (defined $self->{module}) {
+        if ($self->{module} eq $target) {
+            $self->error($scope, "duplicate use of `module` for $target", $self->position($data->[1]));
+        } else {
+            $self->error($scope, "cannot redefine module $self->{module} as $target", $self->position($data->[1]));
+        }
+    }
+
+    if ($target ne $self->{target}) {
+        $self->error($scope, "expected module $self->{target} but found $target", $self->position($data->[1]));
+    }
+
+    if (defined $self->{alias}) {
+        $self->{module} = $self->{alias};
+    } else {
+        $self->{module} = $target;
+    }
+
+    if (exists $self->{targetspace}->{$self->{module}}) {
+        $self->error($scope, "there already exists a module loaded as $self->{module}", $self->position($data->[1]));
+    }
 }
 
 sub variable_declaration($self, $scope, $data) {
@@ -70,24 +95,18 @@ sub variable_declaration($self, $scope, $data) {
     my $name        = $data->[2];
     my $initializer = $data->[3];
 
-    if ($initializer) {
-        $self->evaluate($scope, $initializer);
-    } else {
-        $initializer = [INSTR_LITERAL, ['TYPE', 'Null'], undef, $self->position($data)];
-    }
+    my $result = $self->SUPER::variable_declaration($scope, $data);
 
     if (!exists $scope->{parent}) {
         if (!defined $self->{module}) {
-            $self->error($scope, "Cannot declare variable $name before module name", $self->position($data));
+            $self->error($scope, "cannot declare variable $name before module name", $self->position($data));
         }
 
-        if (exists $self->{namespace}->{$self->{module}}->{$name}) {
-            $self->error($scope, "Cannot redeclare existing variable $name", $self->position($data));
+        if (exists $self->{namespace}->{modules}->{$self->{module}}->{$name}) {
+            $self->error($scope, "cannot redeclare existing local $name", $self->position($data));
         }
 
-        $self->{namespace}->{$self->{module}}->{$name} = $data;
-    } else {
-        $scope->{locals}->{$name} = 1;
+        $self->{namespace}->{modules}->{$self->{module}}->{$name} = $result;
     }
 }
 
@@ -98,14 +117,14 @@ sub function_definition($self, $scope, $data) {
 
     if (!exists $scope->{parent} && $name !~ /^#/) {
         if (!defined $self->{module}) {
-            $self->error($scope, "Cannot define function $name before module name", $self->position($data));
+            $self->error($scope, "cannot define function $name before module name", $self->position($data));
         }
 
-        if (exists $self->{namespace}->{$self->{module}}->{$name}) {
-            $self->error($scope, "Cannot redefine existing function $name", $self->position($data));
+        if (exists $self->{namespace}->{modules}->{$self->{module}}->{$name}) {
+            $self->error($scope, "cannot redefine existing local $name", $self->position($data));
         }
 
-        $self->{namespace}->{$self->{module}}->{$name} = $data;
+        $self->{namespace}->{modules}->{$self->{module}}->{$name} = $data;
     }
 
     my $func_scope = $self->new_scope($scope);
@@ -131,6 +150,10 @@ sub keyword_type($self, $scope, $data) {
     my $name  = $data->[2];
     my $value = $data->[3];
 
+    if (!defined $self->{module}) {
+        $self->error($scope, "cannot define type $name before module name", $self->position($data));
+    }
+
     if (defined $value) {
         $self->evaluate($scope, $value);
     }
@@ -149,19 +172,18 @@ sub keyword_type($self, $scope, $data) {
 }
 
 sub identifier($self, $scope, $data) {
-    # disregard qualified identifiers
-    if ($data->[1]->@* != 1) {
-        return;
-    }
+    my $result = $self->SUPER::identifier($scope, $data);
+    my $ident = $data->[1];
 
-    my $name = $data->[1][0];
+    my ($var, $var_scope) = $self->get_variable($scope, $ident);
 
-    my ($var, $var_scope) = $self->get_variable($scope, $name);
-
-    if (!defined $var && exists $self->{namespace}->{$self->{module}}->{$name}) {
+    # convert identifier to qualified identifier
+    if (!defined $var && exists $self->{identspace}->{$self->{module}}->{$ident}) {
         $data->[0] = INSTR_QIDENT;
-        $data->[1] = [$self->{module}, $name];
+        $data->[1] = [$self->{module}, $ident];
     }
+
+    return $result;
 }
 
 sub keyword_import($self, $scope, $data) {}

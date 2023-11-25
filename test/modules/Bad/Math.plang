@@ -1,0 +1,5 @@
+module Bad::Math
+
+var pi = 4.15
+
+var two_pi = pi * 3.0

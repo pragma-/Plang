@@ -30,6 +30,7 @@ sub initialize($self, %conf) {
     # validate these main instructions
     $self->override_instruction(INSTR_EXPR_GROUP, \&expression_group);
     $self->override_instruction(INSTR_IDENT, \&identifier);
+    $self->override_instruction(INSTR_QIDENT, \&qualified_identifier);
     $self->override_instruction(INSTR_LITERAL, \&literal);
     $self->override_instruction(INSTR_VAR, \&variable_declaration);
     $self->override_instruction(INSTR_ARRAYCONS, \&array_constructor);
@@ -517,6 +518,12 @@ sub identifier($self, $scope, $data) {
     my ($var) = $self->get_variable($scope, $data->[1]);
     $var // $self->error($scope, "undeclared variable `$data->[1]`", $data->[2]);
     return $var;
+}
+
+sub qualified_identifier($self, $scope, $data) {
+    my $result = $self->SUPER::qualified_identifier($scope, $data);
+    $result // $self->error($scope, 'undeclared qualified identifier `' . join('::', $data->[1]->@*) . '`', $data->[2]);
+    return $result;
 }
 
 sub literal($self, $scope, $data) {

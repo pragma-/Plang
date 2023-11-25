@@ -114,11 +114,7 @@ sub function_call($self, $scope, $data) {
     my $text = '';
 
     if ($target->[0] == INSTR_IDENT) {
-        if (ref $target->[1] eq 'ARRAY') {
-            $text .= "BEFORE-DESUGAR " . (join '::', $target->[1]->@*);
-        } else {
-            $text .= "$target->[1]";
-        }
+        $text .= $target->[1];
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $text .= '#anon-' . $target;
     } else {
@@ -472,15 +468,7 @@ sub binary_op($self, $scope, $data) {
 }
 
 sub identifier($self, $scope, $data) {
-    my $name;
-
-    if (ref $data->[1] eq 'ARRAY') {
-        $name = 'BEFORE-DESUGAR ' . (join '::', $data->[1]->@*);
-    } else {
-        $name = $data->[1];
-    }
-
-    return "(ident $name)";
+    return "(ident $data->[1])";
 }
 
 sub qualified_identifier($self, $scope, $data) {

@@ -1,0 +1,2 @@
+import BadModuleBadDecl
+# Import error: cannot declare variable x before module name at line 1, col 1
