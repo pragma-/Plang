@@ -6,84 +6,87 @@ This README describes what is implemented so far.
 <details><summary>Click to show table of contents</summary>
 
 <!-- md-toc-begin -->
-* [Plang](#plang)
-  * [Project structure](#project-structure)
-  * [Running Plang](#running-plang)
-    * [DEBUG environment variable](#debug-environment-variable)
-    * [REPL](#repl)
-  * [Embedding Plang](#embedding-plang)
-  * [Running the Unit Tests](#running-the-unit-tests)
-  * [Example Plang scripts](#example-plang-scripts)
-  * [The Plang Language (so far)](#the-plang-language-so-far)
-      * [Operators](#operators)
-      * [Truthiness](#truthiness)
-    * [Identifiers](#identifiers)
-      * [Keywords](#keywords)
-    * [Variables](#variables)
-    * [Functions](#functions)
-      * [Uniform function call syntax](#uniform-function-call-syntax)
-      * [Optional type annotations](#optional-type-annotations)
-      * [Default arguments](#default-arguments)
-      * [Named arguments](#named-arguments)
-      * [Anonymous functions](#anonymous-functions)
-      * [Closures](#closures)
-      * [Currying](#currying)
-      * [Lazy evaluation](#lazy-evaluation)
-    * [Built-in functions](#built-in-functions)
-      * [Input/Output](#inputoutput)
-        * [print](#print)
-      * [Introspection](#introspection)
-        * [typeof](#typeof)
-        * [whatis](#whatis)
-      * [Data and structures](#data-and-structures)
-        * [length](#length)
-        * [map](#map)
-        * [filter](#filter)
-        * [Type conversion functions](#type-conversion-functions)
-    * [Scoping](#scoping)
-    * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
-      * [if/then/else](#ifthenelse)
-      * [while/next/last](#whilenextlast)
-      * [try/catch/throw](#trycatchthrow)
-    * [Type-checking](#type-checking)
-      * [Optional type annotations](#optional-type-annotations-1)
-      * [Type narrowing during inference](#type-narrowing-during-inference)
-      * [Type conversion](#type-conversion)
-      * [Type unions](#type-unions)
-      * [Defining new types](#defining-new-types)
-        * [Default values in new types](#default-values-in-new-types)
-        * [Inferring type from default values](#inferring-type-from-default-values)
-      * [Types](#types)
-        * [Any](#any)
-        * [Null](#null)
-        * [Boolean](#boolean)
-        * [Number](#number)
-        * [Integer](#integer)
-        * [Real](#real)
-        * [String](#string)
-        * [Array](#array)
-        * [Map](#map-1)
-        * [Function](#function)
-        * [Builtin](#builtin)
-    * [String operations](#string-operations)
-      * [Relational operations](#relational-operations)
-      * [Interpolation](#interpolation)
-      * [Concatenation](#concatenation)
-      * [Substring search](#substring-search)
-      * [Indexing](#indexing)
-      * [Substring](#substring)
-      * [Regular expressions](#regular-expressions)
-    * [Array operations](#array-operations)
-      * [Creating and accessing arrays](#creating-and-accessing-arrays)
-      * [map](#map-2)
-      * [filter](#filter-1)
-    * [Map operations](#map-operations)
-      * [Creating and accessing maps](#creating-and-accessing-maps)
-      * [keys](#keys)
-      * [values](#values)
-      * [exists](#exists)
-      * [delete](#delete)
-    * [Plang EBNF Grammar](#plang-ebnf-grammar)
+* [Project structure](#project-structure)
+* [Running Plang](#running-plang)
+  * [DEBUG environment variable](#debug-environment-variable)
+  * [REPL](#repl)
+* [Embedding Plang](#embedding-plang)
+* [Running the Unit Tests](#running-the-unit-tests)
+* [Example Plang scripts](#example-plang-scripts)
+* [The Plang Language (so far)](#the-plang-language-so-far)
+    * [Operators](#operators)
+    * [Truthiness](#truthiness)
+  * [Identifiers](#identifiers)
+    * [Keywords](#keywords)
+  * [Variables](#variables)
+  * [Functions](#functions)
+    * [Uniform function call syntax](#uniform-function-call-syntax)
+    * [Optional type annotations](#optional-type-annotations)
+    * [Default arguments](#default-arguments)
+    * [Named arguments](#named-arguments)
+    * [Anonymous functions](#anonymous-functions)
+    * [Closures](#closures)
+    * [Currying](#currying)
+    * [Lazy evaluation](#lazy-evaluation)
+  * [Built-in functions](#built-in-functions)
+    * [Input/Output](#inputoutput)
+      * [print](#print)
+    * [Introspection](#introspection)
+      * [typeof](#typeof)
+      * [whatis](#whatis)
+    * [Data and structures](#data-and-structures)
+      * [length](#length)
+      * [map](#map)
+      * [filter](#filter)
+      * [Type conversion functions](#type-conversion-functions)
+  * [Scoping](#scoping)
+  * [Expressions and ExpressionGroups](#expressions-and-expressiongroups)
+    * [if/then/else](#ifthenelse)
+    * [while/next/last](#whilenextlast)
+    * [try/catch/throw](#trycatchthrow)
+  * [Type-checking](#type-checking)
+    * [Optional type annotations](#optional-type-annotations-1)
+    * [Type narrowing during inference](#type-narrowing-during-inference)
+    * [Type conversion](#type-conversion)
+    * [Type unions](#type-unions)
+    * [Defining new types](#defining-new-types)
+      * [Default values in new types](#default-values-in-new-types)
+      * [Inferring type from default values](#inferring-type-from-default-values)
+    * [Types](#types)
+      * [Any](#any)
+      * [Null](#null)
+      * [Boolean](#boolean)
+      * [Number](#number)
+      * [Integer](#integer)
+      * [Real](#real)
+      * [String](#string)
+      * [Array](#array)
+      * [Map](#map-1)
+      * [Function](#function)
+      * [Builtin](#builtin)
+  * [String operations](#string-operations)
+    * [Relational operations](#relational-operations)
+    * [Interpolation](#interpolation)
+    * [Concatenation](#concatenation)
+    * [Substring search](#substring-search)
+    * [Indexing](#indexing)
+    * [Substring](#substring)
+    * [Regular expressions](#regular-expressions)
+  * [Array operations](#array-operations)
+    * [Creating and accessing arrays](#creating-and-accessing-arrays)
+    * [map](#map-2)
+    * [filter](#filter-1)
+  * [Map operations](#map-operations)
+    * [Creating and accessing maps](#creating-and-accessing-maps)
+    * [keys](#keys)
+    * [values](#values)
+    * [exists](#exists)
+    * [delete](#delete)
+  * [Modules](#modules)
+    * [qualified identifiers](#qualified-identifiers)
+    * [module](#module)
+    * [import](#import)
+  * [Plang EBNF Grammar](#plang-ebnf-grammar)
 <!-- md-toc-end -->
 
 </details>
@@ -295,6 +298,9 @@ Keywords are reserved identifiers that have a special meaning to Plang.
 
 Keyword | Description
 --- | ---
+module | module declaration
+import | import a module
+as | provides an alias for `import`, e.g. `import x as y`
 var | variable declaration
 fn | function definition
 return | return value from function
@@ -824,8 +830,8 @@ To define a `Person` type that is a Map with two properties:
 
 ```
     type Person : {
-       "name" : String,
-       "age"  : Integer
+        "name" : String,
+        "age"  : Integer
      }
 ```
 
@@ -848,12 +854,17 @@ You can optionally set default values in new types.
 
 ```
     type Person : {
-       "name" : String = "John Doe",
-       "age"  : Integer = 18
+        "name" : String
+        "age"  : Integer
+    } = {
+        "name" = "John Doe"
+        "age"  = 18
     }
 ```
 
-New variables of type `Person` will be initialized with the default values.
+New variables of type `Person` will be initialized with the default values. See
+the next section for a much more concise way to write the `Person` type by using
+type inference.
 
 ##### Inferring type from default values
 If you use a default value, you can omit the type. Plang will infer the type from the default value.
@@ -863,11 +874,14 @@ If you use a default value, you can omit the type. Plang will infer the type fro
 ```
 
 ```
-    type Person : {
+    type Person = {
        "name" = "John Doe",
        "age"  = 18
     }
 ```
+
+Note that here we use `type Person = { ... }` to set default values instead of `type Person : { ... }`
+to define types.
 
 #### Types
 The currently implemented types and their subtypes are:
@@ -1207,46 +1221,112 @@ the empty Map.
     > var m = {"a" = 1, "b" = 2}; delete m; m
      {}
 
+### Modules
+A module is a collection of related concepts in an independent source file. For
+example, the `Math` module may contain math-related concepts, such as variables
+like `Math::pi` and functions like `Math::abs()`.
+
+To create a module in your project, create a `modules/` directory and place the
+source file, i.e. `Math.plang` in it.
+
+You can create subdirectories within `modules/` to group related modules together.
+For example, a module `Math::Trig::Funcs` would be found as `modules/Math/Trig/Funcs.plang`.
+
+The `-m` switch to the `bin/plang` script allows you to define module search paths.
+Multiple `-m` switches may be provided to create a list of search paths. The paths
+will be searched in reverse order of the `-m` switches provided, starting from the
+last `-m` path.
+
+It is possible to have a module in the same directory as your source file by using
+`-m .` as a module search path.
+
+#### qualified identifiers
+A qualifieid identifier is a collection of identifiers separated by `::`, i.e.
+`Math::pi`.
+
+#### module
+A module file must begin with the `module` keyword followed by the module name.
+
+A module `modules/Math.plang` must begin with `module Math`:
+
+```
+    module Math
+
+    var pi = 3.14159
+
+    fn abs ...
+```
+
+A module `modules/Math/Trig/Funcs.plang` must begin with `module Math::Trig::Funcs`:
+
+```
+    module Math::Trig::Funcs
+
+    fn sin ...
+    fn cos ...
+```
+
+#### import
+To use a module in your source, it must be imported by using the `import` keyword.
+Variables and functions imported from modules can be accessed using qualified identifiers.
+
+```
+    import Math
+
+    var two_pi = Math::pi * 2
+```
+
+Modules may be imported as a different name using the `as` keyword.
+
+```
+    import Math as m
+    import Math::Trig::Funcs as f
+
+    var x = f::cos(m::pi)
+```
+
 ### Plang EBNF Grammar
 Here is the, potentially incomplete, Plang EBNF grammar.
 
-    Program            ::= {Expression}+
-    KeywordNull        ::= "null"
-    KeywordTrue        ::= "true"
-    KeywordFalse       ::= "false"
-    KeywordReturn      ::= "return" [Expression]
-    KeywordWhile       ::= "while" "(" Expression ")" Expression
-    KeywordNext        ::= "next"
-    KeywordLast        ::= "last" [Expression]
-    KeywordIf          ::= "if" Expression "then" Expression "else" Expression
-    KeywordExists      ::= "exists" Expression
-    KeywordDelete      ::= "delete" Expression
-    KeywordKeys        ::= "keys" Expression
-    KeywordValues      ::= "values" Expression
-    KeywordTry         ::= "try" Expression {"catch" ["(" Expression ")"] Expression}+
-    KeywordThrow       ::= "throw" Expression
-    KeywordVar         ::= "var" IDENT [":" Type] [Initializer]
-    KeywordType        ::= "type" IDENT [":" Type] [Initializer]
-    Initializer        ::= "=" Expression
-    Type               ::= TypeLiteral {"|" TypeLiteral}*
-    TypeLiteral        ::= TypeMap | TypeArray | TypeFunction | TYPE
-    TypeMap            ::= "{" {(String | IDENT) ":" Type [","]}* "}"
-    TypeArray          ::= "[" Type "]"
-    TypeFunction       ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
-    TypeFunctionParams ::= "(" {Type [","]}* ")"
-    TypeFunctionReturn ::= "->" TypeLiteral
-    KeywordFn          ::= "fn" [IDENT] [IdentifierList] ["->" Type] Expression
-    IdentifierList     ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
-    MapConstructor     ::= "{" {(String | IDENT) "=" Expression [","]}* "}"
-    String             ::= DQUOTE_STRING | SQUOTE_STRING
-    ArrayConstructor   ::= "[" {Expression [","]}* "]"
-    UnaryOp            ::= Op Expression
-    Op                 ::= "!" | "-" | "+" | ? etc ?
-    BinaryOp           ::= Expression BinOp Expression
-    BinOp              ::= "-" | "+" | "/" | "*" | "%" | ">" | ">=" | "<" | "<=" | "==" | "&&" | ? etc ?
-    ExpressionGroup    ::= "{" {Expression}* "}"
-    Expression         ::= ExpressionGroup | UnaryOp | BinaryOp | Identifier | KeywordNull .. KeywordThrow | LiteralInteger .. LiteralFloat | ? etc ?
-    Identifier         ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}*
-    LiteralInteger     ::= {"0" .. "9"}+
-    LiteralFloat       ::= {"0" .. "9"}* ("." {"0" .. "9"}* ("e" | "E") ["+" | "-"] {"0" .. "9"}+ | "." {"0" .. "9"}+ | ("e" | "E") ["+" | "-"] {"0" .. "9"}+)
-    LiteralHexInteger  ::= "0" ("x" | "X") {"0" .. "9" | "a" .. "f" | "A" .. "F"}+
+     Program            ::= {Expression}+
+     KeywordNull        ::= "null"
+     KeywordTrue        ::= "true"
+     KeywordFalse       ::= "false"
+     KeywordReturn      ::= "return" [Expression]
+     KeywordWhile       ::= "while" "(" Expression ")" Expression
+     KeywordNext        ::= "next"
+     KeywordLast        ::= "last" [Expression]
+     KeywordIf          ::= "if" Expression "then" Expression "else" Expression
+     KeywordExists      ::= "exists" Expression
+     KeywordDelete      ::= "delete" Expression
+     KeywordKeys        ::= "keys" Expression
+     KeywordValues      ::= "values" Expression
+     KeywordTry         ::= try Expression {catch ["(" Expression ")"] Expression}+
+     KeywordThrow       ::= "throw" Expression
+     KeywordVar         ::= "var" IDENT [":" Type] [Initializer]
+     KeywordType        ::= "type" IDENT [":" Type] [Initializer]
+     KeywordModule      ::= "module" Identifier
+     KeywordImport      ::= "import" Identifier ["as" IDENT]
+     Initializer        ::= "=" Expression
+     Type               ::= TypeLiteral {"|" TypeLiteral}*
+     TypeLiteral        ::= TypeMap | TypeArray | TypeFunction | TYPE
+     TypeMap            ::= "{" {(String | IDENT) ":" Type [","]}* "}"
+     TypeArray          ::= "[" Type "]"
+     TypeFunction       ::= (TYPE_Function | TYPE_Builtin) [TypeFunctionParams] [TypeFunctionReturn]
+     TypeFunctionParams ::= "(" {Type [","]}* ")"
+     TypeFunctionReturn ::= "->" TypeLiteral
+     KeywordFn          ::= "fn" [IDENT] [IdentifierList] ["->" Type] Expression
+     IdentifierList     ::= "(" {Identifier [":" Type] [Initializer] [","]}* ")"
+     MapConstructor     ::= "{" {(String | IDENT) "=" Expression [","]}* "}"
+     String             ::= DQUOTE_STRING | SQUOTE_STRING
+     ArrayConstructor   ::= "[" {Expression [","]}* "]"
+     UnaryOp            ::= Op Expression
+     Op                 ::= "!" | "-" | "+" | ...
+     BinaryOp           ::= Expression BinOp Expression
+     BinOp              ::= "-" | "+" | "/" | "*" | "%" | ">" | ">=" | "<" | "<=" | "==" | "&&" | ...
+     ExpressionGroup    ::= "{" {Expression}* "}"
+     Expression         ::= ExpressionGroup | UnaryOp | BinaryOp | Identifier | KeywordNull .. KeywordThrow | LiteralInteger .. LiteralFloat | ...
+     Identifier         ::= ["_" | "a" .. "z" | "A" .. "Z"] {"_" | "a" .. "z" | "A" .. "Z" | "0" .. "9"}* {"::" IDENT}*
+     LiteralInteger     ::= {"0" .. "9"}+
+     LiteralFloat       ::= {"0" .. "9"}* ("." {"0" .. "9"}* ("e" | "E") ["+" | "-"] {"0" .. "9"}+ | "." {"0" .. "9"}+ | ("e" | "E") ["+" | "-"] {"0" .. "9"}+)
+     LiteralHexInteger  ::= "0" ("x" | "X") {"0" .. "9" | "a" .. "f" | "A" .. "F"}+

@@ -1023,7 +1023,11 @@ sub function_call($self, $scope, $data) {
     my $func;
     my $name;
 
-    if ($target->[0] == INSTR_IDENT) {
+    if ($target->[0] == INSTR_QIDENT) {
+        $name = join '::', $target->[1]->@*;
+        $func = $self->{namespace}->{modules}->{$target->[1][0]}->{$target->[1][1]};
+    }
+    elsif ($target->[0] == INSTR_IDENT) {
         $name = $target->[1];
         ($func) = $self->get_variable($scope, $name);
 
@@ -1050,7 +1054,8 @@ sub function_call($self, $scope, $data) {
         } else {
             $self->{debug}->{print}->('FUNCS', "Calling user-defined function `$name` with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         }
-    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
+    }
+    elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $self->{debug}->{print}->('FUNCS', "Calling passed function with arguments: " . Dumper($arguments) . "\n") if $self->{debug};
         $func = $target;
         $name = '#anon-' . $target;

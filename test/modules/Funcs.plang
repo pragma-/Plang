@@ -1,0 +1,14 @@
+module Funcs
+
+fn print_hello() print("hello")
+
+var a = 10
+fn add10_closure(x) x + a
+
+fn scope_a(a) a + 5
+
+fn curriedAdd(x) fn add(y) x + y
+
+var curriedAnon = fn (x) fn (y) x + y
+
+fn flip(f) fn(a: Number, b: Number) f(b, a)

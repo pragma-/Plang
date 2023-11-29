@@ -1,8 +1,7 @@
 #!/usr/bin/env perl
 
 # Imports a Plang module by walking its AST to add variables, functions
-# and new type definitions to the namespace. Rewrites module-specific
-# identifiers into qualified identifiers (i.e. `foo` into `module::foo`).
+# and new type definitions to the namespace.
 
 package Plang::ModuleImporter;
 use parent 'Plang::Interpreter::AST';
@@ -10,9 +9,6 @@ use parent 'Plang::Interpreter::AST';
 use warnings;
 use strict;
 use feature 'signatures';
-
-use Data::Dumper;
-use Devel::StackTrace;
 
 use Plang::Constants::Instructions ':all';
 
@@ -30,7 +26,6 @@ sub initialize($self, %conf) {
 
     $self->override_instruction(INSTR_MODULE,  \&keyword_module);
     $self->override_instruction(INSTR_IMPORT,  \&keyword_import);
-    $self->override_instruction(INSTR_IDENT,   \&identifier);
     $self->override_instruction(INSTR_QIDENT,  \&qualified_identifier);
     $self->override_instruction(INSTR_VAR,     \&variable_declaration);
     $self->override_instruction(INSTR_FUNCDEF, \&function_definition);
@@ -115,7 +110,7 @@ sub function_definition($self, $scope, $data) {
     my $parameters  = $data->[3];
     my $expressions = $data->[4];
 
-    if (!exists $scope->{parent} && $name !~ /^#/) {
+    if (!exists $scope->{parent}) {
         if (!defined $self->{module}) {
             $self->error($scope, "cannot define function $name before module name", $self->position($data));
         }
@@ -123,26 +118,11 @@ sub function_definition($self, $scope, $data) {
         if (exists $self->{namespace}->{modules}->{$self->{module}}->{$name}) {
             $self->error($scope, "cannot redefine existing local $name", $self->position($data));
         }
-
-        $self->{namespace}->{modules}->{$self->{module}}->{$name} = $data;
     }
 
-    my $func_scope = $self->new_scope($scope);
+    my $result = $self->SUPER::function_definition($scope, $data);
 
-    foreach my $param (@$parameters) {
-        my $type = $param->[0];
-        my $ident = $param->[1];
-
-        $func_scope->{locals}->{$ident} = 1;
-
-        if (defined $param->[2]) {
-            $self->evaluate($func_scope, $param->[2]);
-        }
-    }
-
-    foreach my $expr (@$expressions) {
-        $self->evaluate($func_scope, $expr);
-    }
+    $self->{namespace}->{modules}->{$self->{module}}->{$name} = $result;
 }
 
 sub keyword_type($self, $scope, $data) {
@@ -169,21 +149,6 @@ sub keyword_type($self, $scope, $data) {
             }
         }
     }
-}
-
-sub identifier($self, $scope, $data) {
-    my $result = $self->SUPER::identifier($scope, $data);
-    my $ident = $data->[1];
-
-    my ($var, $var_scope) = $self->get_variable($scope, $ident);
-
-    # convert identifier to qualified identifier
-    if (!defined $var && exists $self->{identspace}->{$self->{module}}->{$ident}) {
-        $data->[0] = INSTR_QIDENT;
-        $data->[1] = [$self->{module}, $ident];
-    }
-
-    return $result;
 }
 
 sub keyword_import($self, $scope, $data) {}

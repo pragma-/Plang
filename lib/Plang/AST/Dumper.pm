@@ -113,9 +113,13 @@ sub function_call($self, $scope, $data) {
 
     my $text = '';
 
-    if ($target->[0] == INSTR_IDENT) {
-        $text .= $target->[1];
-    } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
+    if ($target->[0] == INSTR_QIDENT) {
+        $text .= $self->qualified_identifier($scope, $target);
+    }
+    elsif ($target->[0] == INSTR_IDENT) {
+        $text .= $self->identifier($scope, $target);
+    }
+    elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
         $text .= '#anon-' . $target;
     } else {
         my $val = $self->evaluate($scope, $target);

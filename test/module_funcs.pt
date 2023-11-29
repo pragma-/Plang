@@ -1,0 +1,19 @@
+import Funcs as f
+
+f::print_hello()
+
+test_stdout("hello\n", 'print hello')
+
+test_eq(f::add10_closure(15), 25, 'add10 closure')
+
+var a = 100
+
+test_eq(f::scope_a(a), 105, 'scope a')
+
+test_eq(f::curriedAdd(5)(6), 11, 'curried add')
+
+test_eq(f::curriedAnon(2)(3), 5, 'curried anon')
+
+fn sub(x, y) x - y
+
+test_eq(f::flip(sub)(5, 9), 4, 'flip sub')

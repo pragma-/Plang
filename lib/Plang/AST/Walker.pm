@@ -140,7 +140,8 @@ sub function_call($self, $scope, $data) {
     my $target    = $data->[1];
     my $arguments = $data->[2];
 
-    if ($target->[0] == INSTR_IDENT) {
+    if ($target->[0] == INSTR_QIDENT) {
+    } elsif ($target->[0] == INSTR_IDENT) {
         $self->evaluate($scope, $target);
     } elsif ($self->{types}->name_is($target->[0], 'TYPEFUNC')) {
     } else {

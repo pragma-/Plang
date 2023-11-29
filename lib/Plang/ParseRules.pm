@@ -479,7 +479,7 @@ sub KeywordModule($parser) {
     return [INSTR_MODULE, $identifier];
 }
 
-# KeywordModule ::= "import" Identifier ["as" IDENT]
+# KeywordImport ::= "import" Identifier ["as" IDENT]
 sub KeywordImport($parser) {
     my $import_token = consume_keyword($parser, 'import');
 
