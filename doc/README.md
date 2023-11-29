@@ -102,6 +102,8 @@ Path | Description
 [`examples/`](../examples) | Example Plang programs that demonstrate Plang's syntax and semantics.
 [`lib/Plang/Interpreter.pm`](../lib/Plang/Interpreter.pm) | Plang library entry point. Use `Plang::Interpreter` to embed Plang into your Perl scripts.
 [`lib/Plang/Lexer.pm`](../lib/Plang/Lexer.pm) | Generic abstract lexer class that accepts a list of regular expressions to lex into a stream of tokens.
+[`lib/Plang/ModuleImporter.pm`](../lib/Plang/ModuleImporter.pm) | Imports a Plang module by walking its AST to add variables, functions and type definitions.
+[`lib/Plang/Modules.pm`](../lib/Plang/Modules.pm) | Loads a Plang module by finding and parsing its file into an AST, then passing the AST to ModuleImporter.
 [`lib/Plang/Parser.pm`](../lib/Plang/Parser.pm) | Generic abstract backtracking parser class that accepts a list of parse rules.
 [`lib/Plang/ParseRules.pm`](../lib/Plang/ParseRules.pm) | Recursive-descent rules to parse a stream of tokens into an AST.
 [`lib/Plang/Types.pm`](../lib/Plang/Types.pm) | Plang's simple yet evolving and growing type system.
@@ -1226,8 +1228,8 @@ A module is a collection of related concepts in an independent source file. For
 example, the `Math` module may contain math-related concepts, such as variables
 like `Math::pi` and functions like `Math::abs()`.
 
-To create a module in your project, create a `modules/` directory and place the
-source file, i.e. `Math.plang` in it.
+To create a module in your project, make a `modules/` directory and place the
+source file, i.e. `Math.plang`, in it.
 
 You can create subdirectories within `modules/` to group related modules together.
 For example, a module `Math::Trig::Funcs` would be found as `modules/Math/Trig/Funcs.plang`.
@@ -1241,8 +1243,7 @@ It is possible to have a module in the same directory as your source file by usi
 `-m .` as a module search path.
 
 #### qualified identifiers
-A qualifieid identifier is a collection of identifiers separated by `::`, i.e.
-`Math::pi`.
+A qualified identifier is a collection of identifiers separated by `::`, i.e. `Math::pi`.
 
 #### module
 A module file must begin with the `module` keyword followed by the module name.
